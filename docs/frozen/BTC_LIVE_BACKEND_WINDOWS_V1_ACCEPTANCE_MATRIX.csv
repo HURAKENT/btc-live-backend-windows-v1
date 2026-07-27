@@ -1,0 +1,13 @@
+﻿stage,name,deliverable,acceptance_gate,depends_on,stage_d_blocker
+C0,Registry lock,47 canonical IDs locked; executable-rule gaps enumerated,47 unique IDs; registry SHA match; no strategy enabled without parity,,YES
+C1,Walking skeleton,Binance + one Polymarket market + SQLite + canary + REST/WS,10-minute downtime recovery; one deduped pushed canary,C0,YES
+C2,Recovery hardening,"Persistent cursors, cutover buffering, reconciliation, incident ledger",no Binance minute gaps; recovery completeness classified,C1,YES
+C3,Market rollover,Automatic discovery and subscription migration to next daily market,one real or deterministic replay rollover without duplicate subscriptions,C2,YES
+C4,Parity harness,Executable primitives and historical comparison runner,"parity report contains counts, W/L, PnL, ROI and deterministic replay","C0,C2",YES
+C5,Registry 47 runtime,Family-by-family strategy activation,47 PASS or explicit disabled list with reason,C4,NO
+C6,Checkpoint replay,Persistent scheduler and recovered-signal classification,missed checkpoint replay is idempotent and never masquerades as live,"C2,C5",NO
+C7,Paper execution,"Paper orders, partial fills, positions, settlement and PnL",5-share minimum; no fill without supported depth; restart-safe positions,"C5,C6",NO
+C8,Dashboard API contract,Stable REST bootstrap and resumable WebSocket outbox,client closes/reopens and receives all missed events after event_id,"C1,C2",YES
+C9,Windows operations,"single-instance, autostart, logs, backup and integrity checks",second process blocked; clean restart; backup restore drill PASS,C2,NO
+C10,Failure injection,"network, provider, database and process fault tests",fail-closed; no phantom signal; incident visible,"C6,C7,C9",NO
+C11,Windows acceptance,48-hour live observation report,48h; one rollover; two restarts; one outage; integrity PASS,"C3,C5,C6,C7,C8,C9,C10",NO

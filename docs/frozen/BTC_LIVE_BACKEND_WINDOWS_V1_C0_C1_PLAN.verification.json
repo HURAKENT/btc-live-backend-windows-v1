@@ -1,0 +1,47 @@
+{
+  "all_checks_pass": true,
+  "checks": {
+    "intentional_downtime_test_present": true,
+    "modular_monolith": true,
+    "no_placeholders": true,
+    "one_runtime_dependency": true,
+    "push_without_request": true,
+    "real_orders_disabled": true,
+    "registry_47_locked": true,
+    "registry_not_executable": true,
+    "scope_only_c0_c1": true,
+    "single_writer": true,
+    "task_count_14": true,
+    "windows_first": true
+  },
+  "counts": {
+    "final_checklist_items": 0,
+    "registry_count": 47,
+    "task_matrix_rows": 14,
+    "tasks": 14
+  },
+  "created_at_utc": "2026-07-27T13:38:20.824169+00:00",
+  "files": {
+    "BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_FROZEN_CONFIG.json": {
+      "bytes": 2867,
+      "sha256": "e3c74f684c58c33dd9c790593789dc6cc274495dcf6918ab92ebb887e4bfad69"
+    },
+    "BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_IMPLEMENTATION_PLAN.md": {
+      "bytes": 36964,
+      "sha256": "32e2ad57dbe0dfc2b9954390595ee45757d486bf7ca807f8ae747156da171f61"
+    },
+    "BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_TASK_MATRIX.csv": {
+      "bytes": 885,
+      "sha256": "678b57cb2c7acda18ea1dd3a6bb974dc679d116bb4743c654d04fd358f2ed275"
+    }
+  },
+  "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_PLAN_VERIFICATION",
+  "source_locks": {
+    "contract_sha256": "14704aac1ca269178ab26f4de55e58f52377f14ba4f4482dfaffbd5ad3f33007",
+    "design_sha256": "2ddddae4fae7397f2c11f75fb654d66847d4a740f9466810a3d11cf10df3f607",
+    "registry_csv_sha256": "77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd",
+    "registry_json_sha256": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f",
+    "registry_lock_sha256": "5f4dbf5936c8b456dbe15aceeb4210342a452d6b379e0ee820d7b5de27b92957"
+  },
+  "status": "PASS"
+}

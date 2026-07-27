@@ -1,0 +1,234 @@
+{
+  "acceptance": {
+    "vertical_slice": [
+      "one active BTC Daily Range market discovered",
+      "Binance live 1m stream stored",
+      "Polymarket live market stream stored",
+      "intentional 10-minute downtime backfilled",
+      "no missing closed Binance minute after recovery",
+      "current Polymarket orderbook reconciled",
+      "canary signal persisted exactly once",
+      "canary signal pushed without manual refresh",
+      "dashboard test client reconnects using after_event_id",
+      "duplicate source events create no duplicate signal"
+    ],
+    "windows_backend_final": {
+      "continuous_soak_hours": 48,
+      "intentional_restarts": 2,
+      "minimum_market_rollovers": 1,
+      "real_money": "DISABLED",
+      "registry_parity_required": "47/47_OR_EXPLICIT_DISABLED_LIST",
+      "simulated_network_outages": 1
+    }
+  },
+  "api_contract": {
+    "cors_wildcard": false,
+    "event_delivery": {
+      "dashboard_closed_does_not_stop_backend": true,
+      "resume_after_disconnect": true,
+      "source_of_truth": "TRANSACTIONAL_OUTBOX"
+    },
+    "remote_access": false,
+    "rest": [
+      "GET /api/v1/bootstrap",
+      "GET /api/v1/health",
+      "GET /api/v1/sources",
+      "GET /api/v1/signals",
+      "GET /api/v1/incidents"
+    ],
+    "websocket": "GET /ws/v1/events?after_event_id=<id>"
+  },
+  "architecture": {
+    "api_bind": "127.0.0.1",
+    "backend_process_count": 1,
+    "dashboard_direct_provider_access": false,
+    "dashboard_is_separate_client": true,
+    "database": "SQLITE_WAL",
+    "database_synchronous": "FULL",
+    "database_writer_count": 1,
+    "internal_queue": "ASYNCIO_QUEUE",
+    "raw_archive": "DERIVED_DAILY_PARQUET_NOT_LIVE_SOURCE_OF_TRUTH",
+    "rest_api": true,
+    "style": "MODULAR_MONOLITH",
+    "websocket_push": true
+  },
+  "created_at_utc": "2026-07-27T13:16:09.778682+00:00",
+  "external_capability_assumptions": {
+    "binance": [
+      "Spot provides live kline streams",
+      "REST market data supports bounded historical retrieval"
+    ],
+    "polymarket": [
+      "public market WebSocket streams book, price and trade events",
+      "public REST exposes current orderbook and price history"
+    ],
+    "rule": "Endpoint details remain adapter configuration and must be revalidated against official documentation before each release.",
+    "verified_date": "2026-07-27"
+  },
+  "platform": {
+    "docker": false,
+    "linux_migration": "DEFERRED_UNTIL_WINDOWS_ACCEPTANCE",
+    "postgresql": false,
+    "primary": "WINDOWS",
+    "redis": false
+  },
+  "registry_lock": {
+    "activation_requires_parity": true,
+    "count": 47,
+    "csv_sha256": "77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd",
+    "executable_rule_pack_complete": false,
+    "json_sha256": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f"
+  },
+  "restart_recovery": {
+    "binance": {
+      "continuity_check": true,
+      "duplicates_allowed_after_dedup": 0,
+      "exact_recovery_target": "ALL_CLOSED_1M_KLINES"
+    },
+    "collector_bootstrap": "Open live streams in buffering mode, record a cutover boundary, backfill to that boundary, deduplicate, then drain buffered events.",
+    "live_ready_before_recovery_complete": false,
+    "polymarket": {
+      "capability_probe": [
+        "PRICE_HISTORY",
+        "CURRENT_ORDERBOOK",
+        "ORDERBOOK_HISTORY_IF_DOCUMENTED_AND_AVAILABLE"
+      ],
+      "current_book_recovery": true,
+      "full_historical_depth_required": false,
+      "missing_depth_treatment": "BLOCKED_MISSING_HISTORICAL_DEPTH",
+      "price_history_recovery": true
+    },
+    "recovered_decisions": {
+      "current_reevaluation_is_separate_record": true,
+      "execution_eligible": false,
+      "historical_signal_is_current_live_signal": false,
+      "origin": "RECOVERED_AFTER_DOWNTIME"
+    }
+  },
+  "safety": {
+    "authenticated_polymarket_trading_endpoints": false,
+    "fail_closed": true,
+    "live_market_data": true,
+    "live_signal_push": true,
+    "live_strategy_evaluation": true,
+    "paper_execution": "STAGE_C_LATER_MILESTONE",
+    "real_order_submission": false,
+    "wallet_or_private_key_support": false
+  },
+  "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1",
+  "startup_state_machine": [
+    "BOOTING",
+    "SINGLE_INSTANCE_LOCK",
+    "DATABASE_INTEGRITY",
+    "SOURCE_DISCOVERY",
+    "LIVE_BUFFERING",
+    "BINANCE_BACKFILL",
+    "POLYMARKET_BACKFILL",
+    "RECONCILIATION",
+    "STRATEGY_REPLAY",
+    "BUFFER_DRAIN",
+    "LIVE_READY"
+  ],
+  "status": "FROZEN_FOR_USER_REVIEW",
+  "stop_rules": {
+    "architecture_changes_after_freeze": "NEW_CONTRACT_VERSION",
+    "dashboard_work_before_stage_c_api_acceptance": false,
+    "maximum_hotfixes_per_release": 2,
+    "patch_3_plus": "STOP_AND_REVIEW_ARCHITECTURE"
+  },
+  "storage": {
+    "append_only_event_store": true,
+    "event_identity": {
+      "binance_closed_kline": "source:symbol:interval:open_time_ms",
+      "polymarket_book": "source:asset_id:book_hash",
+      "polymarket_event_fallback": "sha256(normalized_payload + asset_id + source_timestamp)"
+    },
+    "integer_fixed_point": {
+      "money": "USD_MICROS",
+      "price": "MICRO_PROBABILITY_0_TO_1000000",
+      "shares": "MICRO_SHARES"
+    },
+    "required_tables": [
+      "schema_migrations",
+      "source_events",
+      "source_cursors",
+      "market_catalog",
+      "canonical_state",
+      "strategy_evaluations",
+      "signals",
+      "outbox_events",
+      "incidents"
+    ],
+    "sqlite_is_authoritative": true,
+    "transactional_outbox": true,
+    "write_before_compute": true,
+    "write_before_push": true
+  },
+  "strategy_engine": {
+    "checkpoint_scheduler": "Persistent due-checkpoint reconciliation; never sleep-only.",
+    "clock": "UTC",
+    "evaluation_key": [
+      "strategy_id",
+      "strategy_version",
+      "market_date",
+      "checkpoint",
+      "input_snapshot_hash",
+      "evaluation_revision"
+    ],
+    "input": "IMMUTABLE_CANONICAL_SNAPSHOT",
+    "output_statuses": [
+      "SIGNAL",
+      "NO_SIGNAL",
+      "BLOCKED",
+      "DATA_GAP",
+      "STALE_INPUT",
+      "RECOVERED_SIGNAL"
+    ],
+    "registry_47_activation_gate": {
+      "failure_action": "STRATEGY_DISABLED_PARITY_FAILURE",
+      "required_for_each_strategy": [
+        "source_rule_lock",
+        "historical_trade_count_parity",
+        "wins_losses_parity",
+        "pnl_roi_parity_with_declared_tolerance",
+        "replay_determinism"
+      ]
+    },
+    "settlement_timezone": "AMERICA_NEW_YORK",
+    "strategies_call_network_directly": false,
+    "strategies_read_system_clock_directly": false,
+    "strategies_write_database_directly": false
+  },
+  "vertical_slice": {
+    "binance": {
+      "closed_klines_only_for_canonical_history": true,
+      "interval": "1m",
+      "live_stream": true,
+      "rest_backfill": true,
+      "symbol": "BTCUSDT"
+    },
+    "polymarket": {
+      "current_orderbook_snapshot": true,
+      "historical_orderbook": "CAPABILITY_PROBE_OPTIONAL_NOT_REQUIRED_FOR_LIVE_READY",
+      "live_market_websocket": true,
+      "market_count": 1,
+      "market_selection": "ACTIVE_BTC_DAILY_RANGE_MARKET",
+      "price_history_backfill": true,
+      "public_market_data_only": true
+    },
+    "push_proof": {
+      "manual_request_needed_for_signal": false,
+      "rest_bootstrap": true,
+      "websocket_event_stream": true
+    },
+    "scope": "C1_WALKING_SKELETON",
+    "strategy": {
+      "dedupe": "ONCE_PER_BACKEND_SESSION_AND_MARKET_IDENTITY",
+      "emits_when": "Both sources are synchronized and the first new closed BTC 1m candle is committed after LIVE_READY.",
+      "id": "CANARY_SYNC_READY_V1",
+      "paper_or_live_eligible": false,
+      "part_of_registry_47": false,
+      "type": "INFRASTRUCTURE_ONLY"
+    }
+  }
+}

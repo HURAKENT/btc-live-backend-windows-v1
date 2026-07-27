@@ -1,0 +1,80 @@
+{
+  "created_at_utc": "2026-07-27T13:38:20.824169+00:00",
+  "data_root": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1_data",
+  "input_locks": {
+    "contract_sha256": "14704aac1ca269178ab26f4de55e58f52377f14ba4f4482dfaffbd5ad3f33007",
+    "design_sha256": "2ddddae4fae7397f2c11f75fb654d66847d4a740f9466810a3d11cf10df3f607",
+    "registry_csv_sha256": "77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd",
+    "registry_json_sha256": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f",
+    "registry_lock_sha256": "5f4dbf5936c8b456dbe15aceeb4210342a452d6b379e0ee820d7b5de27b92957"
+  },
+  "network": {
+    "bind_host": "127.0.0.1",
+    "bind_port": 8767,
+    "cors_allowed_origins": [],
+    "remote_access": false
+  },
+  "project_root": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1",
+  "providers": {
+    "binance": {
+      "closed_only": true,
+      "interval": "1m",
+      "klines_path": "/api/v3/klines",
+      "natural_key": "binance:BTCUSDT:1m:<open_time_ms>",
+      "rest_base": "https://data-api.binance.vision",
+      "rest_fallbacks": [
+        "https://api.binance.com",
+        "https://api-gcp.binance.com"
+      ],
+      "symbol": "BTCUSDT",
+      "websocket": "wss://stream.binance.com:9443/ws/btcusdt@kline_1m"
+    },
+    "polymarket": {
+      "clob_base": "https://clob.polymarket.com",
+      "gamma_base": "https://gamma-api.polymarket.com",
+      "heartbeat_seconds": 10,
+      "natural_key_book": "polymarket:<asset_id>:<book_hash>",
+      "orderbook_path": "/book",
+      "price_history_path": "/prices-history",
+      "subscription_custom_feature_enabled": true,
+      "websocket": "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+    }
+  },
+  "python": {
+    "dependency_policy": "ONE_RUNTIME_DEPENDENCY_PLUS_STDLIB",
+    "runtime_dependency": "aiohttp==3.14.3",
+    "test_framework": "unittest",
+    "venv": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\.venv",
+    "version": "3.12.4"
+  },
+  "release_rules": {
+    "dashboard": false,
+    "maximum_hotfixes": 2,
+    "paper_execution": false,
+    "real_orders": false,
+    "registry_47_execution": false,
+    "wallet_support": false
+  },
+  "runtime_root": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1_runtime",
+  "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_FROZEN_CONFIG",
+  "scope": [
+    "C0",
+    "C1"
+  ],
+  "status": "FROZEN_FOR_IMPLEMENTATION",
+  "storage": {
+    "busy_timeout_ms": 5000,
+    "database_file": "live_backend.sqlite3",
+    "foreign_keys": true,
+    "journal_mode": "WAL",
+    "single_writer": true,
+    "synchronous": "FULL"
+  },
+  "vertical_slice": {
+    "market_count": 1,
+    "paper_eligible": false,
+    "signal_limit": "ONCE_PER_BACKEND_SESSION_AND_MARKET_IDENTITY",
+    "strategy_id": "CANARY_SYNC_READY_V1",
+    "trading_eligible": false
+  }
+}

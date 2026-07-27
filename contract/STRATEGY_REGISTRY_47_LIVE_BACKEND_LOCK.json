@@ -1,0 +1,84 @@
+{
+  "created_at_utc": "2026-07-27T13:16:09.778682+00:00",
+  "critical_distinction": {
+    "canonical_registry_is_executable_rule_pack": false,
+    "meaning": "The registry freezes identities, lineage and research metrics. A strategy becomes executable only after its exact source rule is ported and passes historical parity."
+  },
+  "live_activation_policy": {
+    "default": "DISABLED",
+    "monitor_enabled_requires": [
+      "exact_rule_source_locked",
+      "historical_parity_pass",
+      "deterministic_replay_pass",
+      "input_schema_contract_pass"
+    ],
+    "paper_enabled_requires": [
+      "monitor_enabled",
+      "execution_model_pass",
+      "restart_recovery_pass"
+    ],
+    "real_money_enabled": false
+  },
+  "registry_csv": {
+    "filename": "STRATEGY_REGISTRY_47.csv",
+    "sha256": "77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd"
+  },
+  "registry_json": {
+    "filename": "STRATEGY_REGISTRY_47.json",
+    "sha256": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f"
+  },
+  "schema_version": "BTC_STRATEGY_REGISTRY_47_LIVE_BACKEND_LOCK_V1",
+  "status": "FROZEN_CANONICAL_LIST",
+  "strategy_count": 47,
+  "strategy_ids": [
+    "NO_C1",
+    "NO_A2",
+    "NO_FADE_P1_U2_T18",
+    "NO_A0",
+    "YES_FAVORITE_NEIGHBOR_BASKET",
+    "NO_FADE_P1_T60_U1_EQUALS_U2",
+    "YES_STRICT_A_T60",
+    "YES_STRICT_A_OPERATIONAL",
+    "YES_PF1_OPERATIONAL",
+    "YES_STRICT_A_T30",
+    "YES_PF1_T60",
+    "NO_FADE_P2_U2_T60",
+    "NO_FADE_P2_U1_T60",
+    "YES_PF1_T6H",
+    "NO_FADE_P1_U2_OPERATIONAL",
+    "NO_FADE_P2_U2_T12",
+    "NO_FADE_P1_U1_OPERATIONAL",
+    "NO_FADE_P1_U1_EARLY_LATEST_ONLY",
+    "NO_FADE_P1_U1_T18",
+    "NO_FADE_P2_U2_OPERATIONAL",
+    "NO_FADE_P1_U1_EARLY_COMBINED",
+    "NO_FADE_P1_U2_T12",
+    "NO_FADE_P2_U1_OPERATIONAL",
+    "NO_FADE_P1_U1_T12",
+    "YES_FAVORITE_ONLY",
+    "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY",
+    "NO_FADE_P2_U2_T30",
+    "YES_PF1_T30",
+    "NO_FADE_P2_U1_T30",
+    "NO_FADE_P2_U1_T12",
+    "NO_B2",
+    "NO_FADE_P2_U2_T4H",
+    "YES_PF1_T8H",
+    "NO_FADE_P2_U1_T2H",
+    "NO_A0_V2_VOL",
+    "NO_A2_V2_VOL",
+    "NO_FADE_P1_U1_T18_V2_VOL",
+    "NO_FADE_P2_U1_OPERATIONAL_V2_VOL",
+    "NO_FADE_P2_U1_T60_V2_VOL",
+    "NO_FADE_P2_U2_OPERATIONAL_V2_VOL",
+    "NO_FADE_P2_U2_T60_V2_VOL",
+    "YES_FAVORITE_ONLY_V2_VOL",
+    "YES_PF1_OPERATIONAL_V2_VOL",
+    "YES_PF1_T30_V2_VOL",
+    "YES_PF1_T60_V2_VOL",
+    "YES_STRICT_A_OPERATIONAL_V2_VOL",
+    "YES_STRICT_A_T60_V2_VOL"
+  ],
+  "v1_count": 34,
+  "v2_count": 13
+}
