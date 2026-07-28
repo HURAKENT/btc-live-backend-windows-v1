@@ -144,3 +144,14 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Duplicate source-event verification: two appends of one natural key produce one row and the second result has `inserted=False`; conflicting payload identity is rejected.
 - Transactional outbox verification: signal and outbox rows commit together; forced failure of either insert leaves both counts at zero; duplicate signal identity creates no duplicate outbox event.
 - Tasks 6 and later were not started. No trading, wallet/private-key, paper execution, provider/network, dashboard/API, or Registry 47 execution code was added.
+
+## Live data and recovery block — Tasks 6–8
+
+- Gates: `C1_BINANCE_PROVIDER_PASS`, `C1_POLYMARKET_PROVIDER_PASS`, and `C1_RESTART_RECOVERY_PASS`.
+- Interfaces: Binance closed-kline parser/backfill/stream and reconnect policy; immutable Polymarket market identity, discovery, current-book/history/stream adapters and deterministic book projection; lifecycle state machine, recovery coordinator, continuity/market reconciliation, and recovered-evaluation classification.
+- Targeted GREEN: 12 Binance tests, 16 Polymarket tests, and 14 Recovery tests.
+- Binance: only `k.x=true` becomes canonical history; exact natural keys, decimal strings, two-page 60-second pagination, final-closed inclusion, current-open exclusion, gap/duplicate rejection, reconnect cap/reset, and queue behavior are covered.
+- Polymarket: one future active 11-bucket identity yields 22 unique YES/NO asset IDs; book snapshots replace state, price changes mutate listed levels with zero-size deletion, unknown events persist with WARNING, and PING/PONG is proven against a loopback aiohttp WebSocket server.
+- Recovery: backfill commit precedes buffer drain; synthetic `[1,2] + [2,3]` commits `[1,2,3]`; a ten-minute outage recovers all ten closed minutes; missing minutes block `LIVE_READY`; missing required depth is `BLOCKED_MISSING_HISTORICAL_DEPTH`; recovered evaluations remain non-current and `execution_eligible=false`.
+- No real external provider smoke request was executed; tests use fixtures, fakes, and the local loopback server only.
+- Task 9 was not started. No trading, wallet/private-key, paper execution, API/dashboard, canary, or Registry 47 execution code was added.
