@@ -1,0 +1,338 @@
+{
+  "schema_version": "BTC_STRATEGY_EXECUTABLE_GAP_REPORT_V1",
+  "registry_locked": true,
+  "strategy_count": 47,
+  "executable_now": 0,
+  "requires_parity": 47,
+  "strategies": [
+    {
+      "strategy_id": "NO_C1",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_A2",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U2_T18",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_A0",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_FAVORITE_NEIGHBOR_BASKET",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_T60_U1_EQUALS_U2",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_STRICT_A_T60",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_STRICT_A_OPERATIONAL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_OPERATIONAL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_STRICT_A_T30",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_T60",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U2_T60",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U1_T60",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_T6H",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U2_OPERATIONAL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U2_T12",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U1_OPERATIONAL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U1_EARLY_LATEST_ONLY",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U1_T18",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U1_EARLY_COMBINED",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U2_T12",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U1_T12",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_FAVORITE_ONLY",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U2_T30",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_T30",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U1_T30",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U1_T12",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_B2",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U2_T4H",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_T8H",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U1_T2H",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_A0_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_A2_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P1_U1_T18_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U1_T60_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "NO_FADE_P2_U2_T60_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_FAVORITE_ONLY_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_OPERATIONAL_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_T30_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_PF1_T60_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_STRICT_A_OPERATIONAL_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    },
+    {
+      "strategy_id": "YES_STRICT_A_T60_V2_VOL",
+      "registry_locked": true,
+      "exact_rule_source_locked": false,
+      "historical_parity": "NOT_RUN",
+      "runtime_status": "DISABLED_EXECUTABLE_RULE_GAP"
+    }
+  ]
+}

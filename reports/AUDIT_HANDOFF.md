@@ -120,3 +120,16 @@ PowerShell 5.1 script validation is not applicable because Task 1 created no Pow
 All live ingestion, persistence, recovery, outbox, API, canary, registry execution, paper, and trading capabilities remain absent by frozen Task 1 scope. Registry 47 remains non-executable.
 
 The exact next permissible step is an independent audit of Task 1 in ChatGPT Project. Task 2 is explicitly not started.
+
+## Task 2 — Registry 47 executable-rule gap
+
+- Gate: `C0_REGISTRY_47_LOCK_PASS`.
+- Scope: created `src/registry_lock.py` and `reports/EXECUTABLE_RULE_GAP_REPORT.json`; updated `tests/test_config_registry.py` and this handoff.
+- Canonical verification: 47 rows, 47 unique `strategy_id` values, 34 V1, and 13 V2.
+- Raw CSV SHA-256: `77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd`.
+- Raw JSON SHA-256: `88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f`.
+- Negative coverage rejects JSON/CSV hash mismatch, wrong count, duplicate/missing/unexpected IDs, missing or invalid lineage, invalid top-level shape, and invalid primitive types.
+- Gap report: 47 rows, `executable_now=0`, `requires_parity=47`; every row is registry-locked and has runtime status `DISABLED_EXECUTABLE_RULE_GAP`.
+- Registry 47 remains non-executable: no exact rule source was inferred from names or research metrics, and no strategy execution was added.
+- Frozen plan, contract, canonical registry, package, config, and README files were not changed.
+- Earlier Task 1 statements that Task 2 had not started remain point-in-time audit history; Task 3 has not started.
