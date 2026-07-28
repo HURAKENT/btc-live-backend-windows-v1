@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import importlib.util
 import json
 import os
+import signal
+import socket
+import sqlite3
 import subprocess
 import sys
+import time
 import uuid
 import zipfile
 from datetime import UTC, datetime
@@ -22,6 +27,22 @@ ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 DOWNTIME_REPORT_PATH = REPORTS_DIR / "C1_DOWNTIME_ACCEPTANCE.json"
 FINAL_REPORT_PATH = REPORTS_DIR / "C1_FINAL_ACCEPTANCE.json"
 PACK_PATH = ARTIFACTS_DIR / "C1_ACCEPTANCE_PACK.zip"
+DEFAULT_DATABASE_PATH = (
+    PROJECT_ROOT / "data" / "runtime" / "btc_live_backend.sqlite3"
+)
+ACCEPTANCE_DATA_BASE = (
+    PROJECT_ROOT.parent
+    / "btc_live_backend_windows_v1_data"
+    / "acceptance"
+)
+ACCEPTANCE_RUNTIME_BASE = (
+    PROJECT_ROOT.parent
+    / "btc_live_backend_windows_v1_runtime"
+    / "acceptance"
+)
+API_HOST = "127.0.0.1"
+API_PORT = 8767
+INITIAL_READY_OBSERVATION_SECONDS = 10
 
 
 class AcceptanceBlocked(RuntimeError):
@@ -49,8 +70,73 @@ def require_windows(platform_name: str = os.name) -> None:
         raise AcceptanceBlocked("BLOCKED_UNSUPPORTED_PLATFORM")
 
 
-def backend_command() -> list[str]:
-    return [sys.executable, "run_backend.py"]
+def backend_command(database_path: Path | None = None) -> list[str]:
+    command = [sys.executable, "run_backend.py"]
+    if database_path is not None:
+        command.extend(
+            [
+                "--database-path",
+                str(database_path.resolve(strict=False)),
+            ]
+        )
+    return command
+
+
+def path_fingerprint(path: Path) -> dict[str, Any]:
+    resolved = path.resolve(strict=False)
+    if not resolved.exists():
+        return {
+            "exists": False,
+            "size": None,
+            "mtime_ns": None,
+            "sha256": None,
+        }
+    if not resolved.is_file():
+        raise AcceptanceBlocked("BLOCKED_DEFAULT_DATABASE_NOT_FILE")
+    stat = resolved.stat()
+    return {
+        "exists": True,
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "sha256": _sha256(resolved.read_bytes()),
+    }
+
+
+def validate_acceptance_database_path(
+    database_path: Path,
+    run_data_root: Path,
+) -> Path:
+    if not database_path.is_absolute() or not run_data_root.is_absolute():
+        raise AcceptanceBlocked("BLOCKED_RUNTIME_PATH_CONTRACT")
+    resolved = database_path.resolve(strict=False)
+    data_root = run_data_root.resolve(strict=False)
+    if resolved == DEFAULT_DATABASE_PATH.resolve(strict=False):
+        raise AcceptanceBlocked("BLOCKED_RUNTIME_PATH_CONTRACT")
+    try:
+        resolved.relative_to(data_root)
+    except ValueError:
+        raise AcceptanceBlocked("BLOCKED_RUNTIME_PATH_CONTRACT") from None
+    if resolved != data_root / "btc_live_backend.sqlite3":
+        raise AcceptanceBlocked("BLOCKED_RUNTIME_PATH_CONTRACT")
+    return resolved
+
+
+def acceptance_run_paths(run_id: str) -> tuple[Path, Path, Path]:
+    data_root = (ACCEPTANCE_DATA_BASE / run_id).resolve(strict=False)
+    runtime_root = (ACCEPTANCE_RUNTIME_BASE / run_id).resolve(strict=False)
+    database_path = validate_acceptance_database_path(
+        data_root / "btc_live_backend.sqlite3",
+        data_root,
+    )
+    return data_root, runtime_root, database_path
+
+
+def prepare_run_data_root(data_root: Path) -> None:
+    if data_root.exists():
+        if not data_root.is_dir() or any(data_root.iterdir()):
+            raise AcceptanceBlocked("BLOCKED_ACCEPTANCE_DATA_ROOT_NOT_EMPTY")
+        return
+    data_root.mkdir(parents=True, exist_ok=False)
 
 
 def monotonic_duration_ms(stopped_ns: int, restart_ns: int) -> int:
@@ -296,6 +382,7 @@ def build_final_report(
         ),
         "run_id": run_id,
         "commit_sha": commit_sha,
+        "commit_under_test": commit_sha,
         "status": status,
         "gate": (
             "BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS"
@@ -374,31 +461,42 @@ def inspect_runtime_path_contract(
         if inserted:
             sys.path.remove(str(project_root))
 
-    actual = module.DATABASE_PATH.resolve()
-    expected = (
-        project_root.parent
-        / "btc_live_backend_windows_v1_data"
-        / "acceptance"
-        / run_id
-        / "btc_live_backend.sqlite3"
-    ).resolve()
-    try:
-        actual_label = actual.relative_to(project_root.resolve()).as_posix()
-    except ValueError:
-        actual_label = "OUTSIDE_PROJECT_ROOT"
+    data_root, _, expected = acceptance_run_paths(run_id)
+    resolver = getattr(module, "resolve_database_path", None)
+    supported = callable(resolver)
+    resolved = None
+    blocker = None
+    if supported:
+        try:
+            resolved = resolver(str(expected))
+            supported = resolved == expected
+        except (OSError, ValueError):
+            supported = False
+    if not supported:
+        blocker = "BLOCKED_RUNTIME_PATH_CONTRACT"
     return {
-        "supported": actual == expected,
+        "supported": supported,
         "backend_entrypoint": "run_backend.py",
-        "backend_command": ["CURRENT_SYS_EXECUTABLE", "run_backend.py"],
-        "configured_database_path": actual_label,
+        "backend_command": [
+            "CURRENT_SYS_EXECUTABLE",
+            "run_backend.py",
+            "--database-path",
+            "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
+        ],
+        "configured_database_path": (
+            "data/runtime/btc_live_backend.sqlite3"
+        ),
         "required_acceptance_database_label": (
             "data-root/acceptance/<run_id>/btc_live_backend.sqlite3"
         ),
-        "supported_cli_path_parameters": [],
-        "supported_environment_path_variables": [],
-        "blocker": (
-            None if actual == expected else "BLOCKED_RUNTIME_PATH_CONTRACT"
+        "database_path_sha256": _sha256(str(expected).encode("utf-8")),
+        "run_data_root_sha256": _sha256(str(data_root).encode("utf-8")),
+        "supported_cli_path_parameters": (
+            ["--database-path"] if supported else []
         ),
+        "supported_environment_path_variables": [],
+        "custom_database_path_used": supported,
+        "blocker": blocker,
     }
 
 
@@ -513,6 +611,328 @@ def _blocked_downtime_report(
     }
 
 
+def _port_is_free(host: str = API_HOST, port: int = API_PORT) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.5)
+        return probe.connect_ex((host, port)) != 0
+
+
+def _mutex_is_free() -> bool:
+    from src.single_instance import AlreadyRunningError, WindowsMutex
+
+    try:
+        mutex = WindowsMutex.acquire("BTC_LIVE_BACKEND_WINDOWS_V1")
+    except AlreadyRunningError:
+        return False
+    mutex.close()
+    return True
+
+
+def _local_json(path: str) -> dict[str, Any]:
+    connection = http.client.HTTPConnection(API_HOST, API_PORT, timeout=2)
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        body = response.read()
+    finally:
+        connection.close()
+    if response.status != 200:
+        raise AcceptanceBlocked(f"BLOCKED_LOCAL_API_HTTP_{response.status}")
+    payload = json.loads(body)
+    if type(payload) is not dict:
+        raise AcceptanceBlocked("BLOCKED_LOCAL_API_SHAPE")
+    return payload
+
+
+def _live_ready_evidence(bootstrap: Mapping[str, Any]) -> dict[str, Any]:
+    sources_value = bootstrap.get("sources")
+    sources = sources_value if type(sources_value) is list else []
+    by_name = {
+        item.get("source"): item
+        for item in sources
+        if type(item) is dict and type(item.get("source")) is str
+    }
+    health = bootstrap.get("health")
+    health_mapping = health if type(health) is dict else {}
+    startup_state = health_mapping.get("startup_state")
+    binance = by_name.get("BINANCE") or by_name.get("binance")
+    polymarket = by_name.get("POLYMARKET") or by_name.get("polymarket")
+    market_identity = bootstrap.get("current_market_identity")
+    ready = (
+        startup_state == "LIVE_READY"
+        and type(binance) is dict
+        and binance.get("status") == "LIVE"
+        and type(polymarket) is dict
+        and polymarket.get("status") == "LIVE"
+        and type(market_identity) is dict
+    )
+    return {
+        "live_ready": ready,
+        "startup_state": startup_state,
+        "health_status": health_mapping.get("status"),
+        "source_names": sorted(by_name),
+        "binance_status": (
+            binance.get("status") if type(binance) is dict else None
+        ),
+        "polymarket_status": (
+            polymarket.get("status")
+            if type(polymarket) is dict
+            else None
+        ),
+        "current_market_identity_present": type(market_identity) is dict,
+        "last_event_id": bootstrap.get("last_event_id"),
+    }
+
+
+def _wait_for_initial_live_ready(
+    process: subprocess.Popen[Any],
+) -> dict[str, Any]:
+    deadline = time.monotonic() + INITIAL_READY_OBSERVATION_SECONDS
+    observations: list[dict[str, Any]] = []
+    while time.monotonic() < deadline:
+        exit_code = process.poll()
+        if exit_code is not None:
+            return {
+                "live_ready": False,
+                "process_exit_code": exit_code,
+                "observations": observations,
+                "termination_reason": "BACKEND_EXITED_BEFORE_LIVE_READY",
+            }
+        try:
+            bootstrap = _local_json("/api/v1/bootstrap")
+        except (ConnectionError, OSError, json.JSONDecodeError):
+            time.sleep(0.5)
+            continue
+        evidence = _live_ready_evidence(bootstrap)
+        observations.append(evidence)
+        if evidence["live_ready"]:
+            return {
+                **evidence,
+                "process_exit_code": None,
+                "observations": observations[-3:],
+                "termination_reason": "LIVE_READY",
+            }
+        time.sleep(1)
+    final = observations[-1] if observations else {
+        "live_ready": False,
+        "startup_state": None,
+        "health_status": None,
+        "source_names": [],
+        "binance_status": None,
+        "polymarket_status": None,
+        "current_market_identity_present": False,
+        "last_event_id": None,
+    }
+    return {
+        **final,
+        "process_exit_code": process.poll(),
+        "observations": observations[-3:],
+        "termination_reason": "INITIAL_LIVE_READY_NOT_OBSERVED",
+    }
+
+
+def _start_backend_process(
+    database_path: Path,
+    runtime_root: Path,
+) -> tuple[subprocess.Popen[Any], Any]:
+    runtime_root.mkdir(parents=True, exist_ok=False)
+    log_handle = (runtime_root / "backend.log").open(
+        "w",
+        encoding="utf-8",
+        newline="\n",
+    )
+    environment = os.environ.copy()
+    environment["PYTHONNOUSERSITE"] = "1"
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    process = subprocess.Popen(
+        backend_command(database_path),
+        cwd=PROJECT_ROOT,
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=log_handle,
+        stderr=subprocess.STDOUT,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+    )
+    return process, log_handle
+
+
+def _stop_backend_process(
+    process: subprocess.Popen[Any],
+) -> tuple[int | None, bool, int, int]:
+    stop_requested_at_ms = time.time_ns() // 1_000_000
+    forced = False
+    if process.poll() is None:
+        process.send_signal(signal.CTRL_BREAK_EVENT)
+        try:
+            process.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            forced = True
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=10)
+    stopped_at_ms = time.time_ns() // 1_000_000
+    return process.returncode, forced, stop_requested_at_ms, stopped_at_ms
+
+
+def _database_integrity(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {
+            "status": "NOT_AVAILABLE",
+            "quick_check": "NOT_RUN",
+            "integrity_check": "NOT_RUN",
+            "journal_mode": "NOT_RUN",
+            "synchronous": "NOT_RUN",
+            "foreign_keys": "NOT_RUN",
+        }
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute("PRAGMA foreign_keys=ON")
+        return {
+            "status": "PASS",
+            "quick_check": connection.execute(
+                "PRAGMA quick_check"
+            ).fetchone()[0],
+            "integrity_check": connection.execute(
+                "PRAGMA integrity_check"
+            ).fetchone()[0],
+            "journal_mode": connection.execute(
+                "PRAGMA journal_mode"
+            ).fetchone()[0].lower(),
+            "synchronous": connection.execute(
+                "PRAGMA synchronous"
+            ).fetchone()[0],
+            "foreign_keys": connection.execute(
+                "PRAGMA foreign_keys"
+            ).fetchone()[0],
+        }
+    finally:
+        connection.close()
+
+
+def _actual_blocked_report(
+    *,
+    run_id: str,
+    commit_sha: str,
+    branch: str,
+    started_at: str,
+    status: str,
+    path_contract: Mapping[str, Any],
+    initial_state: Mapping[str, Any],
+    initial_exit_code: int | None,
+    forced_termination: bool,
+    stop_requested_at_ms: int,
+    process_stopped_at_ms: int,
+    database_integrity: Mapping[str, Any],
+    default_before: Mapping[str, Any],
+    default_after: Mapping[str, Any],
+    final_port_free: bool,
+    final_mutex_free: bool,
+) -> dict[str, Any]:
+    not_run = {"status": f"NOT_RUN_{status}"}
+    detail = (
+        "The backend exposed its loopback API but did not expose "
+        "LIVE_READY, live Binance/Polymarket sources, or a current market "
+        "identity. Source review shows BackendRuntime.start_runtime_tasks() "
+        "returns without starting provider/recovery tasks."
+    )
+    return {
+        "schema_version": (
+            "BTC_LIVE_BACKEND_WINDOWS_V1_C1_DOWNTIME_ACCEPTANCE_V1"
+        ),
+        "run_id": run_id,
+        "commit_sha": commit_sha,
+        "commit_under_test": commit_sha,
+        "branch": branch,
+        "status": status,
+        "gate": "NOT_REACHED",
+        "task_14_started": True,
+        "task_14_completed": True,
+        "started_at_utc": started_at,
+        "python_version": ".".join(map(str, sys.version_info[:3])),
+        "platform": sys.platform,
+        "data_path_relative_label": (
+            "data-root/acceptance/<run_id>/btc_live_backend.sqlite3"
+        ),
+        "runtime_path_relative_label": "runtime-root/acceptance/<run_id>",
+        "database_path_contract": {
+            **dict(path_contract),
+            "initial_database_path_sha256": path_contract[
+                "database_path_sha256"
+            ],
+            "restart_database_path_sha256": path_contract[
+                "database_path_sha256"
+            ],
+            "same_path_for_initial_and_restart": True,
+            "default_database_before": dict(default_before),
+            "default_database_after": dict(default_after),
+            "default_database_unchanged": (
+                dict(default_before) == dict(default_after)
+            ),
+        },
+        "initial_state": {
+            "status": status,
+            "live_ready": False,
+            "backend_process_started": True,
+            "runtime_path_contract": dict(path_contract),
+            "observation": dict(initial_state),
+            "sanitized_process_command": path_contract["backend_command"],
+        },
+        "single_instance": dict(not_run),
+        "downtime": {
+            **not_run,
+            "stop_requested_at_ms": stop_requested_at_ms,
+            "process_stopped_at_ms": process_stopped_at_ms,
+            "restart_requested_at_ms": None,
+            "downtime_duration_ms": None,
+            "forced_termination_used": forced_termination,
+            "initial_backend_exit_code": initial_exit_code,
+        },
+        "recovery": {**not_run, "post_restart_live_ready": False},
+        "binance_continuity": {
+            **not_run,
+            "expected_closed_minutes": None,
+            "recovered_closed_minutes": None,
+            "missing_closed_minutes": None,
+            "duplicate_natural_keys": None,
+        },
+        "polymarket_reconciliation": {
+            **not_run,
+            "reconciled": False,
+            "historical_depth_classification": "NOT_RUN",
+        },
+        "canary_semantics": {
+            **not_run,
+            "current_post_restart_count": None,
+            "recovered_execution_eligible": None,
+        },
+        "outbox_replay": {
+            **not_run,
+            "proved": False,
+            "replayed_event_ids": [],
+        },
+        "database_integrity": dict(database_integrity),
+        "final_state": {
+            "backend_absent": True,
+            "mutex_free": final_mutex_free,
+            "port_8767_free": final_port_free,
+        },
+        "security": {
+            "network_used": False,
+            "backend_process_started": True,
+            "unknown_process_stopped": False,
+            "forced_termination_used": forced_termination,
+            "real_order_submission": False,
+            "wallet_or_signing": False,
+            "paper_execution": False,
+            "registry_47_execution": False,
+        },
+        "blocking_failures": [{"code": status, "detail": detail}],
+    }
+
+
 def _pack_entries(
     downtime_report: Mapping[str, Any],
     final_report: Mapping[str, Any],
@@ -570,9 +990,15 @@ def _pack_entries(
             {
                 "events": [
                     "PREFLIGHT_PASS",
-                    "OFFLINE_GATE_PENDING",
-                    "RUNTIME_PATH_CONTRACT_BLOCKED",
-                    "BACKEND_NOT_STARTED",
+                    "OFFLINE_GATE_PASS",
+                    f"ACCEPTANCE_STATUS_{downtime_report['status']}",
+                    (
+                        "BACKEND_STARTED"
+                        if downtime_report["initial_state"][
+                            "backend_process_started"
+                        ]
+                        else "BACKEND_NOT_STARTED"
+                    ),
                 ]
             }
         ),
@@ -595,22 +1021,91 @@ def main() -> int:
     commit_sha = _git_value("rev-parse", "HEAD")
     branch = _git_value("branch", "--show-current")
     path_contract = inspect_runtime_path_contract(PROJECT_ROOT, run_id)
-    if path_contract["supported"]:
-        raise AcceptanceBlocked(
-            "ACCEPTANCE_RUNTIME_IMPLEMENTATION_NOT_REACHED_IN_THIS_BUILD"
-        )
+    if not path_contract["supported"]:
+        raise AcceptanceBlocked("BLOCKED_RUNTIME_PATH_CONTRACT")
 
-    downtime_report = _blocked_downtime_report(
+    provider_report = json.loads(
+        (
+            REPORTS_DIR / "C1_PROVIDER_CAPABILITY_SMOKE.json"
+        ).read_text(encoding="utf-8")
+    )
+    if (
+        provider_report.get("status") != "PASS"
+        or provider_report.get("gate") != "C1_PROVIDER_CAPABILITY_PASS"
+    ):
+        raise AcceptanceBlocked("BLOCKED_PROVIDER_CAPABILITY_PREREQUISITE")
+    gap_report = json.loads(
+        (
+            REPORTS_DIR / "EXECUTABLE_RULE_GAP_REPORT.json"
+        ).read_text(encoding="utf-8")
+    )
+    if gap_report.get("executable_now") != 0:
+        raise AcceptanceBlocked("BLOCKED_REGISTRY_EXECUTION_SCOPE")
+    contract = json.loads(
+        (
+            PROJECT_ROOT
+            / "contract"
+            / "BTC_LIVE_BACKEND_WINDOWS_V1_CONTRACT.json"
+        ).read_text(encoding="utf-8")
+    )
+    serialized_contract = json.dumps(contract, sort_keys=True)
+    if (
+        '"real_order_submission": false' not in serialized_contract
+        or '"executable_rule_pack_complete": false'
+        not in serialized_contract
+    ):
+        raise AcceptanceBlocked("BLOCKED_CONTRACT_SCOPE")
+    if not _port_is_free() or not _mutex_is_free():
+        raise AcceptanceBlocked("BLOCKED_LOCAL_INSTANCE_CONFLICT")
+
+    data_root, runtime_root, database_path = acceptance_run_paths(run_id)
+    prepare_run_data_root(data_root)
+    default_before = path_fingerprint(DEFAULT_DATABASE_PATH)
+    process, log_handle = _start_backend_process(
+        database_path,
+        runtime_root,
+    )
+    try:
+        initial_state = _wait_for_initial_live_ready(process)
+        if initial_state["live_ready"]:
+            status = "BLOCKED_ACCEPTANCE_RUNNER_INCOMPLETE"
+        else:
+            status = "BLOCKED_INITIAL_LIVE_READY"
+        (
+            initial_exit_code,
+            forced_termination,
+            stop_requested_at_ms,
+            process_stopped_at_ms,
+        ) = _stop_backend_process(process)
+    finally:
+        log_handle.close()
+
+    default_after = path_fingerprint(DEFAULT_DATABASE_PATH)
+    database_integrity = _database_integrity(database_path)
+    final_port_free = _port_is_free()
+    final_mutex_free = _mutex_is_free()
+    downtime_report = _actual_blocked_report(
         run_id=run_id,
         commit_sha=commit_sha,
         branch=branch,
         started_at=now.isoformat().replace("+00:00", "Z"),
+        status=status,
         path_contract=path_contract,
+        initial_state=initial_state,
+        initial_exit_code=initial_exit_code,
+        forced_termination=forced_termination,
+        stop_requested_at_ms=stop_requested_at_ms,
+        process_stopped_at_ms=process_stopped_at_ms,
+        database_integrity=database_integrity,
+        default_before=default_before,
+        default_after=default_after,
+        final_port_free=final_port_free,
+        final_mutex_free=final_mutex_free,
     )
     preliminary_final = build_final_report(
         run_id=run_id,
         commit_sha=commit_sha,
-        status="BLOCKED_RUNTIME_PATH_CONTRACT",
+        status=status,
         pack_evidence={
             "status": "BUILDING_BLOCKED_EVIDENCE",
             "path": "artifacts/C1_ACCEPTANCE_PACK.zip",
@@ -622,12 +1117,12 @@ def main() -> int:
     pack_evidence = build_acceptance_pack(
         PACK_PATH,
         _pack_entries(downtime_report, preliminary_final),
-        status="BLOCKED_RUNTIME_PATH_CONTRACT",
+        status=status,
     )
     final_report = build_final_report(
         run_id=run_id,
         commit_sha=commit_sha,
-        status="BLOCKED_RUNTIME_PATH_CONTRACT",
+        status=status,
         pack_evidence=pack_evidence,
     )
     validate_report(final_report)
@@ -635,7 +1130,7 @@ def main() -> int:
     print(
         json.dumps(
             {
-                "status": "BLOCKED_RUNTIME_PATH_CONTRACT",
+                "status": status,
                 "run_id": run_id,
                 "pack_sha256": pack_evidence["sha256"],
             },
