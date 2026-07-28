@@ -20,7 +20,7 @@ from src.app import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
-EXPECTED_TASK_13_PROVIDER_BASE = "a3f90ddb1f2e97fa97551db871a70e91859ecc89"
+EXPECTED_TASK_13_PROVIDER_BASE = "3fde827d490ab3abf47af5d271a9614658aba8c7"
 OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 LAUNCHERS = (
@@ -397,6 +397,16 @@ class LiveContractSmokeTests(unittest.TestCase):
         self.assertEqual(contract["event_container_field"], "events")
         self.assertEqual(contract["event_container_type"], "list")
         self.assertEqual(contract["cursor_fields"], ["next_cursor"])
+        self.assertEqual(contract["response_cursor_field"], "next_cursor")
+        self.assertEqual(
+            contract["request_cursor_parameter"],
+            "after_cursor",
+        )
+        self.assertEqual(
+            contract["incorrect_parameter_previously_tested"],
+            "cursor",
+        )
+        self.assertTrue(contract["official_contract_confirmed"])
         self.assertIn("timestamp_representation", contract)
         self.assertFalse(contract["auth_used"])
         self.assertIs(type(diagnostic["pages_scanned"]), int)
@@ -421,13 +431,12 @@ class LiveContractSmokeTests(unittest.TestCase):
         )
         required = {
             "page_index",
-            "event_count",
-            "new_unique_event_count",
+            "events_count",
+            "new_unique_events",
             "latency_ms",
             "payload_sha256",
-            "cursor_input_sha256",
-            "next_cursor_sha256",
-            "page_identity_sha256",
+            "input_after_cursor_sha256",
+            "response_next_cursor_sha256",
             "http_status",
         }
         forbidden_raw = {"events", "raw_page", "raw_payload", "payload"}
@@ -436,13 +445,46 @@ class LiveContractSmokeTests(unittest.TestCase):
             self.assertFalse(set(page) & forbidden_raw)
             for name in (
                 "payload_sha256",
-                "cursor_input_sha256",
-                "next_cursor_sha256",
-                "page_identity_sha256",
+                "input_after_cursor_sha256",
+                "response_next_cursor_sha256",
             ):
                 value = page[name]
                 if value is not None:
                     self.assertRegex(value, r"^[0-9a-f]{64}$")
+
+        cumulative_unique = 0
+        previous_cumulative = 0
+        for index, page in enumerate(diagnostic["page_summaries"]):
+            cumulative_unique += page["new_unique_events"]
+            self.assertGreaterEqual(cumulative_unique, previous_cumulative)
+            previous_cumulative = cumulative_unique
+            if index == 0:
+                self.assertIsNone(page["input_after_cursor_sha256"])
+            else:
+                self.assertEqual(
+                    page["input_after_cursor_sha256"],
+                    diagnostic["page_summaries"][index - 1][
+                        "response_next_cursor_sha256"
+                    ],
+                )
+        self.assertEqual(
+            cumulative_unique,
+            diagnostic["unique_objects_scanned"],
+        )
+
+    def test_task_13_repeated_page_is_never_successful_pagination(self):
+        _, provider = self._task_13_reports()
+        diagnostic = provider["gamma_discovery_diagnostic"]
+        if diagnostic["termination_reason"] in {
+            "REPEATED_PAGE",
+            "REPEATED_NEXT_CURSOR",
+        }:
+            self.assertNotEqual(provider["status"], "PASS")
+            self.assertFalse(diagnostic["scan_complete_within_bound"])
+        self.assertEqual(
+            diagnostic["keyset_contract"]["request_cursor_parameter"],
+            "after_cursor",
+        )
 
     def test_task_13_keyset_status_evidence_is_fail_closed(self):
         _, provider = self._task_13_reports()

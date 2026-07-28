@@ -198,3 +198,12 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Candidate count is 2; structural matches are 0; adapter matches are 0. The root cause is `SCAN_INCOMPLETE`, and the Task 13 status is `BLOCKED_PROVIDER_SCHEMA`.
 - CLOB books, price history, and market WebSocket remain `SKIPPED_BLOCKED_UPSTREAM` because no canonical asset identity was established.
 - Provider implementation and all other production code remain unchanged. Task 14 was not started, and final C1 PASS is not claimed.
+
+### Task 13 — Gamma keyset after_cursor recovery
+
+- The official cursor contract is now applied exactly: response `next_cursor` is passed unchanged as request parameter `after_cursor`; the previous `cursor` probe was incorrect and is not used by the current scan.
+- Correct pagination produced 50 distinct pages and 5,000 unique event IDs. Every page returned 100 new IDs, and each page input cursor hash matched the previous page next-cursor hash.
+- Termination was `MAX_UNIQUE_EVENTS_REACHED`: page 50 still returned a non-empty next cursor, so the inventory remained incomplete at the approved bound.
+- Candidate count is 39; structural matches are 0; adapter matches are 0. Task 13 is `BLOCKED_PROVIDER_NETWORK` with root cause `SCAN_INCOMPLETE`.
+- CLOB books, price history, and market WebSocket remain `SKIPPED_BLOCKED_UPSTREAM` because no canonical asset identity was established.
+- Provider implementation and all production code remain unchanged. Task 14 was not started, and final C1 PASS is not claimed.
