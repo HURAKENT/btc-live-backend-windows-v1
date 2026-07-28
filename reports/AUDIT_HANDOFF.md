@@ -207,3 +207,13 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Candidate count is 39; structural matches are 0; adapter matches are 0. Task 13 is `BLOCKED_PROVIDER_NETWORK` with root cause `SCAN_INCOMPLETE`.
 - CLOB books, price history, and market WebSocket remain `SKIPPED_BLOCKED_UPSTREAM` because no canonical asset identity was established.
 - Provider implementation and all production code remain unchanged. Task 14 was not started, and final C1 PASS is not claimed.
+
+### Task 13 — targeted Gamma discovery recovery
+
+- The historical 5,000-event scan remains pagination evidence, not proof that the current inventory lacks a canonical event. The final targeted cycle used the dynamic UTC window `2026-07-28T14:10:49Z` through `2026-08-11T20:10:49Z`.
+- Targeted keyset Query A (`title_search=Bitcoin price on`) returned HTTP 200 with six unique events on one page and terminated below the 500-result cursor threshold. Queries B/C were unnecessary.
+- Public search was not invoked because Query A already produced five future manual structural matches. Candidate / manual structural / adapter counts are 6 / 5 / 0.
+- Each of the five future matches has 11 unique binary markets, 22 unique CLOB token IDs, and 11 range labels. All five are therefore simultaneously eligible under the manual structural gate, so Task 13 is `BLOCKED_AMBIGUOUS_DISCOVERY` with root cause `AMBIGUOUS_DISCOVERY`.
+- The existing adapter rejected all five with `BTC_DAILY_RANGE_DATA_GAP`; observed `ticker` values use `bitcoin-price-on-<date>` rather than `BTC-DAILY-RANGE-<date>`. This mismatch is recorded as evidence but does not override the higher-priority ambiguous-discovery classification.
+- No single Gamma identity was selected. CLOB books, price history, and market WebSocket remain `SKIPPED_BLOCKED_UPSTREAM`.
+- Requests used public read-only GET only, `DummyCookieJar`, `trust_env=False`, and no VPN/proxy bypass, authentication, cookies, wallet, or order method. Production code is unchanged. Task 14 was not started, and final C1 PASS is not claimed.

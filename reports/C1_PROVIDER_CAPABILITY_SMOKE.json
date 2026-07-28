@@ -1,7 +1,7 @@
 {
   "schema_version": "BTC_LIVE_BACKEND_C1_PROVIDER_CAPABILITY_V1",
-  "commit_sha": "3fde827d490ab3abf47af5d271a9614658aba8c7",
-  "status": "BLOCKED_PROVIDER_NETWORK",
+  "commit_sha": "f2867f10a8bdff4b774e11700d1b539c6d57e98e",
+  "status": "BLOCKED_AMBIGUOUS_DISCOVERY",
   "network_scope": "PUBLIC_READ_ONLY",
   "authentication_used": false,
   "secrets_used": false,
@@ -58,7 +58,7 @@
       "auth_used": false
     },
     "gamma_discovery": {
-      "status": "BLOCKED_PROVIDER_NETWORK",
+      "status": "BLOCKED_AMBIGUOUS_DISCOVERY",
       "endpoint": "https://gamma-api.polymarket.com/events/keyset",
       "http_status": 200,
       "observed_top_level_fields": [
@@ -66,7 +66,7 @@
         "events",
         "next_cursor"
       ],
-      "timestamp_unit": null,
+      "timestamp_unit": "ISO-8601 UTC",
       "event_id": null,
       "event_slug": null,
       "end_date": null,
@@ -74,15 +74,10 @@
       "asset_ids": 0,
       "unique_asset_ids": 0,
       "canonical_asset_ids": [],
-      "payload_sha256": "8dd03081261292dbdab4ee11538cf2cc6ce81301953ecad2064c02b4a049da08",
-      "latency_ms": {
-        "contract_probe": 885,
-        "scan_pages_min": 897,
-        "scan_pages_max": 3206,
-        "connect_timeouts": 0
-      },
-      "pages_scanned": 50,
-      "objects_scanned": 5000,
+      "payload_sha256": "7040af49bbd9b73b73ba45e6a9b12b1c3d32e5fb47638570a71c950539be2a54",
+      "latency_ms": 1371,
+      "pages_scanned": 1,
+      "objects_scanned": 6,
       "auth_used": false
     },
     "clob_books": {
@@ -416,12 +411,511 @@
       }
     ]
   },
+  "targeted_discovery": {
+    "strategy": "KEYSET_TITLE_SEARCH_THEN_PUBLIC_SEARCH",
+    "date_window": {
+      "end_date_min": "2026-07-28T14:10:49Z",
+      "end_date_max": "2026-08-11T20:10:49Z"
+    },
+    "keyset_queries": [
+      {
+        "query_label": "A",
+        "title_search": "Bitcoin price on",
+        "parameter_names": [
+          "ascending",
+          "closed",
+          "end_date_max",
+          "end_date_min",
+          "limit",
+          "order",
+          "title_search"
+        ],
+        "http_status": 200,
+        "pages": [
+          {
+            "page_index": 1,
+            "http_status": 200,
+            "events_returned": 6,
+            "new_unique_event_ids": 6,
+            "payload_sha256": "7040af49bbd9b73b73ba45e6a9b12b1c3d32e5fb47638570a71c950539be2a54",
+            "latency_ms": 1371,
+            "input_after_cursor_sha256": null,
+            "response_next_cursor_sha256": null
+          }
+        ],
+        "events_returned": 6,
+        "unique_event_ids": 6,
+        "termination": "RESULT_COUNT_BELOW_CURSOR_THRESHOLD",
+        "auth_used": false
+      }
+    ],
+    "public_search_queries": [],
+    "unique_candidate_count": 6,
+    "manual_structural_match_count": 5,
+    "adapter_match_count": 0,
+    "termination_reason": "MULTIPLE_STRUCTURAL_MATCHES",
+    "root_cause": "AMBIGUOUS_DISCOVERY",
+    "candidate_slices": [
+      {
+        "event_id": "729581",
+        "slug": "bitcoin-price-on-july-28-2026",
+        "title": "Bitcoin price on July 28?",
+        "ticker": "bitcoin-price-on-july-28-2026",
+        "active": true,
+        "closed": false,
+        "end_date": "2026-07-28T16:00:00Z",
+        "markets_count": 11,
+        "market_ids": [
+          "3017852",
+          "3017854",
+          "3017856",
+          "3017857",
+          "3017860",
+          "3017862",
+          "3017866",
+          "3017869",
+          "3017871",
+          "3017874",
+          "3017875"
+        ],
+        "outcomes_representation": [
+          "str"
+        ],
+        "clob_token_ids_representation": [
+          "str"
+        ],
+        "total_token_ids": 22,
+        "unique_token_ids": 22,
+        "event_field_names": [
+          "active",
+          "closed",
+          "endDate",
+          "id",
+          "markets",
+          "slug",
+          "ticker",
+          "title"
+        ],
+        "market_field_names": [
+          "active",
+          "closed",
+          "clobTokenIds",
+          "groupItemTitle",
+          "id",
+          "outcomes"
+        ],
+        "manual_structural_checks": {
+          "active_true": true,
+          "closed_false": true,
+          "future_resolution": false,
+          "btc_daily_range_semantics": true,
+          "markets_count_11": true,
+          "unique_market_ids_11": true,
+          "binary_markets_11": true,
+          "two_tokens_per_market": true,
+          "unique_token_ids_22": true,
+          "group_item_ranges_11": true,
+          "active_markets_11": true,
+          "open_markets_11": false
+        },
+        "manual_structural_match": false,
+        "adapter_result": {
+          "accepted": false,
+          "error_type": "ValueError",
+          "error": "BTC_DAILY_RANGE_DATA_GAP"
+        },
+        "slice_sha256": "f6d1e1d51105b31911ad0797992e0197312ac135722c8467f24b068a929987f8"
+      },
+      {
+        "event_id": "733270",
+        "slug": "bitcoin-price-on-july-29-2026",
+        "title": "Bitcoin price on July 29?",
+        "ticker": "bitcoin-price-on-july-29-2026",
+        "active": true,
+        "closed": false,
+        "end_date": "2026-07-29T16:00:00Z",
+        "markets_count": 11,
+        "market_ids": [
+          "3030283",
+          "3030285",
+          "3030287",
+          "3030289",
+          "3030291",
+          "3030293",
+          "3030295",
+          "3030300",
+          "3030302",
+          "3030306",
+          "3030311"
+        ],
+        "outcomes_representation": [
+          "str"
+        ],
+        "clob_token_ids_representation": [
+          "str"
+        ],
+        "total_token_ids": 22,
+        "unique_token_ids": 22,
+        "event_field_names": [
+          "active",
+          "closed",
+          "endDate",
+          "id",
+          "markets",
+          "slug",
+          "ticker",
+          "title"
+        ],
+        "market_field_names": [
+          "active",
+          "closed",
+          "clobTokenIds",
+          "groupItemTitle",
+          "id",
+          "outcomes"
+        ],
+        "manual_structural_checks": {
+          "active_true": true,
+          "closed_false": true,
+          "future_resolution": true,
+          "btc_daily_range_semantics": true,
+          "markets_count_11": true,
+          "unique_market_ids_11": true,
+          "binary_markets_11": true,
+          "two_tokens_per_market": true,
+          "unique_token_ids_22": true,
+          "group_item_ranges_11": true,
+          "active_markets_11": true,
+          "open_markets_11": true
+        },
+        "manual_structural_match": true,
+        "adapter_result": {
+          "accepted": false,
+          "error_type": "ValueError",
+          "error": "BTC_DAILY_RANGE_DATA_GAP"
+        },
+        "slice_sha256": "97ab9be18bdd18688454b64fbcd46134512340768f0368dedbed6c6d909915c7"
+      },
+      {
+        "event_id": "738509",
+        "slug": "bitcoin-price-on-july-30-2026",
+        "title": "Bitcoin price on July 30?",
+        "ticker": "bitcoin-price-on-july-30-2026",
+        "active": true,
+        "closed": false,
+        "end_date": "2026-07-30T16:00:00Z",
+        "markets_count": 11,
+        "market_ids": [
+          "3055398",
+          "3055399",
+          "3055404",
+          "3055411",
+          "3055425",
+          "3055444",
+          "3055461",
+          "3055471",
+          "3055477",
+          "3055482",
+          "3055492"
+        ],
+        "outcomes_representation": [
+          "str"
+        ],
+        "clob_token_ids_representation": [
+          "str"
+        ],
+        "total_token_ids": 22,
+        "unique_token_ids": 22,
+        "event_field_names": [
+          "active",
+          "closed",
+          "endDate",
+          "id",
+          "markets",
+          "slug",
+          "ticker",
+          "title"
+        ],
+        "market_field_names": [
+          "active",
+          "closed",
+          "clobTokenIds",
+          "groupItemTitle",
+          "id",
+          "outcomes"
+        ],
+        "manual_structural_checks": {
+          "active_true": true,
+          "closed_false": true,
+          "future_resolution": true,
+          "btc_daily_range_semantics": true,
+          "markets_count_11": true,
+          "unique_market_ids_11": true,
+          "binary_markets_11": true,
+          "two_tokens_per_market": true,
+          "unique_token_ids_22": true,
+          "group_item_ranges_11": true,
+          "active_markets_11": true,
+          "open_markets_11": true
+        },
+        "manual_structural_match": true,
+        "adapter_result": {
+          "accepted": false,
+          "error_type": "ValueError",
+          "error": "BTC_DAILY_RANGE_DATA_GAP"
+        },
+        "slice_sha256": "babd80d7cf5d9c5b1b42a5d928953090301ce5aecb1cf4893e8db2521d00c342"
+      },
+      {
+        "event_id": "743557",
+        "slug": "bitcoin-price-on-july-31-2026",
+        "title": "Bitcoin price on July 31?",
+        "ticker": "bitcoin-price-on-july-31-2026",
+        "active": true,
+        "closed": false,
+        "end_date": "2026-07-31T16:00:00Z",
+        "markets_count": 11,
+        "market_ids": [
+          "3081970",
+          "3081972",
+          "3081974",
+          "3081980",
+          "3081994",
+          "3082008",
+          "3082019",
+          "3082025",
+          "3082029",
+          "3082033",
+          "3082038"
+        ],
+        "outcomes_representation": [
+          "str"
+        ],
+        "clob_token_ids_representation": [
+          "str"
+        ],
+        "total_token_ids": 22,
+        "unique_token_ids": 22,
+        "event_field_names": [
+          "active",
+          "closed",
+          "endDate",
+          "id",
+          "markets",
+          "slug",
+          "ticker",
+          "title"
+        ],
+        "market_field_names": [
+          "active",
+          "closed",
+          "clobTokenIds",
+          "groupItemTitle",
+          "id",
+          "outcomes"
+        ],
+        "manual_structural_checks": {
+          "active_true": true,
+          "closed_false": true,
+          "future_resolution": true,
+          "btc_daily_range_semantics": true,
+          "markets_count_11": true,
+          "unique_market_ids_11": true,
+          "binary_markets_11": true,
+          "two_tokens_per_market": true,
+          "unique_token_ids_22": true,
+          "group_item_ranges_11": true,
+          "active_markets_11": true,
+          "open_markets_11": true
+        },
+        "manual_structural_match": true,
+        "adapter_result": {
+          "accepted": false,
+          "error_type": "ValueError",
+          "error": "BTC_DAILY_RANGE_DATA_GAP"
+        },
+        "slice_sha256": "c6b91bdd9022cae6f960b92b839c256a0373e2795deba222a5c699eeced333f8"
+      },
+      {
+        "event_id": "748046",
+        "slug": "bitcoin-price-on-august-1-2026",
+        "title": "Bitcoin price on August 1?",
+        "ticker": "bitcoin-price-on-august-1-2026",
+        "active": true,
+        "closed": false,
+        "end_date": "2026-08-01T16:00:00Z",
+        "markets_count": 11,
+        "market_ids": [
+          "3101438",
+          "3101440",
+          "3101443",
+          "3101447",
+          "3101452",
+          "3101458",
+          "3101465",
+          "3101469",
+          "3101473",
+          "3101476",
+          "3101479"
+        ],
+        "outcomes_representation": [
+          "str"
+        ],
+        "clob_token_ids_representation": [
+          "str"
+        ],
+        "total_token_ids": 22,
+        "unique_token_ids": 22,
+        "event_field_names": [
+          "active",
+          "closed",
+          "endDate",
+          "id",
+          "markets",
+          "slug",
+          "ticker",
+          "title"
+        ],
+        "market_field_names": [
+          "active",
+          "closed",
+          "clobTokenIds",
+          "groupItemTitle",
+          "id",
+          "outcomes"
+        ],
+        "manual_structural_checks": {
+          "active_true": true,
+          "closed_false": true,
+          "future_resolution": true,
+          "btc_daily_range_semantics": true,
+          "markets_count_11": true,
+          "unique_market_ids_11": true,
+          "binary_markets_11": true,
+          "two_tokens_per_market": true,
+          "unique_token_ids_22": true,
+          "group_item_ranges_11": true,
+          "active_markets_11": true,
+          "open_markets_11": true
+        },
+        "manual_structural_match": true,
+        "adapter_result": {
+          "accepted": false,
+          "error_type": "ValueError",
+          "error": "BTC_DAILY_RANGE_DATA_GAP"
+        },
+        "slice_sha256": "90dda1606cf678846ca0e5dd29b7d0288b7df1a3e811bb2e22914e51ed3e4b50"
+      },
+      {
+        "event_id": "761819",
+        "slug": "bitcoin-price-on-august-4-2026",
+        "title": "Bitcoin price on August 4?",
+        "ticker": "bitcoin-price-on-august-4-2026",
+        "active": true,
+        "closed": false,
+        "end_date": "2026-08-04T16:00:00Z",
+        "markets_count": 11,
+        "market_ids": [
+          "3158053",
+          "3158057",
+          "3158064",
+          "3158073",
+          "3158094",
+          "3158116",
+          "3158122",
+          "3158129",
+          "3158134",
+          "3158136",
+          "3158138"
+        ],
+        "outcomes_representation": [
+          "str"
+        ],
+        "clob_token_ids_representation": [
+          "str"
+        ],
+        "total_token_ids": 22,
+        "unique_token_ids": 22,
+        "event_field_names": [
+          "active",
+          "closed",
+          "endDate",
+          "id",
+          "markets",
+          "slug",
+          "ticker",
+          "title"
+        ],
+        "market_field_names": [
+          "active",
+          "closed",
+          "clobTokenIds",
+          "groupItemTitle",
+          "id",
+          "outcomes"
+        ],
+        "manual_structural_checks": {
+          "active_true": true,
+          "closed_false": true,
+          "future_resolution": true,
+          "btc_daily_range_semantics": true,
+          "markets_count_11": true,
+          "unique_market_ids_11": true,
+          "binary_markets_11": true,
+          "two_tokens_per_market": true,
+          "unique_token_ids_22": true,
+          "group_item_ranges_11": true,
+          "active_markets_11": true,
+          "open_markets_11": true
+        },
+        "manual_structural_match": true,
+        "adapter_result": {
+          "accepted": false,
+          "error_type": "ValueError",
+          "error": "BTC_DAILY_RANGE_DATA_GAP"
+        },
+        "slice_sha256": "df2791529a8e38fbc12888013ab2b8fcab8c4859a15d986b15eed22482b6b8ba"
+      }
+    ],
+    "client_security": {
+      "cookie_jar": "DummyCookieJar",
+      "trust_env": false,
+      "connect_timeout_seconds": 10,
+      "request_timeout_seconds": 20,
+      "transport_retries_max": 2,
+      "vpn_or_proxy_bypass_used": false,
+      "authentication_used": false
+    },
+    "network_request_evidence": [
+      {
+        "method": "GET",
+        "endpoint": "https://gamma-api.polymarket.com/events/keyset",
+        "parameter_names": [
+          "ascending",
+          "closed",
+          "end_date_max",
+          "end_date_min",
+          "limit",
+          "order",
+          "title_search"
+        ],
+        "http_status": 200,
+        "payload_sha256": "7040af49bbd9b73b73ba45e6a9b12b1c3d32e5fb47638570a71c950539be2a54",
+        "latency_ms": 1371,
+        "attempt": 1,
+        "auth_used": false
+      }
+    ]
+  },
   "observed_schema_warnings": [
     "GAMMA_PAGE_SIZE_CAPPED_AT_100",
-    "KEYSET_SCAN_BOUND_EXHAUSTED"
+    "HISTORICAL_KEYSET_SCAN_BOUND_EXHAUSTED",
+    "TARGETED_MULTIPLE_MANUAL_STRUCTURAL_MATCHES",
+    "TARGETED_ADAPTER_MATCHES_ZERO"
   ],
   "blocking_failures": [
-    "KEYSET_SCAN_INCOMPLETE: after_cursor pagination returned 50 distinct pages and 5000 unique events, but page 50 still returned a non-empty next_cursor at the configured bound."
+    "AMBIGUOUS_DISCOVERY: targeted Query A returned five future active events that each satisfy the manual 11-market/22-token BTC Daily Range structure; no single event may be selected safely.",
+    "ADAPTER_REJECTION_EVIDENCE: all five manual structural matches were rejected with ValueError: BTC_DAILY_RANGE_DATA_GAP; observed event ticker values use bitcoin-price-on-<date> rather than the adapter prefix BTC-DAILY-RANGE-<date>."
   ],
   "trading_approval": false,
   "task_14_started": false

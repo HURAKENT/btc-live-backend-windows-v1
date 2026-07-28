@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tomllib
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 import run_backend
@@ -20,7 +21,7 @@ from src.app import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
-EXPECTED_TASK_13_PROVIDER_BASE = "3fde827d490ab3abf47af5d271a9614658aba8c7"
+EXPECTED_TASK_13_PROVIDER_BASE = "f2867f10a8bdff4b774e11700d1b539c6d57e98e"
 OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 LAUNCHERS = (
@@ -338,12 +339,11 @@ class LiveContractSmokeTests(unittest.TestCase):
             gamma = provider["checks"]["gamma_discovery"]
             self.assertEqual(gamma["asset_ids"], 0)
             self.assertEqual(gamma["unique_asset_ids"], 0)
-            diagnostic = provider["gamma_discovery_diagnostic"]
-            self.assertTrue(diagnostic["scan_complete_within_bound"])
-            self.assertEqual(diagnostic["structural_match_count"], 0)
+            targeted = provider["targeted_discovery"]
+            self.assertEqual(targeted["manual_structural_match_count"], 0)
             self.assertEqual(
-                diagnostic["root_cause"],
-                "EXTERNAL_INVENTORY_ABSENT",
+                targeted["root_cause"],
+                "NO_DISCOVERABLE_ACTIVE_CANONICAL_EVENT",
             )
         else:
             self.assertIn(
@@ -488,7 +488,7 @@ class LiveContractSmokeTests(unittest.TestCase):
 
     def test_task_13_keyset_status_evidence_is_fail_closed(self):
         _, provider = self._task_13_reports()
-        diagnostic = provider["gamma_discovery_diagnostic"]
+        targeted = provider["targeted_discovery"]
         status = provider["status"]
         if status == "PASS":
             gamma = provider["checks"]["gamma_discovery"]
@@ -506,25 +506,37 @@ class LiveContractSmokeTests(unittest.TestCase):
                 "PASS",
             )
         elif status == "WAIT_EXTERNAL_INVENTORY":
-            self.assertTrue(diagnostic["scan_complete_within_bound"])
-            self.assertEqual(diagnostic["structural_match_count"], 0)
-        elif status == "BLOCKED_DISCOVERY_SCHEMA":
-            self.assertGreaterEqual(diagnostic["structural_match_count"], 1)
-            mismatches = diagnostic.get("schema_mismatches", [])
-            self.assertTrue(mismatches)
-            for mismatch in mismatches:
-                self.assertIn("expected", mismatch)
-                self.assertIn("observed", mismatch)
-                self.assertIn("adapter_rejection", mismatch)
-        elif status == "BLOCKED_AMBIGUOUS_DISCOVERY":
-            self.assertGreaterEqual(diagnostic["structural_match_count"], 2)
-        else:
-            self.assertIn(
-                status,
-                {"BLOCKED_PROVIDER_NETWORK", "BLOCKED_PROVIDER_SCHEMA"},
+            self.assertEqual(targeted["manual_structural_match_count"], 0)
+            self.assertEqual(
+                targeted["root_cause"],
+                "NO_DISCOVERABLE_ACTIVE_CANONICAL_EVENT",
             )
-            self.assertFalse(diagnostic["scan_complete_within_bound"])
-            self.assertEqual(diagnostic["root_cause"], "SCAN_INCOMPLETE")
+        elif status == "BLOCKED_DISCOVERY_SCHEMA":
+            self.assertGreaterEqual(
+                targeted["manual_structural_match_count"],
+                1,
+            )
+            rejected = [
+                candidate
+                for candidate in targeted["candidate_slices"]
+                if candidate["manual_structural_match"]
+                and not candidate["adapter_result"]["accepted"]
+            ]
+            self.assertTrue(rejected)
+            for candidate in rejected:
+                self.assertIn("error", candidate["adapter_result"])
+        elif status == "BLOCKED_AMBIGUOUS_DISCOVERY":
+            self.assertGreaterEqual(
+                targeted["manual_structural_match_count"],
+                2,
+            )
+            self.assertEqual(targeted["root_cause"], "AMBIGUOUS_DISCOVERY")
+        else:
+            self.assertEqual(status, "BLOCKED_PROVIDER_NETWORK")
+            self.assertEqual(
+                targeted["root_cause"],
+                "NETWORK_POLICY_OR_GEO_RESTRICTION",
+            )
             self.assertTrue(provider["blocking_failures"])
 
         self.assertFalse(provider["task_14_started"])
@@ -533,21 +545,142 @@ class LiveContractSmokeTests(unittest.TestCase):
 
     def test_task_13_candidate_slice_hashes_are_reproducible(self):
         _, provider = self._task_13_reports()
-        candidates = provider["gamma_discovery_diagnostic"][
-            "candidate_slices"
+        candidate_groups = (
+            provider["gamma_discovery_diagnostic"]["candidate_slices"],
+            provider["targeted_discovery"]["candidate_slices"],
+        )
+        for candidates in candidate_groups:
+            self.assertLessEqual(len(candidates), 20)
+            for candidate in candidates:
+                expected = candidate["slice_sha256"]
+                unhashed = dict(candidate)
+                del unhashed["slice_sha256"]
+                encoded = json.dumps(
+                    unhashed,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                self.assertEqual(
+                    hashlib.sha256(encoded).hexdigest(),
+                    expected,
+                )
+
+    def test_task_13_targeted_discovery_contract_is_exact(self):
+        _, provider = self._task_13_reports()
+        targeted = provider["targeted_discovery"]
+        self.assertEqual(
+            targeted["strategy"],
+            "KEYSET_TITLE_SEARCH_THEN_PUBLIC_SEARCH",
+        )
+        window = targeted["date_window"]
+        end_min = datetime.fromisoformat(
+            window["end_date_min"].replace("Z", "+00:00")
+        )
+        end_max = datetime.fromisoformat(
+            window["end_date_max"].replace("Z", "+00:00")
+        )
+        self.assertIsNotNone(end_min.tzinfo)
+        self.assertIsNotNone(end_max.tzinfo)
+        self.assertLess(end_min, end_max)
+        self.assertLessEqual(len(targeted["keyset_queries"]), 3)
+        self.assertLessEqual(len(targeted["public_search_queries"]), 3)
+
+        allowed_titles = {"Bitcoin price on", "Bitcoin", "BTC"}
+        for query in targeted["keyset_queries"]:
+            self.assertIn(query["title_search"], allowed_titles)
+            parameter_names = set(query["parameter_names"])
+            self.assertIn("title_search", parameter_names)
+            self.assertNotIn("active", parameter_names)
+            self.assertNotIn("live", parameter_names)
+            self.assertNotIn("offset", parameter_names)
+            self.assertNotIn("cursor", parameter_names)
+            self.assertLessEqual(len(query["pages"]), 3)
+            for page in query["pages"]:
+                self.assertRegex(
+                    page["payload_sha256"],
+                    r"^[0-9a-f]{64}$",
+                )
+
+        allowed_searches = {
+            "Bitcoin price on",
+            "Bitcoin",
+            "BTC daily range",
+        }
+        for query in targeted["public_search_queries"]:
+            self.assertIn(query["q"], allowed_searches)
+            self.assertIn("q", query["parameter_names"])
+            self.assertFalse(query["auth_used"])
+
+    def test_task_13_targeted_candidates_are_deduplicated(self):
+        _, provider = self._task_13_reports()
+        targeted = provider["targeted_discovery"]
+        candidate_ids = [
+            candidate["event_id"]
+            for candidate in targeted["candidate_slices"]
         ]
-        self.assertLessEqual(len(candidates), 20)
-        for candidate in candidates:
-            expected = candidate["slice_sha256"]
-            unhashed = dict(candidate)
-            del unhashed["slice_sha256"]
-            encoded = json.dumps(
-                unhashed,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode("utf-8")
-            self.assertEqual(hashlib.sha256(encoded).hexdigest(), expected)
+        self.assertEqual(len(candidate_ids), len(set(candidate_ids)))
+        self.assertGreaterEqual(
+            targeted["unique_candidate_count"],
+            len(candidate_ids),
+        )
+        manual_matches = sum(
+            candidate["manual_structural_match"]
+            for candidate in targeted["candidate_slices"]
+        )
+        self.assertEqual(
+            manual_matches,
+            targeted["manual_structural_match_count"],
+        )
+
+    def test_task_13_targeted_client_security_is_fail_closed(self):
+        _, provider = self._task_13_reports()
+        targeted = provider["targeted_discovery"]
+        security = targeted["client_security"]
+        self.assertEqual(security["cookie_jar"], "DummyCookieJar")
+        self.assertFalse(security["trust_env"])
+        self.assertLessEqual(security["connect_timeout_seconds"], 10)
+        self.assertLessEqual(security["request_timeout_seconds"], 20)
+        self.assertLessEqual(security["transport_retries_max"], 2)
+        self.assertFalse(security["vpn_or_proxy_bypass_used"])
+        self.assertFalse(security["authentication_used"])
+
+        allowed_exact = {
+            "https://gamma-api.polymarket.com/events/keyset",
+            "https://gamma-api.polymarket.com/public-search",
+            "https://clob.polymarket.com/book",
+            "https://clob.polymarket.com/prices-history",
+            "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+        }
+        detail = re.compile(
+            r"^https://gamma-api\.polymarket\.com/events/[A-Za-z0-9_-]+$"
+        )
+        for request in targeted["network_request_evidence"]:
+            endpoint = request["endpoint"]
+            self.assertTrue(
+                endpoint in allowed_exact or detail.fullmatch(endpoint)
+            )
+            self.assertEqual(request["method"], "GET")
+            self.assertFalse(request["auth_used"])
+
+        if provider["status"] == "BLOCKED_PROVIDER_NETWORK":
+            self.assertEqual(
+                targeted["root_cause"],
+                "NETWORK_POLICY_OR_GEO_RESTRICTION",
+            )
+            restriction_evidence = [
+                failure
+                for failure in provider["blocking_failures"]
+                if isinstance(failure, dict)
+                and failure.get("http_status") in {403, 451}
+                and re.fullmatch(
+                    r"[0-9a-f]{64}",
+                    failure.get("payload_sha256", ""),
+                )
+                and failure.get("subreason")
+                == "NETWORK_POLICY_OR_GEO_RESTRICTION"
+            ]
+            self.assertTrue(restriction_evidence)
 
     def test_task_13_payload_hashes_are_lowercase_sha256(self):
         _, provider = self._task_13_reports()
@@ -567,6 +700,7 @@ class LiveContractSmokeTests(unittest.TestCase):
             "https://data-api.binance.vision/api/v3/klines",
             "wss://stream.binance.com:9443/ws/btcusdt@kline_1m",
             "https://gamma-api.polymarket.com/events/keyset",
+            "https://gamma-api.polymarket.com/public-search",
             "https://clob.polymarket.com/book",
             "https://clob.polymarket.com/prices-history",
             "wss://ws-subscriptions-clob.polymarket.com/ws/market",
