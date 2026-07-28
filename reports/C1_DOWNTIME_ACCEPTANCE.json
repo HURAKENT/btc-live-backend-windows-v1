@@ -4,76 +4,182 @@
     "expected_closed_minutes": null,
     "missing_closed_minutes": null,
     "recovered_closed_minutes": null,
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
   },
   "blocking_failures": [
     {
-      "code": "BLOCKED_RUNTIME_PATH_CONTRACT",
-      "detail": "run_backend.py fixes the database at data/runtime/btc_live_backend.sqlite3 and exposes no acceptance-specific CLI or environment path contract"
+      "code": "BLOCKED_INITIAL_LIVE_READY",
+      "detail": "The backend exposed its loopback API but did not expose LIVE_READY, live Binance/Polymarket sources, or a current market identity. Source review shows BackendRuntime.start_runtime_tasks() returns without starting provider/recovery tasks."
+    },
+    {
+      "code": "BLOCKED_GRACEFUL_SHUTDOWN",
+      "detail": "The cleanup CTRL_BREAK_EVENT stopped the process without forced termination, but the observed Windows process exit code was 3221225786 rather than the required clean exit code 0."
     }
   ],
   "branch": "codex/c0-c1",
   "canary_semantics": {
     "current_post_restart_count": null,
     "recovered_execution_eligible": null,
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
   },
-  "commit_sha": "de398ccb1762b02922f04341fcb6ed82c5a2e7b9",
-  "data_path_relative_label": "data-root/acceptance/<run_id>",
+  "commit_sha": "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb",
+  "commit_under_test": "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb",
+  "data_path_relative_label": "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
   "database_integrity": {
-    "foreign_keys": "NOT_RUN",
-    "integrity_check": "NOT_RUN",
-    "journal_mode": "NOT_RUN",
-    "quick_check": "NOT_RUN",
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT",
-    "synchronous": "NOT_RUN"
+    "foreign_keys": 1,
+    "integrity_check": "ok",
+    "journal_mode": "wal",
+    "quick_check": "ok",
+    "status": "PASS",
+    "synchronous": 2
+  },
+  "database_path_contract": {
+    "backend_command": [
+      "CURRENT_SYS_EXECUTABLE",
+      "run_backend.py",
+      "--database-path",
+      "data-root/acceptance/<run_id>/btc_live_backend.sqlite3"
+    ],
+    "backend_entrypoint": "run_backend.py",
+    "blocker": null,
+    "configured_database_path": "data/runtime/btc_live_backend.sqlite3",
+    "custom_database_path_used": true,
+    "database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
+    "default_database_after": {
+      "exists": false,
+      "mtime_ns": null,
+      "sha256": null,
+      "size": null
+    },
+    "default_database_before": {
+      "exists": false,
+      "mtime_ns": null,
+      "sha256": null,
+      "size": null
+    },
+    "default_database_unchanged": true,
+    "initial_database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
+    "required_acceptance_database_label": "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
+    "restart_database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
+    "run_data_root_sha256": "40308b3499428ad811c0df0eb3a035d21adc3d06b7cba4072ec4eb8caedb0ed4",
+    "same_path_for_initial_and_restart": true,
+    "supported": true,
+    "supported_cli_path_parameters": [
+      "--database-path"
+    ],
+    "supported_environment_path_variables": []
   },
   "downtime": {
     "downtime_duration_ms": null,
     "forced_termination_used": false,
-    "process_stopped_at_ms": null,
+    "initial_backend_exit_code": 3221225786,
+    "process_stopped_at_ms": 1785275786540,
     "restart_requested_at_ms": null,
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY",
+    "stop_requested_at_ms": 1785275786535
   },
+  "final_state": {
+    "backend_absent": true,
+    "mutex_free": true,
+    "port_8767_free": true
+  },
+  "gate": "NOT_REACHED",
   "initial_state": {
-    "backend_process_started": false,
+    "backend_process_started": true,
     "live_ready": false,
+    "observation": {
+      "binance_status": null,
+      "current_market_identity_present": false,
+      "health_status": "PASS",
+      "last_event_id": 0,
+      "live_ready": false,
+      "observations": [
+        {
+          "binance_status": null,
+          "current_market_identity_present": false,
+          "health_status": "PASS",
+          "last_event_id": 0,
+          "live_ready": false,
+          "polymarket_status": null,
+          "source_names": [],
+          "startup_state": null
+        },
+        {
+          "binance_status": null,
+          "current_market_identity_present": false,
+          "health_status": "PASS",
+          "last_event_id": 0,
+          "live_ready": false,
+          "polymarket_status": null,
+          "source_names": [],
+          "startup_state": null
+        },
+        {
+          "binance_status": null,
+          "current_market_identity_present": false,
+          "health_status": "PASS",
+          "last_event_id": 0,
+          "live_ready": false,
+          "polymarket_status": null,
+          "source_names": [],
+          "startup_state": null
+        }
+      ],
+      "polymarket_status": null,
+      "process_exit_code": null,
+      "source_names": [],
+      "startup_state": null,
+      "termination_reason": "INITIAL_LIVE_READY_NOT_OBSERVED"
+    },
     "runtime_path_contract": {
       "backend_command": [
         "CURRENT_SYS_EXECUTABLE",
-        "run_backend.py"
+        "run_backend.py",
+        "--database-path",
+        "data-root/acceptance/<run_id>/btc_live_backend.sqlite3"
       ],
       "backend_entrypoint": "run_backend.py",
-      "blocker": "BLOCKED_RUNTIME_PATH_CONTRACT",
+      "blocker": null,
       "configured_database_path": "data/runtime/btc_live_backend.sqlite3",
+      "custom_database_path_used": true,
+      "database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
       "required_acceptance_database_label": "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
-      "supported": false,
-      "supported_cli_path_parameters": [],
+      "run_data_root_sha256": "40308b3499428ad811c0df0eb3a035d21adc3d06b7cba4072ec4eb8caedb0ed4",
+      "supported": true,
+      "supported_cli_path_parameters": [
+        "--database-path"
+      ],
       "supported_environment_path_variables": []
     },
-    "status": "NOT_STARTED"
+    "sanitized_process_command": [
+      "CURRENT_SYS_EXECUTABLE",
+      "run_backend.py",
+      "--database-path",
+      "data-root/acceptance/<run_id>/btc_live_backend.sqlite3"
+    ],
+    "status": "BLOCKED_INITIAL_LIVE_READY"
   },
   "outbox_replay": {
     "proved": false,
     "replayed_event_ids": [],
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
   },
   "platform": "win32",
   "polymarket_reconciliation": {
     "historical_depth_classification": "NOT_RUN",
     "reconciled": false,
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
   },
   "python_version": "3.12.4",
   "recovery": {
     "post_restart_live_ready": false,
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
   },
-  "run_id": "C1-ACCEPTANCE-20260728T212826Z-4C5B0826",
+  "run_id": "C1-ACCEPTANCE-20260728T215615Z-10F16FD7",
   "runtime_path_relative_label": "runtime-root/acceptance/<run_id>",
   "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_DOWNTIME_ACCEPTANCE_V1",
   "security": {
-    "backend_process_started": false,
+    "backend_process_started": true,
     "forced_termination_used": false,
     "network_used": false,
     "paper_execution": false,
@@ -83,10 +189,10 @@
     "wallet_or_signing": false
   },
   "single_instance": {
-    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
   },
-  "started_at_utc": "2026-07-28T21:28:26.563353Z",
-  "status": "BLOCKED_RUNTIME_PATH_CONTRACT",
+  "started_at_utc": "2026-07-28T21:56:15.151385Z",
+  "status": "BLOCKED_INITIAL_LIVE_READY",
   "task_14_completed": true,
   "task_14_started": true
 }

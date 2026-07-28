@@ -26,6 +26,7 @@ from src.app import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
 EXPECTED_TASK_13_PROVIDER_BASE = "46e8f3ded26c31f77a79b5bbdb02a290e97ca45c"
+EXPECTED_TASK_14_COMMIT = "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb"
 OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 DOWNTIME_REPORT = PROJECT_ROOT / "reports" / "C1_DOWNTIME_ACCEPTANCE.json"
@@ -952,41 +953,101 @@ class LiveContractSmokeTests(unittest.TestCase):
         )
         self.assertEqual(
             downtime["commit_sha"],
-            "de398ccb1762b02922f04341fcb6ed82c5a2e7b9",
+            EXPECTED_TASK_14_COMMIT,
         )
         self.assertEqual(final["commit_sha"], downtime["commit_sha"])
+        self.assertEqual(
+            downtime["commit_under_test"],
+            EXPECTED_TASK_14_COMMIT,
+        )
+        self.assertEqual(
+            final["commit_under_test"],
+            EXPECTED_TASK_14_COMMIT,
+        )
 
-    def test_task_14_runtime_path_blocker_is_fail_closed(self):
+    def test_task_14_runtime_path_contract_passed_before_live_ready_blocker(self):
         downtime, final = self._task_14_reports()
         self.assertEqual(
             downtime["status"],
-            "BLOCKED_RUNTIME_PATH_CONTRACT",
+            "BLOCKED_INITIAL_LIVE_READY",
         )
         self.assertEqual(final["status"], downtime["status"])
         self.assertEqual(final["gate"], "NOT_REACHED")
-        contract = downtime["initial_state"]["runtime_path_contract"]
-        self.assertFalse(contract["supported"])
+        contract = downtime["database_path_contract"]
+        self.assertTrue(contract["supported"])
+        self.assertTrue(contract["custom_database_path_used"])
         self.assertEqual(
             contract["configured_database_path"],
             "data/runtime/btc_live_backend.sqlite3",
         )
-        self.assertEqual(contract["supported_cli_path_parameters"], [])
+        self.assertEqual(
+            contract["supported_cli_path_parameters"],
+            ["--database-path"],
+        )
         self.assertEqual(contract["supported_environment_path_variables"], [])
         self.assertEqual(
+            contract["initial_database_path_sha256"],
+            contract["restart_database_path_sha256"],
+        )
+        self.assertTrue(contract["same_path_for_initial_and_restart"])
+        self.assertTrue(contract["default_database_unchanged"])
+        self.assertEqual(
             downtime["blocking_failures"][0]["code"],
-            "BLOCKED_RUNTIME_PATH_CONTRACT",
+            "BLOCKED_INITIAL_LIVE_READY",
         )
 
-    def test_task_14_blocker_prevented_backend_network_and_fake_downtime(self):
+    def test_task_14_initial_live_ready_blocker_stopped_before_fake_downtime(self):
         downtime, _ = self._task_14_reports()
         self.assertTrue(downtime["task_14_started"])
         self.assertTrue(downtime["task_14_completed"])
-        self.assertFalse(downtime["initial_state"]["backend_process_started"])
+        self.assertTrue(downtime["initial_state"]["backend_process_started"])
+        observation = downtime["initial_state"]["observation"]
+        self.assertFalse(observation["live_ready"])
+        self.assertEqual(observation["health_status"], "PASS")
+        self.assertIsNone(observation["startup_state"])
+        self.assertEqual(observation["source_names"], [])
+        self.assertFalse(observation["current_market_identity_present"])
         self.assertFalse(downtime["security"]["network_used"])
         self.assertFalse(downtime["security"]["forced_termination_used"])
         self.assertIsNone(downtime["downtime"]["downtime_duration_ms"])
-        self.assertIsNone(downtime["downtime"]["process_stopped_at_ms"])
+        self.assertIsInstance(
+            downtime["downtime"]["process_stopped_at_ms"],
+            int,
+        )
         self.assertIsNone(downtime["downtime"]["restart_requested_at_ms"])
+        self.assertNotEqual(
+            downtime["downtime"]["initial_backend_exit_code"],
+            0,
+        )
+        self.assertEqual(
+            [item["code"] for item in downtime["blocking_failures"]],
+            [
+                "BLOCKED_INITIAL_LIVE_READY",
+                "BLOCKED_GRACEFUL_SHUTDOWN",
+            ],
+        )
+        self.assertEqual(
+            downtime["final_state"],
+            {
+                "backend_absent": True,
+                "mutex_free": True,
+                "port_8767_free": True,
+            },
+        )
+
+    def test_task_14_isolated_database_integrity_is_preserved(self):
+        downtime, _ = self._task_14_reports()
+        self.assertEqual(
+            downtime["database_integrity"],
+            {
+                "foreign_keys": 1,
+                "integrity_check": "ok",
+                "journal_mode": "wal",
+                "quick_check": "ok",
+                "status": "PASS",
+                "synchronous": 2,
+            },
+        )
 
     def test_task_14_pass_contract_is_complete_when_status_is_pass(self):
         downtime, final = self._task_14_reports()

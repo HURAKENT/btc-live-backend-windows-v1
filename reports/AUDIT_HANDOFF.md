@@ -255,3 +255,15 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Blocked evidence pack: `artifacts/C1_ACCEPTANCE_PACK.zip`; SHA-256 `5d009ff3563d793855f550ed5434a1ea2e54b2a39da20f91170faa691050a3dc`; 22,218 bytes; ZIP CRC PASS; internal `SHA256SUMS` PASS; path traversal, duplicate entries, missing hashes, SHA mismatches, raw SQLite/WAL/SHM, and raw WebSocket logs all equal zero.
 - `scripts/RUN_C1_ACCEPTANCE_SAFE.ps1` now invokes `tools\simulate_downtime.py` directly through the existing Windows `.venv` Python and propagates its exit code.
 - C2, C3 rollover, C4, C5, paper execution, and trading work were not started. Registry 47 remains non-executable. `BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS` and trading approval are not claimed.
+
+### Task 14 — isolated database remediation and runtime retry
+
+- Runtime-path TDD reproduced the hardcoded-path blocker: the initial 16-test RED had 15 expected feature-missing errors. Commit under test `a6348f6e0c4e0eee4bd529d35d360a99e8d455fb` adds `--database-path` with exact absolute `.sqlite3` validation while preserving the no-argument path `data/runtime/btc_live_backend.sqlite3`; the final focused gate passed 18 tests.
+- New run ID: `C1-ACCEPTANCE-20260728T215615Z-10F16FD7`. The initial and planned restart commands use the same sanitized database label `data-root/acceptance/<run_id>/btc_live_backend.sqlite3`; the resolved path SHA-256 is `f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba`.
+- The default database did not exist before or after the run, so its existence/size/mtime/SHA-256 fingerprint is unchanged.
+- The Windows backend process started, created/migrated the isolated database, and exposed the loopback API. Three final bootstrap observations reported database health `PASS` and `last_event_id=0`, but no startup state, no Binance or Polymarket sources, and no current market identity.
+- Final Task 14 status is `BLOCKED_INITIAL_LIVE_READY`; gate is `NOT_REACHED`. Source evidence is exact: `BackendRuntime.start_runtime_tasks()` returns without starting provider/recovery tasks. Per the hard-stop rule, no production remediation was attempted.
+- The process was stopped before any intentional downtime. `stop_requested_at_ms=1785275786535`, `process_stopped_at_ms=1785275786540`, `restart_requested_at_ms=null`, and no 600,000–630,000 ms interval was claimed.
+- Cleanup used `CTRL_BREAK_EVENT` and no forced termination, but the observed Windows process exit code was `3221225786`, not clean exit `0`; this is separately recorded as `BLOCKED_GRACEFUL_SHUTDOWN` evidence and was not fixed.
+- Isolated SQLite evidence remained valid: `quick_check=ok`, `integrity_check=ok`, `journal_mode=wal`, `synchronous=2`, and `foreign_keys=1`. Final state: backend absent, mutex free, and port 8767 free.
+- The replacement blocked acceptance pack is sanitized and self-verifying; no raw database/WAL/SHM or raw WebSocket log is included. C2/C3, paper execution, Registry 47 execution, wallet/signing, and trading were not started. Final C1 PASS is not claimed.
