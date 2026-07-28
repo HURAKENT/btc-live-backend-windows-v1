@@ -133,3 +133,14 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Registry 47 remains non-executable: no exact rule source was inferred from names or research metrics, and no strategy execution was added.
 - Frozen plan, contract, canonical registry, package, config, and README files were not changed.
 - Earlier Task 1 statements that Task 2 had not started remain point-in-time audit history; Task 3 has not started.
+
+## Core block — Tasks 3–5
+
+- Gates: `C1_DOMAIN_CONTRACT_PASS`, `C1_EVENT_STORE_PASS`, and `C1_TRANSACTIONAL_OUTBOX_PASS`.
+- Scope: created `src/fixed_point.py`, `src/models.py`, `src/storage.py`, `src/outbox.py`, `migrations/0001_core.sql`, `migrations/0002_indexes.sql`, and `tests/test_storage_outbox.py`; updated this handoff.
+- Interfaces: integer-micros value objects; immutable source/snapshot/evaluation/signal/outbox models; `SqliteStore`, `SqliteWriter`, and `WriteCommand`; atomic `commit_signal_and_outbox`, resumable `read_outbox_after`, and committed-ID `OutboxBroker`.
+- Targeted GREEN: 11 Domain tests, 10 Storage tests, and 9 Outbox tests.
+- SQLite verification: `journal_mode=wal`, `synchronous=FULL` (`2`), and `foreign_keys=ON` (`1`); all nine contract-required tables are migration-managed.
+- Duplicate source-event verification: two appends of one natural key produce one row and the second result has `inserted=False`; conflicting payload identity is rejected.
+- Transactional outbox verification: signal and outbox rows commit together; forced failure of either insert leaves both counts at zero; duplicate signal identity creates no duplicate outbox event.
+- Tasks 6 and later were not started. No trading, wallet/private-key, paper execution, provider/network, dashboard/API, or Registry 47 execution code was added.

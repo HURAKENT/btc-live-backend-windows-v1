@@ -5,9 +5,9 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
-from src.models import SourceEvent
+from src.models import OutboxEvent, SignalRecord, SourceEvent
 
 
 _MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
@@ -30,6 +30,10 @@ _COUNTABLE_TABLES = frozenset(
 class AppendResult:
     event_id: int
     inserted: bool
+
+
+class CommittedPublisher(Protocol):
+    def publish_committed(self, event_id: int) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +191,156 @@ class SqliteStore:
             if self._connection.in_transaction:
                 self._connection.rollback()
             raise
+
+    def commit_signal_and_outbox(
+        self,
+        signal: SignalRecord,
+        *,
+        topic: str,
+        broker: CommittedPublisher | None = None,
+    ) -> tuple[int, int]:
+        if type(signal) is not SignalRecord:
+            raise ValueError("INVALID_SIGNAL_TYPE")
+        if type(topic) is not str:
+            raise ValueError("INVALID_OUTBOX_TOPIC_TYPE")
+        if not topic:
+            raise ValueError("INVALID_OUTBOX_TOPIC")
+
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            signal_cursor = self._connection.execute(
+                """
+                INSERT INTO signals(
+                    identity_key,
+                    evaluation_key,
+                    strategy_id,
+                    signal_type,
+                    payload_json,
+                    created_at_ms
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(identity_key) DO NOTHING
+                """,
+                (
+                    signal.identity_key,
+                    signal.evaluation_key,
+                    signal.strategy_id,
+                    signal.signal_type,
+                    signal.payload_json,
+                    signal.created_at_ms,
+                ),
+            )
+            signal_inserted = signal_cursor.rowcount == 1
+            stored_signal = self._connection.execute(
+                """
+                SELECT
+                    signal_id,
+                    evaluation_key,
+                    strategy_id,
+                    signal_type,
+                    payload_json,
+                    created_at_ms
+                FROM signals
+                WHERE identity_key = ?
+                """,
+                (signal.identity_key,),
+            ).fetchone()
+            if stored_signal is None:
+                raise RuntimeError("SIGNAL_INSERT_MISSING")
+            expected_signal = (
+                signal.evaluation_key,
+                signal.strategy_id,
+                signal.signal_type,
+                signal.payload_json,
+                signal.created_at_ms,
+            )
+            if tuple(stored_signal[1:]) != expected_signal:
+                raise ValueError("SIGNAL_IDENTITY_CONFLICT")
+
+            signal_id = stored_signal[0]
+            outbox_cursor = self._connection.execute(
+                """
+                INSERT INTO outbox_events(
+                    signal_id,
+                    topic,
+                    payload_json,
+                    created_at_ms
+                )
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(signal_id) DO NOTHING
+                """,
+                (
+                    signal_id,
+                    topic,
+                    signal.payload_json,
+                    signal.created_at_ms,
+                ),
+            )
+            outbox_inserted = outbox_cursor.rowcount == 1
+            stored_outbox = self._connection.execute(
+                """
+                SELECT event_id, topic, payload_json, created_at_ms
+                FROM outbox_events
+                WHERE signal_id = ?
+                """,
+                (signal_id,),
+            ).fetchone()
+            if stored_outbox is None:
+                raise RuntimeError("OUTBOX_INSERT_MISSING")
+            expected_outbox = (
+                topic,
+                signal.payload_json,
+                signal.created_at_ms,
+            )
+            if tuple(stored_outbox[1:]) != expected_outbox:
+                raise ValueError("OUTBOX_SIGNAL_CONFLICT")
+            if signal_inserted != outbox_inserted:
+                raise RuntimeError("SIGNAL_OUTBOX_ATOMICITY_VIOLATION")
+
+            outbox_id = stored_outbox[0]
+            self._connection.commit()
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+        if outbox_inserted and broker is not None:
+            broker.publish_committed(outbox_id)
+        return signal_id, outbox_id
+
+    def read_outbox_after(
+        self,
+        event_id: int,
+        limit: int,
+    ) -> list[OutboxEvent]:
+        if type(event_id) is not int:
+            raise ValueError("INVALID_OUTBOX_EVENT_ID_TYPE")
+        if event_id < 0:
+            raise ValueError("INVALID_OUTBOX_EVENT_ID")
+        if type(limit) is not int:
+            raise ValueError("INVALID_OUTBOX_LIMIT_TYPE")
+        if not 1 <= limit <= 1000:
+            raise ValueError("INVALID_OUTBOX_LIMIT")
+
+        rows = self.rows(
+            """
+            SELECT event_id, topic, payload_json, created_at_ms
+            FROM outbox_events
+            WHERE event_id > ?
+            ORDER BY event_id ASC
+            LIMIT ?
+            """,
+            (event_id, limit),
+        )
+        return [
+            OutboxEvent(
+                event_id=row[0],
+                topic=row[1],
+                payload_json=row[2],
+                created_at_ms=row[3],
+            )
+            for row in rows
+        ]
 
     def open_read_only(self) -> sqlite3.Connection:
         uri = f"{self._path.resolve().as_uri()}?mode=ro"

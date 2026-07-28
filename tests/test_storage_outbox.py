@@ -21,6 +21,11 @@ from src.models import (
     SourceEvent,
     StrategyEvaluation,
 )
+from src.outbox import (
+    OutboxBroker,
+    commit_signal_and_outbox,
+    read_outbox_after,
+)
 from src.storage import SqliteStore, SqliteWriter, WriteCommand
 
 
@@ -298,6 +303,171 @@ class StorageTests(unittest.TestCase):
         self.assertTrue(result.inserted)
         self.store = SqliteStore.open(self.db_path)
         self.assertEqual(self.store.count("source_events"), 1)
+
+
+class OutboxTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_directory = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.temp_directory.name, "outbox.sqlite3")
+        self.store = SqliteStore.open(self.db_path)
+        self.store.migrate()
+
+    def tearDown(self):
+        self.store.close()
+        self.temp_directory.cleanup()
+
+    def test_signal_and_outbox_are_atomic(self):
+        signal_id, outbox_id = commit_signal_and_outbox(
+            self.store,
+            self._signal(1),
+            topic="signal.created",
+        )
+        self.assertGreater(signal_id, 0)
+        self.assertGreater(outbox_id, 0)
+        self.assertEqual(self.store.count("signals"), 1)
+        self.assertEqual(self.store.count("outbox_events"), 1)
+
+    def test_outbox_insert_failure_rolls_back_signal(self):
+        self.store._connection.execute(
+            """
+            CREATE TRIGGER fail_outbox_insert
+            BEFORE INSERT ON outbox_events
+            BEGIN
+                SELECT RAISE(ABORT, 'forced outbox failure');
+            END
+            """
+        )
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "forced outbox failure"):
+            commit_signal_and_outbox(
+                self.store,
+                self._signal(1),
+                topic="signal.created",
+            )
+        self.assertEqual(self.store.count("signals"), 0)
+        self.assertEqual(self.store.count("outbox_events"), 0)
+
+    def test_signal_insert_failure_creates_no_outbox(self):
+        self.store._connection.execute(
+            """
+            CREATE TRIGGER fail_signal_insert
+            BEFORE INSERT ON signals
+            BEGIN
+                SELECT RAISE(ABORT, 'forced signal failure');
+            END
+            """
+        )
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "forced signal failure"):
+            commit_signal_and_outbox(
+                self.store,
+                self._signal(1),
+                topic="signal.created",
+            )
+        self.assertEqual(self.store.count("signals"), 0)
+        self.assertEqual(self.store.count("outbox_events"), 0)
+
+    def test_outbox_resume_is_strictly_after_event_id_and_ascending(self):
+        ids = [self._commit(index)[1] for index in range(1, 4)]
+        rows = read_outbox_after(self.store, ids[0], limit=100)
+        self.assertEqual([row.event_id for row in rows], ids[1:])
+        self.assertEqual(
+            [row.event_id for row in rows],
+            sorted(row.event_id for row in rows),
+        )
+
+    def test_outbox_limit_is_bounded_and_fail_closed(self):
+        for index in range(1, 4):
+            self._commit(index)
+        rows = read_outbox_after(self.store, 0, limit=2)
+        self.assertEqual(len(rows), 2)
+
+        invalid_cases = (
+            (0, 0, "INVALID_OUTBOX_LIMIT"),
+            (0, 1001, "INVALID_OUTBOX_LIMIT"),
+            (0, True, "INVALID_OUTBOX_LIMIT_TYPE"),
+            (True, 1, "INVALID_OUTBOX_EVENT_ID_TYPE"),
+            (-1, 1, "INVALID_OUTBOX_EVENT_ID"),
+        )
+        for event_id, limit, code in invalid_cases:
+            with self.subTest(event_id=event_id, limit=limit):
+                with self.assertRaisesRegex(ValueError, code):
+                    read_outbox_after(self.store, event_id, limit=limit)
+
+    def test_empty_backlog_returns_empty_list(self):
+        self.assertEqual(read_outbox_after(self.store, 0, limit=100), [])
+
+    def test_repeated_read_does_not_mutate_outbox(self):
+        self._commit(1)
+        first = read_outbox_after(self.store, 0, limit=100)
+        second = read_outbox_after(self.store, 0, limit=100)
+        self.assertEqual(first, second)
+        self.assertEqual(self.store.count("outbox_events"), 1)
+
+    def test_broker_publishes_only_after_commit_is_visible(self):
+        store = self.store
+
+        class VisibilityBroker(OutboxBroker):
+            def __init__(self):
+                super().__init__()
+                self.visible_at_publish = False
+
+            def publish_committed(self, event_id):
+                reader = store.open_read_only()
+                try:
+                    count = reader.execute(
+                        "SELECT COUNT(*) FROM outbox_events WHERE event_id = ?",
+                        (event_id,),
+                    ).fetchone()[0]
+                finally:
+                    reader.close()
+                self.visible_at_publish = count == 1
+                super().publish_committed(event_id)
+
+        broker = VisibilityBroker()
+        _, outbox_id = commit_signal_and_outbox(
+            self.store,
+            self._signal(1),
+            topic="signal.created",
+            broker=broker,
+        )
+        self.assertTrue(broker.visible_at_publish)
+        self.assertEqual(broker.committed_event_ids, (outbox_id,))
+
+    def test_duplicate_signal_identity_creates_no_duplicate_outbox(self):
+        broker = OutboxBroker()
+        first = commit_signal_and_outbox(
+            self.store,
+            self._signal(1),
+            topic="signal.created",
+            broker=broker,
+        )
+        second = commit_signal_and_outbox(
+            self.store,
+            self._signal(1),
+            topic="signal.created",
+            broker=broker,
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(self.store.count("signals"), 1)
+        self.assertEqual(self.store.count("outbox_events"), 1)
+        self.assertEqual(broker.committed_event_ids, (first[1],))
+
+    def _commit(self, index):
+        return commit_signal_and_outbox(
+            self.store,
+            self._signal(index),
+            topic="signal.created",
+        )
+
+    @staticmethod
+    def _signal(index):
+        return SignalRecord(
+            identity_key=f"signal:{index}",
+            evaluation_key=f"evaluation:{index}",
+            strategy_id="CANARY_SYNC_READY_V1",
+            signal_type="SYNC_READY",
+            payload_json=f'{{"sequence":{index}}}',
+            created_at_ms=1000 + index,
+        )
 
 
 if __name__ == "__main__":
