@@ -349,6 +349,9 @@ class SqliteStore:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    def open_read_store(self) -> SqliteReadStore:
+        return SqliteReadStore(self.open_read_only())
+
     def integrity_report(self) -> dict[str, Any]:
         quick_check = self.scalar("PRAGMA quick_check")
         integrity_check = self.scalar("PRAGMA integrity_check")
@@ -399,6 +402,200 @@ class SqliteStore:
         if table not in _COUNTABLE_TABLES:
             raise ValueError("INVALID_COUNT_TABLE")
         return self.scalar(f"SELECT COUNT(*) FROM {table}")
+
+
+class SqliteReadStore:
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+        self._closed = False
+
+    def close(self) -> None:
+        if not self._closed:
+            self._connection.close()
+            self._closed = True
+
+    def scalar(
+        self,
+        sql: str,
+        parameters: tuple[Any, ...] = (),
+    ) -> Any:
+        row = self._connection.execute(sql, parameters).fetchone()
+        return None if row is None else row[0]
+
+    def rows(
+        self,
+        sql: str,
+        parameters: tuple[Any, ...] = (),
+    ) -> list[tuple[Any, ...]]:
+        return self._connection.execute(sql, parameters).fetchall()
+
+    def health(self) -> dict[str, Any]:
+        quick_check = self.scalar("PRAGMA quick_check")
+        foreign_keys = self.scalar("PRAGMA foreign_keys")
+        journal_mode = self.scalar("PRAGMA journal_mode").lower()
+        status = (
+            "PASS"
+            if quick_check == "ok"
+            and foreign_keys == 1
+            and journal_mode == "wal"
+            else "FAIL"
+        )
+        return {
+            "database": {
+                "foreign_keys": foreign_keys,
+                "journal_mode": journal_mode,
+                "quick_check": quick_check,
+            },
+            "status": status,
+        }
+
+    def sources(self) -> list[dict[str, Any]]:
+        rows = self.rows(
+            """
+            SELECT
+                source,
+                COUNT(*),
+                MAX(source_timestamp_ms),
+                MAX(received_timestamp_ms)
+            FROM source_events
+            GROUP BY source
+            ORDER BY source ASC
+            """
+        )
+        return [
+            {
+                "event_count": row[1],
+                "last_received_timestamp_ms": row[3],
+                "last_source_timestamp_ms": row[2],
+                "source": row[0],
+            }
+            for row in rows
+        ]
+
+    def signals(self, *, limit: int) -> list[dict[str, Any]]:
+        _validate_read_limit(limit)
+        rows = self.rows(
+            """
+            SELECT
+                signal_id,
+                identity_key,
+                evaluation_key,
+                strategy_id,
+                signal_type,
+                payload_json,
+                created_at_ms
+            FROM signals
+            ORDER BY signal_id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [
+            {
+                "created_at_ms": row[6],
+                "evaluation_key": row[2],
+                "identity_key": row[1],
+                "payload": _decode_stored_json(row[5]),
+                "signal_id": row[0],
+                "signal_type": row[4],
+                "strategy_id": row[3],
+            }
+            for row in rows
+        ]
+
+    def incidents(self, *, limit: int) -> list[dict[str, Any]]:
+        _validate_read_limit(limit)
+        rows = self.rows(
+            """
+            SELECT
+                incident_id,
+                incident_key,
+                severity,
+                status,
+                payload_json,
+                created_at_ms
+            FROM incidents
+            ORDER BY incident_id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [
+            {
+                "created_at_ms": row[5],
+                "incident_id": row[0],
+                "incident_key": row[1],
+                "payload": _decode_stored_json(row[4]),
+                "severity": row[2],
+                "status": row[3],
+            }
+            for row in rows
+        ]
+
+    def current_market_identity(self) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            """
+            SELECT market_id, payload_json, updated_at_ms
+            FROM market_catalog
+            ORDER BY updated_at_ms DESC, market_id ASC
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "market_id": row[0],
+            "payload": _decode_stored_json(row[1]),
+            "updated_at_ms": row[2],
+        }
+
+    def last_event_id(self) -> int:
+        return self.scalar(
+            "SELECT COALESCE(MAX(event_id), 0) FROM outbox_events"
+        )
+
+    def read_outbox_after(
+        self,
+        event_id: int,
+        limit: int,
+    ) -> list[OutboxEvent]:
+        if type(event_id) is not int:
+            raise ValueError("INVALID_OUTBOX_EVENT_ID_TYPE")
+        if event_id < 0:
+            raise ValueError("INVALID_OUTBOX_EVENT_ID")
+        _validate_read_limit(limit)
+        rows = self.rows(
+            """
+            SELECT event_id, topic, payload_json, created_at_ms
+            FROM outbox_events
+            WHERE event_id > ?
+            ORDER BY event_id ASC
+            LIMIT ?
+            """,
+            (event_id, limit),
+        )
+        return [
+            OutboxEvent(
+                event_id=row[0],
+                topic=row[1],
+                payload_json=row[2],
+                created_at_ms=row[3],
+            )
+            for row in rows
+        ]
+
+
+def _validate_read_limit(limit: int) -> None:
+    if type(limit) is not int:
+        raise ValueError("INVALID_READ_LIMIT_TYPE")
+    if not 1 <= limit <= 1000:
+        raise ValueError("INVALID_READ_LIMIT")
+
+
+def _decode_stored_json(value: str) -> Any:
+    import json
+
+    return json.loads(value)
 
 
 class SqliteWriter:

@@ -155,3 +155,14 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Recovery: backfill commit precedes buffer drain; synthetic `[1,2] + [2,3]` commits `[1,2,3]`; a ten-minute outage recovers all ten closed minutes; missing minutes block `LIVE_READY`; missing required depth is `BLOCKED_MISSING_HISTORICAL_DEPTH`; recovered evaluations remain non-current and `execution_eligible=false`.
 - No real external provider smoke request was executed; tests use fixtures, fakes, and the local loopback server only.
 - Task 9 was not started. No trading, wallet/private-key, paper execution, API/dashboard, canary, or Registry 47 execution code was added.
+
+## Observable vertical slice — Tasks 9–10
+
+- Gates: `C1_CANARY_PASS` and `C1_PUSH_API_PASS`.
+- Canary: `CANARY_SYNC_READY_V1` is infrastructure-only, is not part of Registry 47, and is never paper- or live-execution eligible.
+- Deterministic session/market/closed-kline identity suppresses duplicate signal and outbox rows; recovered evaluations have `execution_eligible=false` and remain distinct from current reevaluation.
+- REST routes: `/api/v1/bootstrap`, `/api/v1/health`, `/api/v1/sources`, `/api/v1/signals`, and `/api/v1/incidents`.
+- WebSocket `/ws/v1/events` provides committed-only, strictly increasing, resumable delivery with database replay, race-window reread, and event-ID deduplication.
+- Tests use temporary SQLite databases and loopback aiohttp servers; no external provider request is made.
+- No trading, wallet/private-key, paper execution, dashboard, or Registry 47 execution code was added.
+- Task 11 was not started.
