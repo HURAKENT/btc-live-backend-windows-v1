@@ -189,3 +189,12 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Observed schema warning: the Gamma listing endpoint capped each requested page at 100 objects.
 - No authentication, secrets, wallet data, user channel, or order method was used. Requests were limited to public read-only allowlisted endpoints.
 - Task 14 was not started, and final C1 PASS is not claimed.
+
+### Task 13 Gamma keyset recovery
+
+- Offset pagination evidence is exact: offset 2000 returned 100 objects, while offset 2100 returned HTTP 422 with `offset too large, use /events/keyset for deeper pagination`.
+- The public keyset probe returned HTTP 200 with top-level fields `$schema`, `events`, and `next_cursor`; `events` was a list and `next_cursor` was a 212-character string.
+- The filtered keyset scan read two pages and 100 unique events. It terminated `REPEATED_PAGE`: sending the observed `next_cursor` value as `cursor` returned the same 100 event IDs and the same next cursor.
+- Candidate count is 2; structural matches are 0; adapter matches are 0. The root cause is `SCAN_INCOMPLETE`, and the Task 13 status is `BLOCKED_PROVIDER_SCHEMA`.
+- CLOB books, price history, and market WebSocket remain `SKIPPED_BLOCKED_UPSTREAM` because no canonical asset identity was established.
+- Provider implementation and all other production code remain unchanged. Task 14 was not started, and final C1 PASS is not claimed.

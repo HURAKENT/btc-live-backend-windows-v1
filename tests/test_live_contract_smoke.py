@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -18,7 +19,8 @@ from src.app import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-EXPECTED_TASK_13_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
+EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
+EXPECTED_TASK_13_PROVIDER_BASE = "a3f90ddb1f2e97fa97551db871a70e91859ecc89"
 OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 LAUNCHERS = (
@@ -268,8 +270,15 @@ class LiveContractSmokeTests(unittest.TestCase):
             provider["schema_version"],
             "BTC_LIVE_BACKEND_C1_PROVIDER_CAPABILITY_V1",
         )
+        self.assertEqual(
+            offline["commit_sha"],
+            EXPECTED_TASK_13_OFFLINE_COMMIT,
+        )
+        self.assertEqual(
+            provider["commit_sha"],
+            EXPECTED_TASK_13_PROVIDER_BASE,
+        )
         for report in (offline, provider):
-            self.assertEqual(report["commit_sha"], EXPECTED_TASK_13_COMMIT)
             self.assertRegex(report["commit_sha"], r"^[0-9a-f]{40}$")
 
     def test_task_13_offline_gate_is_pass(self):
@@ -325,16 +334,30 @@ class LiveContractSmokeTests(unittest.TestCase):
             self.assertEqual(gamma["unique_asset_ids"], 22)
             self.assertEqual(len(set(gamma["canonical_asset_ids"])), 22)
             self.assertEqual(books["requested"], 22)
-        else:
-            self.assertEqual(
-                provider["status"],
-                "BLOCKED_EXTERNAL_INVENTORY",
-            )
+        elif provider["status"] == "WAIT_EXTERNAL_INVENTORY":
             gamma = provider["checks"]["gamma_discovery"]
-            self.assertEqual(gamma["pages_scanned"], 5)
-            self.assertEqual(gamma["objects_scanned"], 500)
             self.assertEqual(gamma["asset_ids"], 0)
             self.assertEqual(gamma["unique_asset_ids"], 0)
+            diagnostic = provider["gamma_discovery_diagnostic"]
+            self.assertTrue(diagnostic["scan_complete_within_bound"])
+            self.assertEqual(diagnostic["structural_match_count"], 0)
+            self.assertEqual(
+                diagnostic["root_cause"],
+                "EXTERNAL_INVENTORY_ABSENT",
+            )
+        else:
+            self.assertIn(
+                provider["status"],
+                {
+                    "BLOCKED_DISCOVERY_SCHEMA",
+                    "BLOCKED_AMBIGUOUS_DISCOVERY",
+                    "BLOCKED_PROVIDER_NETWORK",
+                    "BLOCKED_PROVIDER_SCHEMA",
+                },
+            )
+            self.assertTrue(provider["blocking_failures"])
+
+        if provider["status"] != "PASS":
             for name in (
                 "clob_books",
                 "clob_price_history",
@@ -345,7 +368,144 @@ class LiveContractSmokeTests(unittest.TestCase):
                     "SKIPPED_BLOCKED_UPSTREAM",
                 )
             self.assertEqual(provider["checks"]["clob_books"]["requested"], 0)
+
+    def test_task_13_keyset_diagnostic_contract_is_exact(self):
+        _, provider = self._task_13_reports()
+        diagnostic = provider["gamma_discovery_diagnostic"]
+        self.assertEqual(diagnostic["pagination_mode"], "KEYSET")
+        self.assertEqual(
+            diagnostic["offset_limit_evidence"],
+            {
+                "last_successful_offset": 2000,
+                "next_offset": 2100,
+                "http_status": 422,
+                "provider_message": (
+                    "offset too large, use /events/keyset for deeper pagination"
+                ),
+            },
+        )
+        contract = diagnostic["keyset_contract"]
+        self.assertEqual(
+            contract["endpoint"],
+            "https://gamma-api.polymarket.com/events/keyset",
+        )
+        self.assertEqual(contract["top_level_type"], "dict")
+        self.assertEqual(
+            contract["top_level_fields"],
+            ["$schema", "events", "next_cursor"],
+        )
+        self.assertEqual(contract["event_container_field"], "events")
+        self.assertEqual(contract["event_container_type"], "list")
+        self.assertEqual(contract["cursor_fields"], ["next_cursor"])
+        self.assertIn("timestamp_representation", contract)
+        self.assertFalse(contract["auth_used"])
+        self.assertIs(type(diagnostic["pages_scanned"]), int)
+        self.assertIs(type(diagnostic["unique_objects_scanned"]), int)
+        self.assertIn(
+            diagnostic["root_cause"],
+            {
+                "CANONICAL_MARKET_FOUND",
+                "EXTERNAL_INVENTORY_ABSENT",
+                "DISCOVERY_SCHEMA_MISMATCH",
+                "AMBIGUOUS_DISCOVERY",
+                "SCAN_INCOMPLETE",
+            },
+        )
+
+    def test_task_13_keyset_page_evidence_has_hashes_without_raw_pages(self):
+        _, provider = self._task_13_reports()
+        diagnostic = provider["gamma_discovery_diagnostic"]
+        self.assertEqual(
+            len(diagnostic["page_summaries"]),
+            diagnostic["pages_scanned"],
+        )
+        required = {
+            "page_index",
+            "event_count",
+            "new_unique_event_count",
+            "latency_ms",
+            "payload_sha256",
+            "cursor_input_sha256",
+            "next_cursor_sha256",
+            "page_identity_sha256",
+            "http_status",
+        }
+        forbidden_raw = {"events", "raw_page", "raw_payload", "payload"}
+        for page in diagnostic["page_summaries"]:
+            self.assertEqual(set(page), required)
+            self.assertFalse(set(page) & forbidden_raw)
+            for name in (
+                "payload_sha256",
+                "cursor_input_sha256",
+                "next_cursor_sha256",
+                "page_identity_sha256",
+            ):
+                value = page[name]
+                if value is not None:
+                    self.assertRegex(value, r"^[0-9a-f]{64}$")
+
+    def test_task_13_keyset_status_evidence_is_fail_closed(self):
+        _, provider = self._task_13_reports()
+        diagnostic = provider["gamma_discovery_diagnostic"]
+        status = provider["status"]
+        if status == "PASS":
+            gamma = provider["checks"]["gamma_discovery"]
+            self.assertEqual(gamma["markets"], 11)
+            self.assertEqual(gamma["asset_ids"], 22)
+            self.assertEqual(gamma["unique_asset_ids"], 22)
+            self.assertEqual(provider["checks"]["clob_books"]["requested"], 22)
+            self.assertEqual(provider["checks"]["clob_books"]["status"], "PASS")
+            self.assertEqual(
+                provider["checks"]["clob_price_history"]["status"],
+                "PASS",
+            )
+            self.assertEqual(
+                provider["checks"]["polymarket_websocket"]["status"],
+                "PASS",
+            )
+        elif status == "WAIT_EXTERNAL_INVENTORY":
+            self.assertTrue(diagnostic["scan_complete_within_bound"])
+            self.assertEqual(diagnostic["structural_match_count"], 0)
+        elif status == "BLOCKED_DISCOVERY_SCHEMA":
+            self.assertGreaterEqual(diagnostic["structural_match_count"], 1)
+            mismatches = diagnostic.get("schema_mismatches", [])
+            self.assertTrue(mismatches)
+            for mismatch in mismatches:
+                self.assertIn("expected", mismatch)
+                self.assertIn("observed", mismatch)
+                self.assertIn("adapter_rejection", mismatch)
+        elif status == "BLOCKED_AMBIGUOUS_DISCOVERY":
+            self.assertGreaterEqual(diagnostic["structural_match_count"], 2)
+        else:
+            self.assertIn(
+                status,
+                {"BLOCKED_PROVIDER_NETWORK", "BLOCKED_PROVIDER_SCHEMA"},
+            )
+            self.assertFalse(diagnostic["scan_complete_within_bound"])
+            self.assertEqual(diagnostic["root_cause"], "SCAN_INCOMPLETE")
             self.assertTrue(provider["blocking_failures"])
+
+        self.assertFalse(provider["task_14_started"])
+        self.assertFalse(provider["trading_approval"])
+        self.assertNotEqual(provider["status"], "C1_PASS")
+
+    def test_task_13_candidate_slice_hashes_are_reproducible(self):
+        _, provider = self._task_13_reports()
+        candidates = provider["gamma_discovery_diagnostic"][
+            "candidate_slices"
+        ]
+        self.assertLessEqual(len(candidates), 20)
+        for candidate in candidates:
+            expected = candidate["slice_sha256"]
+            unhashed = dict(candidate)
+            del unhashed["slice_sha256"]
+            encoded = json.dumps(
+                unhashed,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            self.assertEqual(hashlib.sha256(encoded).hexdigest(), expected)
 
     def test_task_13_payload_hashes_are_lowercase_sha256(self):
         _, provider = self._task_13_reports()
@@ -364,7 +524,7 @@ class LiveContractSmokeTests(unittest.TestCase):
         allowlist = {
             "https://data-api.binance.vision/api/v3/klines",
             "wss://stream.binance.com:9443/ws/btcusdt@kline_1m",
-            "https://gamma-api.polymarket.com/events",
+            "https://gamma-api.polymarket.com/events/keyset",
             "https://clob.polymarket.com/book",
             "https://clob.polymarket.com/prices-history",
             "wss://ws-subscriptions-clob.polymarket.com/ws/market",
