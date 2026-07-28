@@ -177,3 +177,15 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Targeted verification passes 12 lifecycle tests and 20 offline smoke tests; smoke coverage includes launcher safety and frozen runtime invariants without dependency installation or forbidden PowerShell behavior.
 - Delivery remains loopback-only; real orders, wallet/private-key support, paper execution, and Registry 47 execution remain disabled.
 - Tasks 13–14 are not complete; Task 13 was not started.
+
+## Task 13 — Real provider capability smoke
+
+- Gate: `BLOCKED_EXTERNAL_INVENTORY`; `C1_PROVIDER_CAPABILITY_PASS` is not claimed.
+- The pre-network offline gate passed 157 `unittest` tests, `compileall`, `pip check`, frozen config and Registry 47 checks, fresh SQLite integrity/PRAGMA checks, source deduplication, transactional outbox, lifecycle exit mapping, and launcher safety.
+- Binance REST capability passed against the primary public endpoint: HTTP 200, canonical closed-kline adapter acceptance, and exact deterministic natural key.
+- Binance public WebSocket capability passed: handshake and a schema-valid BTCUSDT 1m kline were observed; the open candle was correctly ignored by the canonical parser.
+- Gamma returned five bounded pages containing 500 objects, but no active, future-resolution, structurally valid BTC Daily Range event with 11 binary markets and 22 unique CLOB asset IDs was present.
+- Consequently, no canonical market identity or asset IDs existed; all 22-book, one-hour price-history, and Polymarket market-WebSocket checks were skipped as upstream-blocked rather than guessed.
+- Observed schema warning: the Gamma listing endpoint capped each requested page at 100 objects.
+- No authentication, secrets, wallet data, user channel, or order method was used. Requests were limited to public read-only allowlisted endpoints.
+- Task 14 was not started, and final C1 PASS is not claimed.

@@ -1,0 +1,23 @@
+{
+  "schema_version": "BTC_LIVE_BACKEND_C1_OFFLINE_VERIFICATION_V1",
+  "commit_sha": "812628afa5afb5a020dceed4a44d0a3fc8170543",
+  "status": "PASS",
+  "tests": {
+    "total": 157,
+    "failures": 0,
+    "errors": 0
+  },
+  "compileall": "PASS",
+  "pip_check": "PASS",
+  "sqlite": {
+    "quick_check": "ok",
+    "integrity_check": "ok",
+    "journal_mode": "wal",
+    "synchronous": 2,
+    "foreign_keys": 1
+  },
+  "real_order_submission": false,
+  "wallet_support": false,
+  "paper_execution": false,
+  "registry_47_executable": false
+}

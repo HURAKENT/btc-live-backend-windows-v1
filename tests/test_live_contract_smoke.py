@@ -18,6 +18,9 @@ from src.app import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+EXPECTED_TASK_13_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
+OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
+PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 LAUNCHERS = (
     PROJECT_ROOT / "scripts" / "RUN_BACKEND_SAFE.ps1",
     PROJECT_ROOT / "scripts" / "RUN_TESTS_SAFE.ps1",
@@ -251,10 +254,154 @@ class LiveContractSmokeTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_task_13_and_14_artifacts_do_not_exist(self):
+    def test_task_13_reports_exist(self):
+        self.assertTrue(OFFLINE_REPORT.is_file())
+        self.assertTrue(PROVIDER_REPORT.is_file())
+
+    def test_task_13_report_contracts_are_exact(self):
+        offline, provider = self._task_13_reports()
+        self.assertEqual(
+            offline["schema_version"],
+            "BTC_LIVE_BACKEND_C1_OFFLINE_VERIFICATION_V1",
+        )
+        self.assertEqual(
+            provider["schema_version"],
+            "BTC_LIVE_BACKEND_C1_PROVIDER_CAPABILITY_V1",
+        )
+        for report in (offline, provider):
+            self.assertEqual(report["commit_sha"], EXPECTED_TASK_13_COMMIT)
+            self.assertRegex(report["commit_sha"], r"^[0-9a-f]{40}$")
+
+    def test_task_13_offline_gate_is_pass(self):
+        offline, _ = self._task_13_reports()
+        self.assertEqual(offline["status"], "PASS")
+        self.assertEqual(offline["tests"]["total"], 157)
+        self.assertEqual(offline["tests"]["failures"], 0)
+        self.assertEqual(offline["tests"]["errors"], 0)
+        self.assertEqual(offline["compileall"], "PASS")
+        self.assertEqual(offline["pip_check"], "PASS")
+        self.assertEqual(
+            offline["sqlite"],
+            {
+                "quick_check": "ok",
+                "integrity_check": "ok",
+                "journal_mode": "wal",
+                "synchronous": 2,
+                "foreign_keys": 1,
+            },
+        )
+
+    def test_task_13_provider_scope_is_public_read_only(self):
+        _, provider = self._task_13_reports()
+        self.assertEqual(provider["network_scope"], "PUBLIC_READ_ONLY")
+        self.assertFalse(provider["authentication_used"])
+        self.assertFalse(provider["secrets_used"])
+        self.assertFalse(provider["trading_approval"])
+        self.assertFalse(provider["task_14_started"])
+
+    def test_task_13_provider_checks_are_complete_or_explicitly_blocked(self):
+        _, provider = self._task_13_reports()
+        required = {
+            "binance_rest",
+            "binance_websocket",
+            "gamma_discovery",
+            "clob_books",
+            "clob_price_history",
+            "polymarket_websocket",
+        }
+        self.assertEqual(set(provider["checks"]), required)
+        self.assertEqual(provider["checks"]["binance_rest"]["status"], "PASS")
+        self.assertEqual(
+            provider["checks"]["binance_websocket"]["status"],
+            "PASS",
+        )
+
+        if provider["status"] == "PASS":
+            gamma = provider["checks"]["gamma_discovery"]
+            books = provider["checks"]["clob_books"]
+            self.assertIsNotNone(gamma["event_id"])
+            self.assertEqual(gamma["markets"], 11)
+            self.assertEqual(gamma["asset_ids"], 22)
+            self.assertEqual(gamma["unique_asset_ids"], 22)
+            self.assertEqual(len(set(gamma["canonical_asset_ids"])), 22)
+            self.assertEqual(books["requested"], 22)
+        else:
+            self.assertEqual(
+                provider["status"],
+                "BLOCKED_EXTERNAL_INVENTORY",
+            )
+            gamma = provider["checks"]["gamma_discovery"]
+            self.assertEqual(gamma["pages_scanned"], 5)
+            self.assertEqual(gamma["objects_scanned"], 500)
+            self.assertEqual(gamma["asset_ids"], 0)
+            self.assertEqual(gamma["unique_asset_ids"], 0)
+            for name in (
+                "clob_books",
+                "clob_price_history",
+                "polymarket_websocket",
+            ):
+                self.assertEqual(
+                    provider["checks"][name]["status"],
+                    "SKIPPED_BLOCKED_UPSTREAM",
+                )
+            self.assertEqual(provider["checks"]["clob_books"]["requested"], 0)
+            self.assertTrue(provider["blocking_failures"])
+
+    def test_task_13_payload_hashes_are_lowercase_sha256(self):
+        _, provider = self._task_13_reports()
+        observed = 0
+        for check in provider["checks"].values():
+            payload_hash = check["payload_sha256"]
+            if payload_hash is None:
+                self.assertNotEqual(check["status"], "PASS")
+                continue
+            observed += 1
+            self.assertRegex(payload_hash, r"^[0-9a-f]{64}$")
+        self.assertGreaterEqual(observed, 2)
+
+    def test_task_13_endpoints_are_allowlisted_and_unauthenticated(self):
+        _, provider = self._task_13_reports()
+        allowlist = {
+            "https://data-api.binance.vision/api/v3/klines",
+            "wss://stream.binance.com:9443/ws/btcusdt@kline_1m",
+            "https://gamma-api.polymarket.com/events",
+            "https://clob.polymarket.com/book",
+            "https://clob.polymarket.com/prices-history",
+            "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+        }
+        for check in provider["checks"].values():
+            self.assertIn(check["endpoint"], allowlist)
+            self.assertFalse(check["auth_used"])
+        serialized = json.dumps(provider, sort_keys=True).lower()
+        for forbidden in (
+            "authorization",
+            "api_key",
+            "private_key",
+            "user channel",
+            "place_order",
+            "cancel_order",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, serialized)
+
+    def test_task_13_reports_have_no_secret_like_keys(self):
+        for report in self._task_13_reports():
+            keys = set(self._nested_keys(report))
+            for forbidden in (
+                "authorization",
+                "cookie",
+                "credentials",
+                "password",
+                "private_key",
+                "secret",
+                "token",
+                "wallet_address",
+            ):
+                with self.subTest(forbidden=forbidden):
+                    self.assertNotIn(forbidden, keys)
+
+    def test_task_14_artifacts_do_not_exist(self):
         forbidden = (
-            PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json",
-            PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json",
             PROJECT_ROOT / "tools" / "simulate_downtime.py",
             PROJECT_ROOT / "reports" / "C1_DOWNTIME_ACCEPTANCE.json",
             PROJECT_ROOT / "reports" / "C1_FINAL_ACCEPTANCE.json",
@@ -265,6 +412,23 @@ class LiveContractSmokeTests(unittest.TestCase):
     @staticmethod
     def _launcher(path: Path) -> str:
         return path.read_text(encoding="utf-8-sig")
+
+    @staticmethod
+    def _task_13_reports() -> tuple[dict, dict]:
+        return (
+            json.loads(OFFLINE_REPORT.read_text(encoding="utf-8")),
+            json.loads(PROVIDER_REPORT.read_text(encoding="utf-8")),
+        )
+
+    @classmethod
+    def _nested_keys(cls, value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                yield key.lower()
+                yield from cls._nested_keys(item)
+        elif isinstance(value, list):
+            for item in value:
+                yield from cls._nested_keys(item)
 
 
 if __name__ == "__main__":

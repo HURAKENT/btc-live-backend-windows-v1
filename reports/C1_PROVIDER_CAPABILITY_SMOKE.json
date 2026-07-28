@@ -1,0 +1,142 @@
+{
+  "schema_version": "BTC_LIVE_BACKEND_C1_PROVIDER_CAPABILITY_V1",
+  "commit_sha": "812628afa5afb5a020dceed4a44d0a3fc8170543",
+  "status": "BLOCKED_EXTERNAL_INVENTORY",
+  "network_scope": "PUBLIC_READ_ONLY",
+  "authentication_used": false,
+  "secrets_used": false,
+  "checks": {
+    "binance_rest": {
+      "status": "PASS",
+      "endpoint": "https://data-api.binance.vision/api/v3/klines",
+      "selected_endpoint": "primary",
+      "http_status": 200,
+      "observed_top_level_fields": [],
+      "observed_top_level_type": "list",
+      "observed_row_length": 12,
+      "timestamp_unit": "milliseconds",
+      "latest_closed_open_time_ms": 1785265020000,
+      "canonical_natural_key": "binance:BTCUSDT:1m:1785265020000",
+      "payload_sha256": "56d0163b28647c4110b636e82898417aaddd2744bbf722624536da7789122a83",
+      "latency_ms": 1385,
+      "auth_used": false
+    },
+    "binance_websocket": {
+      "status": "PASS",
+      "endpoint": "wss://stream.binance.com:9443/ws/btcusdt@kline_1m",
+      "handshake": "PASS",
+      "observed_top_level_fields": [
+        "E",
+        "e",
+        "k",
+        "s"
+      ],
+      "observed_kline_fields": [
+        "B",
+        "L",
+        "Q",
+        "T",
+        "V",
+        "c",
+        "f",
+        "h",
+        "i",
+        "l",
+        "n",
+        "o",
+        "q",
+        "s",
+        "t",
+        "v",
+        "x"
+      ],
+      "timestamp_unit": "milliseconds",
+      "observed_closed_flag": false,
+      "canonical_adapter_result": "OPEN_IGNORED",
+      "payload_sha256": "4e5f684118a2dfbced197d213ea666cd64a4b053c65b2872f22a27db909decaf",
+      "latency_ms": 1533,
+      "auth_used": false
+    },
+    "gamma_discovery": {
+      "status": "BLOCKED_EXTERNAL_INVENTORY",
+      "endpoint": "https://gamma-api.polymarket.com/events",
+      "http_status": 200,
+      "observed_top_level_fields": [
+        "active",
+        "closed",
+        "slug",
+        "ticker"
+      ],
+      "timestamp_unit": null,
+      "event_id": null,
+      "event_slug": null,
+      "end_date": null,
+      "markets": 0,
+      "asset_ids": 0,
+      "unique_asset_ids": 0,
+      "canonical_asset_ids": [],
+      "payload_sha256": null,
+      "latency_ms": {
+        "successful_pages": [
+          2665,
+          764,
+          2856,
+          2364,
+          2228
+        ],
+        "connect_timeouts_before_success": 2
+      },
+      "pages_scanned": 5,
+      "objects_scanned": 500,
+      "auth_used": false
+    },
+    "clob_books": {
+      "status": "SKIPPED_BLOCKED_UPSTREAM",
+      "endpoint": "https://clob.polymarket.com/book",
+      "observed_top_level_fields": [],
+      "timestamp_unit": null,
+      "requested": 0,
+      "successful": 0,
+      "empty": 0,
+      "failed": 0,
+      "per_asset": [],
+      "payload_sha256": null,
+      "latency_ms": null,
+      "auth_used": false
+    },
+    "clob_price_history": {
+      "status": "SKIPPED_BLOCKED_UPSTREAM",
+      "endpoint": "https://clob.polymarket.com/prices-history",
+      "observed_top_level_fields": [],
+      "timestamp_unit": "seconds",
+      "asset_id": null,
+      "points_count": 0,
+      "payload_sha256": null,
+      "latency_ms": null,
+      "auth_used": false
+    },
+    "polymarket_websocket": {
+      "status": "SKIPPED_BLOCKED_UPSTREAM",
+      "endpoint": "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+      "handshake": "NOT_ATTEMPTED",
+      "subscription_sent": false,
+      "ping_sent": false,
+      "pong_received": false,
+      "observed_top_level_fields": [],
+      "observed_event_types": [],
+      "subscribed_asset_ids": [],
+      "timestamp_unit": null,
+      "payload_sha256": null,
+      "latency_ms": null,
+      "auth_used": false
+    }
+  },
+  "observed_schema_warnings": [
+    "GAMMA_PAGE_SIZE_CAPPED_AT_100"
+  ],
+  "blocking_failures": [
+    "No active structurally valid BTC Daily Range event was found in 5 pages / 500 objects."
+  ],
+  "trading_approval": false,
+  "task_14_started": false
+}
