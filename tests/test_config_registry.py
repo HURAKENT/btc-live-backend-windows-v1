@@ -78,6 +78,25 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "INVALID_CONFIG_TYPE: bind_port"):
             self._load_payload(payload)
 
+    def test_runtime_config_direct_type_mismatches_are_rejected(self):
+        cases = (
+            ("bind_host", 127001),
+            ("bind_port", 8767.0),
+            ("bind_port", True),
+            ("real_orders_enabled", 0),
+            ("wallet_enabled", 0),
+            ("paper_enabled", 0),
+            ("dashboard_enabled", 0),
+            ("database_writer_count", True),
+            ("database_writer_count", 1.0),
+        )
+
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                with self.assertRaises(ValueError) as caught:
+                    validate_runtime_config(self._valid_config(**{field: value}))
+                self.assertEqual(str(caught.exception), f"INVALID_CONFIG_TYPE: {field}")
+
     @staticmethod
     def _valid_payload():
         return {

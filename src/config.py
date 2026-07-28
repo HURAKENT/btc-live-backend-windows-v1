@@ -6,17 +6,16 @@ from pathlib import Path
 from typing import Any
 
 
-_CONFIG_KEYS = frozenset(
-    {
-        "bind_host",
-        "bind_port",
-        "real_orders_enabled",
-        "wallet_enabled",
-        "paper_enabled",
-        "dashboard_enabled",
-        "database_writer_count",
-    }
+_CONFIG_FIELD_TYPES: tuple[tuple[str, type[Any]], ...] = (
+    ("bind_host", str),
+    ("bind_port", int),
+    ("real_orders_enabled", bool),
+    ("wallet_enabled", bool),
+    ("paper_enabled", bool),
+    ("dashboard_enabled", bool),
+    ("database_writer_count", int),
 )
+_CONFIG_KEYS = frozenset(field for field, _ in _CONFIG_FIELD_TYPES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +57,10 @@ def load_runtime_config(path: Path) -> RuntimeConfig:
 
 
 def validate_runtime_config(config: RuntimeConfig) -> None:
+    for field, expected_type in _CONFIG_FIELD_TYPES:
+        if type(getattr(config, field)) is not expected_type:
+            raise ValueError(f"INVALID_CONFIG_TYPE: {field}")
+
     if config.bind_host != "127.0.0.1":
         raise ValueError("BIND_HOST_MUST_BE_LOOPBACK")
     if not 1024 <= config.bind_port <= 65535:

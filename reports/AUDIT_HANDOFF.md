@@ -104,6 +104,17 @@ PowerShell 5.1 script validation is not applicable because Task 1 created no Pow
 - PowerShell scripts created: 0.
 - No Binance, Polymarket, WebSocket, SQLite, recovery, outbox, replay, dashboard implementation, Strategy Registry execution, trading logic, wallet/signing, or order-submission code was created.
 
+## Independent audit remediation
+
+- Source finding: direct `RuntimeConfig` instances reached `validate_runtime_config()` without exact runtime-type validation.
+- Confirmed bypass cases before the fix: `bind_port=8767.0`, `database_writer_count=True`, and `real_orders_enabled=0` were accepted.
+- TDD RED: `test_runtime_config_direct_type_mismatches_are_rejected` failed in all 9 adversarial subtests because invalid types were accepted or returned a value-validation error instead of `INVALID_CONFIG_TYPE: <field>`.
+- Implementation: `validate_runtime_config()` now applies an exact `type(value) is expected_type` gate for all seven frozen fields before preserving the existing value-validation order.
+- GREEN: the focused test passed; all 14 `ConfigTests` passed; full `unittest discover` passed all 14 tests.
+- Adversarial proof: all 9 direct-construction mismatches raised the exact `ValueError: INVALID_CONFIG_TYPE: <field>` contract; the canonical frozen config still loaded with loopback bind, port 8767, four false feature flags, and one database writer.
+- Task 2 has not started.
+- Remediation scope is limited to `src/config.py`, `tests/test_config_registry.py`, and this handoff. Frozen, contract, registry, and package files were not changed.
+
 ## Known gaps and next step
 
 All live ingestion, persistence, recovery, outbox, API, canary, registry execution, paper, and trading capabilities remain absent by frozen Task 1 scope. Registry 47 remains non-executable.
