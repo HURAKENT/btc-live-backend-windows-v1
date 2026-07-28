@@ -5,6 +5,7 @@ import copy
 import json
 import unittest
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 from aiohttp import ClientSession, WSMsgType, web
@@ -83,6 +84,188 @@ class FakeSession:
         if not self.responses:
             raise AssertionError("unexpected request")
         return FakeResponse(self.responses.pop(0))
+
+
+class RawHistoryResponse(FakeResponse):
+    def __init__(self, body, status=200):
+        super().__init__(None, status=status)
+        self.body = body
+        self.json_calls = 0
+        self.read_calls = 0
+
+    async def json(self):
+        self.json_calls += 1
+        raise AssertionError("price history must use Decimal-aware raw JSON")
+
+    async def read(self):
+        self.read_calls += 1
+        return self.body
+
+
+class RawHistorySession:
+    def __init__(self, body):
+        self.response = RawHistoryResponse(body)
+        self.calls = []
+
+    def get(self, url, *, params):
+        self.calls.append((url, dict(params)))
+        return self.response
+
+
+class PolymarketWireBoundaryTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _book_with_timestamp(timestamp):
+        payload = load_fixture("polymarket_book.json")
+        payload["timestamp"] = timestamp
+        return payload
+
+    @staticmethod
+    async def _history_events(session):
+        return [
+            event
+            async for event in iter_price_history(
+                session,
+                asset_id="token-00-yes",
+                start_ts=100,
+                end_ts=100,
+            )
+        ]
+
+    async def test_rest_book_accepts_digit_only_string_timestamp(self):
+        payload = self._book_with_timestamp("1785556800000")
+
+        events = await fetch_current_books(
+            FakeSession([payload]),
+            ["token-00-yes"],
+        )
+
+        self.assertEqual(events[0].source_timestamp_ms, 1785556800000)
+
+    async def test_rest_book_int_and_string_timestamp_have_same_identity(self):
+        int_event = (
+            await fetch_current_books(
+                FakeSession([self._book_with_timestamp(1785556800000)]),
+                ["token-00-yes"],
+            )
+        )[0]
+        string_event = (
+            await fetch_current_books(
+                FakeSession([self._book_with_timestamp("1785556800000")]),
+                ["token-00-yes"],
+            )
+        )[0]
+
+        self.assertEqual(
+            (int_event.source_timestamp_ms, int_event.natural_key),
+            (string_event.source_timestamp_ms, string_event.natural_key),
+        )
+
+    def test_ws_book_accepts_digit_only_string_timestamp(self):
+        event = parse_market_ws_message(
+            self._book_with_timestamp("1785556800000")
+        )[0]
+
+        self.assertEqual(event.source_timestamp_ms, 1785556800000)
+
+    async def test_ws_and_rest_book_share_timestamp_policy(self):
+        payload = self._book_with_timestamp("1785556800000")
+        rest_event = (
+            await fetch_current_books(FakeSession([payload]), ["token-00-yes"])
+        )[0]
+        ws_event = parse_market_ws_message(copy.deepcopy(payload))[0]
+
+        self.assertEqual(
+            (rest_event.source_timestamp_ms, rest_event.natural_key),
+            (ws_event.source_timestamp_ms, ws_event.natural_key),
+        )
+
+    def test_bool_book_timestamp_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_market_ws_message(self._book_with_timestamp(True))
+
+    def test_negative_string_book_timestamp_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_market_ws_message(self._book_with_timestamp("-1"))
+
+    def test_whitespace_book_timestamp_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_market_ws_message(self._book_with_timestamp(" 1785556800000"))
+
+    def test_fractional_string_book_timestamp_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_market_ws_message(self._book_with_timestamp("123.0"))
+
+    def test_exponent_string_book_timestamp_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_market_ws_message(self._book_with_timestamp("1e3"))
+
+    def test_non_numeric_book_timestamp_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_market_ws_message(self._book_with_timestamp("abc"))
+
+    async def test_history_json_fraction_decodes_as_decimal_not_float(self):
+        session = RawHistorySession(
+            b'{"history":[{"t":100,"p":0.456}]}'
+        )
+
+        events = await self._history_events(session)
+
+        payload = json.loads(events[0].payload_json)
+        self.assertEqual(payload["price_micros"], 456000)
+        self.assertEqual(payload["provider_point"]["p"], "0.456")
+        self.assertEqual(session.response.read_calls, 1)
+        self.assertEqual(session.response.json_calls, 0)
+
+    async def test_history_decimal_price_is_accepted(self):
+        events = await self._history_events(
+            FakeSession([{"history": [{"t": 100, "p": Decimal("0.456")}]}])
+        )
+
+        self.assertEqual(
+            json.loads(events[0].payload_json)["price_micros"],
+            456000,
+        )
+
+    async def test_history_decimal_string_price_remains_accepted(self):
+        events = await self._history_events(
+            FakeSession([{"history": [{"t": 100, "p": "0.456"}]}])
+        )
+
+        self.assertEqual(
+            json.loads(events[0].payload_json)["price_micros"],
+            456000,
+        )
+
+    async def test_history_exact_integer_price_is_accepted(self):
+        events = await self._history_events(
+            FakeSession([{"history": [{"t": 100, "p": 1}]}])
+        )
+
+        self.assertEqual(
+            json.loads(events[0].payload_json)["price_micros"],
+            1000000,
+        )
+
+    async def test_history_direct_float_price_is_rejected(self):
+        session = FakeSession([{"history": [{"t": 100, "p": 0.456}]}])
+
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            await self._history_events(session)
+
+    async def test_history_malformed_and_non_finite_prices_are_rejected(self):
+        invalid_prices = (
+            "not-a-decimal",
+            "NaN",
+            "Infinity",
+            "-Infinity",
+            Decimal("NaN"),
+            Decimal("Infinity"),
+        )
+        for price in invalid_prices:
+            with self.subTest(price=price):
+                session = FakeSession([{"history": [{"t": 100, "p": price}]}])
+                with self.assertRaises(ValueError):
+                    await self._history_events(session)
 
 
 class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):

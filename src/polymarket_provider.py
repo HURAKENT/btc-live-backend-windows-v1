@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import json
 from collections.abc import AsyncIterator, Callable, Sequence
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from aiohttp import WSMsgType
@@ -48,6 +49,60 @@ def _canonical_json(value: Any) -> str:
         )
     except (TypeError, ValueError):
         raise ValueError("POLYMARKET_INVALID_PAYLOAD") from None
+
+
+def _normalize_timestamp_ms(value: Any, field: str) -> int:
+    if type(value) is int:
+        timestamp_ms = value
+    elif (
+        type(value) is str
+        and value
+        and value.isascii()
+        and value.isdigit()
+    ):
+        timestamp_ms = int(value)
+    else:
+        raise ValueError(f"POLYMARKET_INVALID_TYPE: {field}")
+    if timestamp_ms <= 0:
+        raise ValueError(f"POLYMARKET_INVALID_TYPE: {field}")
+    return timestamp_ms
+
+
+def _reject_json_constant(_value: str) -> None:
+    raise ValueError("POLYMARKET_INVALID_PAYLOAD")
+
+
+def _decode_history_json(raw_body: bytes) -> Any:
+    if type(raw_body) is not bytes:
+        raise ValueError("POLYMARKET_INVALID_PAYLOAD")
+    try:
+        return json.loads(
+            raw_body.decode("utf-8"),
+            parse_float=Decimal,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        raise ValueError("POLYMARKET_INVALID_PAYLOAD") from None
+
+
+async def _read_history_payload(response: Any) -> Any:
+    read = getattr(response, "read", None)
+    if callable(read):
+        return _decode_history_json(await read())
+    return await response.json()
+
+
+def _normalize_history_price(value: Any, field: str) -> tuple[int, str]:
+    if type(value) not in (Decimal, str, int):
+        raise ValueError(f"POLYMARKET_INVALID_TYPE: {field}")
+    try:
+        decimal_value = Decimal(value)
+    except (InvalidOperation, ValueError):
+        raise ValueError(f"POLYMARKET_INVALID_TYPE: {field}") from None
+    if not decimal_value.is_finite():
+        raise ValueError(f"POLYMARKET_INVALID_TYPE: {field}")
+    price_micros = ProbabilityMicros.from_decimal(decimal_value).value
+    return price_micros, format(decimal_value, "f")
 
 
 def _source_event(
@@ -102,7 +157,7 @@ def _parse_levels(levels: Any, field: str) -> list[dict[str, int]]:
 def _parse_book(payload: dict[str, Any]) -> SourceEvent:
     asset_id = _require_type(payload.get("asset_id"), str, "asset_id")
     book_hash = _require_type(payload.get("hash"), str, "hash")
-    timestamp_ms = _require_type(payload.get("timestamp"), int, "timestamp")
+    timestamp_ms = _normalize_timestamp_ms(payload.get("timestamp"), "timestamp")
     bids = _parse_levels(payload.get("bids"), "bids")
     asks = _parse_levels(payload.get("asks"), "asks")
 
@@ -379,7 +434,7 @@ async def iter_price_history(
                 raise ValueError(
                     f"POLYMARKET_HISTORY_HTTP_ERROR: {response.status}"
                 )
-            payload = await response.json()
+            payload = await _read_history_payload(response)
         _require_type(payload, dict, "history.response")
         history = _require_type(payload.get("history"), list, "history")
         if not history:
@@ -393,13 +448,10 @@ async def iter_price_history(
                 int,
                 f"history[{index}].t",
             )
-            price = ProbabilityMicros.from_decimal(
-                _require_type(
-                    point.get("p"),
-                    str,
-                    f"history[{index}].p",
-                )
-            ).value
+            price, provider_price = _normalize_history_price(
+                point.get("p"),
+                f"history[{index}].p",
+            )
             if timestamp > end_ts:
                 continue
             if timestamp in seen or (
@@ -412,7 +464,7 @@ async def iter_price_history(
                 "asset_id": asset_id,
                 "event_type": "price_history",
                 "price_micros": price,
-                "provider_point": point,
+                "provider_point": {**point, "p": provider_price},
                 "timestamp_seconds": timestamp,
             }
             canonical = _canonical_json(normalized)

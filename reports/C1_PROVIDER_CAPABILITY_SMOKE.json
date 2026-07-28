@@ -1,8 +1,8 @@
 {
   "schema_version": "BTC_LIVE_BACKEND_C1_PROVIDER_CAPABILITY_V1",
-  "commit_sha": "da5a40a59ac0d463b557611cb4f104852cf95991",
-  "status": "BLOCKED_PROVIDER_SCHEMA",
-  "gate": "BLOCKED_PROVIDER_SCHEMA",
+  "commit_sha": "46e8f3ded26c31f77a79b5bbdb02a290e97ca45c",
+  "status": "PASS",
+  "gate": "C1_PROVIDER_CAPABILITY_PASS",
   "network_scope": "PUBLIC_READ_ONLY",
   "authentication_used": false,
   "secrets_used": false,
@@ -104,7 +104,7 @@
       "auth_used": false
     },
     "clob_books": {
-      "status": "BLOCKED_PROVIDER_SCHEMA",
+      "status": "PASS",
       "endpoint": "https://clob.polymarket.com/book",
       "observed_top_level_fields": [
         "asks",
@@ -120,48 +120,50 @@
       ],
       "timestamp_unit": "milliseconds encoded as decimal string",
       "timestamp_observed_type": "str",
-      "timestamp_expected_type": "int",
+      "timestamp_normalized_type": "int",
       "requested": 22,
       "http_successful": 22,
-      "successful": 0,
-      "empty": 0,
-      "schema_valid_empty_books": 0,
-      "failed": 22,
+      "http_200": 22,
+      "successful": 22,
+      "parser_successful": 22,
+      "empty": 8,
+      "schema_valid_empty_books": 8,
+      "failed": 0,
       "per_asset_payload_sha256": [
-        "0d927efa77616a27029ae28cd34cf2dff4c10bfb213c09aacf050772f0da1a79",
-        "60e69496e187e4c76c1265f849e3b865809286081a79cb28114bc21078502d55",
-        "75b589f2055dd81e1bebfdd6aea25c264242615ac35a429067c8f53a2e28eae5",
-        "716fb035dca93960efd3ef3dc100c3edd0cea4e0993cb5f9143899ecbb352151",
-        "80e52a7d64948b7bd40f9cb7595d1ada6a97852ec44dc263c5d67f36a75672d0",
-        "5a6fd4af6c70520a2d722b6aa79edcf8bfb4d2e7084a2cfdf59b22168bcea044",
-        "a635faa92dbfb89761b881077c8a37a0778cd235f0a27300cd698ffcaf8fb8e3",
-        "d87d03a15e54472eab8cc9cdc2bb14e81c74ac9fe38e2088adbca7ba6f7c865b",
-        "1b39ec623868428d5d5a099846120ff400a0a5310593984568e038ddb5faa151",
-        "89b8e298e2b4ad8b95b251c9cccc94ad2533ca16a696d4bb46b9df214c806159",
-        "03b5c166c8bc8eff813eb5735274562487de330c19d2f6f7ec5d971255fc2151",
-        "3c2340b14267812cc86724fb1c25e264d2f9054eaeeb0bf3ad4acae381740609",
-        "b4bccc7caf8e1f8bda3d87fcf0580387cdcfe852badaed9f08539f958e90f5f8",
-        "5eb0cf9c62632b7fc1cb9dc6de3f5d77717b2f7bf9221ddf366ffe5063940f9d",
-        "235d36cd4000efac61c11699a7385ca75c572750545d7da4ff07748eaa9028af",
-        "1fc2587a9338d40b050880aa180541d87aed1228cfa51e216126add0913087e9",
-        "bcbf3f95ed0a0391f139509ac4ff607be8b49f2afad3ff15e440432b6e4e2ec7",
-        "eb90b2f32ebe4f8d37f4a78488503fd594560a8f29b26d3ef4a13506b20a3e3e",
-        "2dc716db5d386fd2c5179b0b74e9ef4dab666aa320b4a4b32decc2a5a30f3bdb",
-        "c684039655ba695f0b984df617871a8644814fd01ee9b368faca028036ab8091",
-        "85c2686d27d988aa38cc15cd08a4d1731d62aff94732d6f2ca328f5cf5636a87",
-        "2f3b601f196380573bc4dee67d668ebbdfbb783ce6d43045de8e2f76664a6b2d"
+        "f4269bd89ad783e2dbeff05a3611918fae9329057b42af8c42ddcc9b19c751d5",
+        "dcf5bf0abdbadd155b38157cffded5d6547b8063ecc6fa071a007573863e5418",
+        "338cfe96b95442e69f60cdcd70759255ac55a2777e28f1545962e2bbfc65256e",
+        "a4add36a5e4b90ab3f6c5bddf81feee121514a4c34637ace1ae7638a5b8e8a75",
+        "7d5f866b4805a44da679177020dc197b17bb9a12517116b270ff74f0dd469acc",
+        "03434b9bd5cf07b652c279bb98379be95a8e3fcc2e8b3b42374c909472eb39eb",
+        "1fc8460a54df720e4080c2cf806b3aeec205ea808c628b33566197b2295c9203",
+        "d930166df5ca4cacf26af767d4788ba6d0440a1dba68fef0c4039171ffa6324d",
+        "037cd6ad5fe2ad5c8e7e24ad456817b8dbb5cf7a75faf7dcc0b3a78c582a4454",
+        "53df58c9fcdcd23f2252867360af0f9f7a7bcae87676f3435d6f267e20a41f13",
+        "e0c765f12531e09e63c14544ab972d2651aa0b951c41ae7d601356b04732f497",
+        "0c5e1460b21f25a4d0bd55eb69b5728717e4116331c220b31a1ce39713ca2574",
+        "8429842074982d074dd6f370880df3cc02e85ed9f18015917fb134798f71d823",
+        "1764a7062478ea47889f78f00f2570e80661fe96ee946ffa1b74fe0d81a4ad44",
+        "c4958dc15ae312556f4fc12c6e8f81226c91f6387973a4e533d145bb899bc3f2",
+        "8362870c742e017e21ba5111fafbb4e473bda0e66606379b5ea4a66dc23a0353",
+        "aa985989f7081a3ce695f8acaf654644e91f6d64cd231bb05f0e0f20993947a8",
+        "53311ca953783ef1a0df4aab1178395d3b5025cda15a831cb24e9ad6579e60ae",
+        "176700aee227ef37ba241f09475ab8ddb1395cb0cb59ec9851d1bec14bb30969",
+        "49b0e7ea3fb7ca35e279530c33f9871e0bf4790b4ceb09d71f32c0638aac3cca",
+        "28139a504867528227da8be0db7c8b03d01da957af80ef601180d20487f90bee",
+        "402887155876113e4caa64e92af3a84d4a7ce684801b5262b278846e074e4484"
       ],
-      "adapter_error": "ValueError: POLYMARKET_INVALID_TYPE: timestamp",
-      "payload_sha256": "f6ad1ab1a2fae8b8d0196aaa486c9be1a2e2ef34c349244916e594ce724d2732",
+      "failure_evidence": [],
+      "payload_sha256": "88483befc8e61ee319a16126f68409fad5e4c7dfb7661be97d88f5a3b752eccd",
       "latency_ms": {
-        "min": 116,
-        "max": 1175,
-        "average": 324
+        "min": 80,
+        "max": 1297,
+        "average": 225
       },
       "auth_used": false
     },
     "clob_price_history": {
-      "status": "BLOCKED_PROVIDER_SCHEMA",
+      "status": "PASS",
       "endpoint": "https://clob.polymarket.com/prices-history",
       "http_status": 200,
       "observed_top_level_fields": [
@@ -175,23 +177,37 @@
         "t"
       ],
       "timestamp_observed_type": "int",
-      "price_observed_type": "float",
-      "price_expected_type": "str",
-      "adapter_error": "INVALID_HISTORY_POINT:0",
-      "payload_sha256": "113b004829064b296dc2a0cc09b87587a702066cdde3508fc58d14f98139ae6b",
-      "latency_ms": 721,
+      "decoded_price_types": [
+        "Decimal"
+      ],
+      "float_prices_observed": 0,
+      "adapter_events": 31,
+      "payload_sha256": "688c049af5f61216bd328e6462a0f5991d0d3ab4c72d278cb8babe1695424189",
+      "latency_ms": 172,
       "auth_used": false
     },
     "polymarket_websocket": {
-      "status": "BLOCKED_PROVIDER_SCHEMA",
+      "status": "PASS",
       "endpoint": "wss://ws-subscriptions-clob.polymarket.com/ws/market",
       "handshake": "PASS",
       "subscription_sent": true,
       "ping_sent": true,
-      "pong_received": false,
+      "pong_received": true,
       "provider_event_received": true,
-      "canonical_event_accepted": false,
-      "observed_top_level_fields": [],
+      "event_received": true,
+      "canonical_event_accepted": true,
+      "string_timestamp_normalized": true,
+      "observed_top_level_fields": [
+        "asks",
+        "asset_id",
+        "bids",
+        "event_type",
+        "hash",
+        "last_trade_price",
+        "market",
+        "tick_size",
+        "timestamp"
+      ],
       "observed_event_types": [
         "book"
       ],
@@ -200,9 +216,8 @@
         "50953759202579245249438437576777553450663302025536539992349304816934240380897"
       ],
       "timestamp_unit": "milliseconds encoded as decimal string",
-      "adapter_error": "ValueError: POLYMARKET_INVALID_TYPE: timestamp",
-      "payload_sha256": null,
-      "latency_ms": null,
+      "payload_sha256": "17ba2d271eaee88f17bb46f516a6c9333018ca093a967979cb37c3e47a584180",
+      "latency_ms": 745,
       "auth_used": false
     }
   },
@@ -1012,18 +1027,41 @@
     "asset_ids": 22,
     "unique_asset_ids": 22
   },
+  "clob_boundary_remediation": {
+    "root_cause": "WIRE_TYPES_DID_NOT_MATCH_STRICT_PROVIDER_BOUNDARY",
+    "book_timestamp_wire_type": "string",
+    "book_timestamp_normalization": "POSITIVE_ASCII_DIGITS_TO_INT",
+    "rest_and_ws_share_timestamp_policy": true,
+    "history_json_fractional_number_decoder": "DECIMAL",
+    "binary_float_price_allowed": false,
+    "red_test_confirmed": true,
+    "books_requested": 22,
+    "books_parser_successful": 22,
+    "history_float_prices_observed": 0,
+    "websocket_pong_observed": true,
+    "network_allowlist": [
+      "https://clob.polymarket.com/book",
+      "https://clob.polymarket.com/prices-history",
+      "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+    ],
+    "cookie_jar": "DummyCookieJar",
+    "trust_env": false,
+    "transport_retries_max": 2,
+    "gamma_rerun": false,
+    "binance_rerun": false,
+    "vpn_or_proxy_bypass_used": false,
+    "authentication_used": false
+  },
   "observed_schema_warnings": [
     "GAMMA_PAGE_SIZE_CAPPED_AT_100",
-    "HISTORICAL_KEYSET_SCAN_BOUND_EXHAUSTED",
+    "HISTORICAL_KEYSET_SCAN_BOUND_EXHAUSTED"
+  ],
+  "superseded_schema_evidence": [
     "CLOB_BOOK_TIMESTAMP_OBSERVED_AS_STRING",
-    "CLOB_PRICE_HISTORY_PRICE_OBSERVED_AS_FLOAT",
+    "CLOB_PRICE_HISTORY_PRICE_OBSERVED_AS_FLOAT_WITH_STANDARD_DECODER",
     "CLOB_WS_INITIAL_EVENT_TIMESTAMP_OBSERVED_AS_STRING"
   ],
-  "blocking_failures": [
-    "CLOB_BOOK_SCHEMA_MISMATCH: all 22 public HTTP 200 book responses expose timestamp as str; existing _parse_book requires exact int and rejects each with POLYMARKET_INVALID_TYPE: timestamp.",
-    "CLOB_PRICE_HISTORY_SCHEMA_MISMATCH: the public HTTP 200 one-hour response contains 31 points with t=int and p=float; existing iter_price_history requires p=str and rejects the first point.",
-    "CLOB_WEBSOCKET_SCHEMA_MISMATCH: handshake, subscription, and literal PING succeeded, but the initial event timestamp is str and existing parse_market_ws_message rejected it before PONG could be observed."
-  ],
+  "blocking_failures": [],
   "trading_approval": false,
   "task_14_started": false
 }

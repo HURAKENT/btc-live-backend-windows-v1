@@ -21,7 +21,7 @@ from src.app import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
-EXPECTED_TASK_13_PROVIDER_BASE = "da5a40a59ac0d463b557611cb4f104852cf95991"
+EXPECTED_TASK_13_PROVIDER_BASE = "46e8f3ded26c31f77a79b5bbdb02a290e97ca45c"
 OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 LAUNCHERS = (
@@ -764,6 +764,61 @@ class LiveContractSmokeTests(unittest.TestCase):
                 "C1_PROVIDER_CAPABILITY_PASS",
             )
             self.assertTrue(provider["blocking_failures"])
+
+    def test_task_13_clob_boundary_remediation_contract_is_exact(self):
+        _, provider = self._task_13_reports()
+        remediation = provider["clob_boundary_remediation"]
+        self.assertEqual(
+            remediation["root_cause"],
+            "WIRE_TYPES_DID_NOT_MATCH_STRICT_PROVIDER_BOUNDARY",
+        )
+        self.assertEqual(
+            remediation["book_timestamp_normalization"],
+            "POSITIVE_ASCII_DIGITS_TO_INT",
+        )
+        self.assertTrue(remediation["rest_and_ws_share_timestamp_policy"])
+        self.assertEqual(
+            remediation["history_json_fractional_number_decoder"],
+            "DECIMAL",
+        )
+        self.assertFalse(remediation["binary_float_price_allowed"])
+        self.assertTrue(remediation["red_test_confirmed"])
+        self.assertEqual(
+            set(remediation["network_allowlist"]),
+            {
+                "https://clob.polymarket.com/book",
+                "https://clob.polymarket.com/prices-history",
+                "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+            },
+        )
+        self.assertEqual(remediation["cookie_jar"], "DummyCookieJar")
+        self.assertFalse(remediation["trust_env"])
+        self.assertFalse(remediation["gamma_rerun"])
+        self.assertFalse(remediation["binance_rerun"])
+        self.assertFalse(remediation["vpn_or_proxy_bypass_used"])
+        self.assertFalse(remediation["authentication_used"])
+
+        if provider["status"] == "PASS":
+            books = provider["checks"]["clob_books"]
+            history = provider["checks"]["clob_price_history"]
+            websocket = provider["checks"]["polymarket_websocket"]
+            self.assertEqual(books["requested"], 22)
+            self.assertEqual(books["http_200"], 22)
+            self.assertEqual(books["parser_successful"], 22)
+            self.assertEqual(books["failed"], 0)
+            self.assertEqual(history["float_prices_observed"], 0)
+            self.assertEqual(history["status"], "PASS")
+            self.assertEqual(websocket["handshake"], "PASS")
+            self.assertTrue(websocket["subscription_sent"])
+            self.assertTrue(websocket["ping_sent"])
+            self.assertTrue(websocket["pong_received"])
+            self.assertTrue(websocket["canonical_event_accepted"])
+            self.assertEqual(provider["blocking_failures"], [])
+            self.assertEqual(provider["gate"], "C1_PROVIDER_CAPABILITY_PASS")
+        self.assertFalse(provider["task_14_started"])
+        self.assertFalse(provider["trading_approval"])
+        self.assertFalse(provider["authentication_used"])
+        self.assertFalse(provider["secrets_used"])
 
     def test_task_13_clob_schema_blocker_is_exact_and_hashed(self):
         _, provider = self._task_13_reports()

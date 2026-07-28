@@ -228,3 +228,16 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Market WebSocket handshake, subscription, and literal `PING` succeeded. The initial event exposed the same string timestamp mismatch and was rejected before a `PONG` could be observed.
 - Only public read-only allowlisted endpoints were used, with `DummyCookieJar`, `trust_env=False`, redirect rejection, bounded timeouts/retries, and no VPN/proxy bypass, authentication, secrets, wallet, user channel, or order method.
 - Production changes are limited to `src/market_discovery.py`; the CLOB/provider adapter was not changed. Task 14 was not started. `C1_PROVIDER_CAPABILITY_PASS` and final C1 PASS are not claimed.
+
+### Task 13 — CLOB boundary remediation
+
+- Confirmed root cause: actual CLOB book timestamps are positive decimal strings, while the provider boundary required exact integers; standard JSON history decoding also materialized fractional `p` values as binary floats.
+- TDD RED: 16 focused boundary tests produced one failure and six errors on the unchanged provider, specifically reproducing string-timestamp rejection, ordinary `response.json()` use for fractional history, and rejection of `Decimal`/exact-integer history prices.
+- Book timestamps now use one strict REST/WS normalization policy: exact positive integers or non-empty positive ASCII-digit strings become canonical integer milliseconds; bool, float, signed, whitespace, fractional, exponent, and non-numeric forms remain rejected.
+- Price-history response bytes are decoded once with `parse_float=Decimal`; `Decimal`, decimal strings, and exact integers are accepted, while direct float, bool, malformed, NaN, and Infinity remain rejected.
+- Fresh public read-only evidence: 22/22 books returned HTTP 200 and 22/22 passed the canonical parser; eight books had at least one empty side and were accepted without invented liquidity.
+- One-hour price history returned 31 points, all fractional prices decoded as `Decimal`, zero floats, and 31 canonical adapter events.
+- Market WebSocket handshake, subscription, literal `PING`, literal `PONG`, initial `book`, string-timestamp normalization, and canonical parser acceptance all passed for the selected YES/NO pair.
+- Task 13 status is `PASS` and gate `C1_PROVIDER_CAPABILITY_PASS` is reached. This is provider capability evidence only and is not trading approval.
+- Production scope changed only `src/polymarket_provider.py`; no authentication, cookies, secrets, wallet, user channel, order method, VPN/proxy bypass, Gamma rerun, or Binance rerun was used.
+- Task 14 was not started. Final C1 PASS is not claimed until Task 14 is completed.
