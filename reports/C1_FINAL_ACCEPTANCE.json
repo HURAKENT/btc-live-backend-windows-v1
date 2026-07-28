@@ -1,0 +1,64 @@
+{
+  "acceptance_pack": {
+    "crc_pass": true,
+    "duplicate_entries": 0,
+    "internal_sha256s_verified": true,
+    "missing_sha_entries": 0,
+    "path": "artifacts/C1_ACCEPTANCE_PACK.zip",
+    "path_traversal_entries": 0,
+    "sha256": "5d009ff3563d793855f550ed5434a1ea2e54b2a39da20f91170faa691050a3dc",
+    "sha_mismatch": 0,
+    "size": 22218
+  },
+  "commit_sha": "de398ccb1762b02922f04341fcb6ed82c5a2e7b9",
+  "gate": "NOT_REACHED",
+  "intentional_downtime_acceptance": {
+    "completed": true,
+    "status": "BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "limitations": [
+    "C1 proves only walking-skeleton infrastructure.",
+    "Registry 47 remains non-executable.",
+    "Strategy parity is not established.",
+    "Paper execution is absent.",
+    "Real order submission is absent.",
+    "Wallet and signing support are absent.",
+    "C2 recovery hardening was not performed.",
+    "C3 rollover was not performed.",
+    "C1 PASS is not trading approval."
+  ],
+  "prerequisites": {
+    "C0_REGISTRY_47_LOCK_PASS": true,
+    "C0_RUNTIME_FREEZE_PASS": true,
+    "C1_BINANCE_PROVIDER_PASS": true,
+    "C1_CANARY_PASS": true,
+    "C1_DOMAIN_CONTRACT_PASS": true,
+    "C1_EVENT_STORE_PASS": true,
+    "C1_POLYMARKET_PROVIDER_PASS": true,
+    "C1_PROVIDER_CAPABILITY_PASS": true,
+    "C1_PUSH_API_PASS": true,
+    "C1_RESTART_RECOVERY_PASS": true,
+    "C1_SAFE_DELIVERY_PASS": true,
+    "C1_TRANSACTIONAL_OUTBOX_PASS": true,
+    "C1_WINDOWS_LIFECYCLE_PASS": true
+  },
+  "run_id": "C1-ACCEPTANCE-20260728T212826Z-4C5B0826",
+  "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_FINAL_ACCEPTANCE_V1",
+  "scope_assertions": {
+    "c2_started": false,
+    "c3_rollover_started": false,
+    "c4_started": false,
+    "c5_started": false,
+    "paper_execution": false,
+    "registry_47_execution": false
+  },
+  "security_assertions": {
+    "credentials_used": false,
+    "public_read_only_network_only": true,
+    "real_order_submission": false,
+    "trading_approval": false,
+    "wallet_or_signing": false
+  },
+  "status": "BLOCKED_RUNTIME_PATH_CONTRACT",
+  "trading_approval": false
+}

@@ -1,0 +1,92 @@
+{
+  "binance_continuity": {
+    "duplicate_natural_keys": null,
+    "expected_closed_minutes": null,
+    "missing_closed_minutes": null,
+    "recovered_closed_minutes": null,
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "blocking_failures": [
+    {
+      "code": "BLOCKED_RUNTIME_PATH_CONTRACT",
+      "detail": "run_backend.py fixes the database at data/runtime/btc_live_backend.sqlite3 and exposes no acceptance-specific CLI or environment path contract"
+    }
+  ],
+  "branch": "codex/c0-c1",
+  "canary_semantics": {
+    "current_post_restart_count": null,
+    "recovered_execution_eligible": null,
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "commit_sha": "de398ccb1762b02922f04341fcb6ed82c5a2e7b9",
+  "data_path_relative_label": "data-root/acceptance/<run_id>",
+  "database_integrity": {
+    "foreign_keys": "NOT_RUN",
+    "integrity_check": "NOT_RUN",
+    "journal_mode": "NOT_RUN",
+    "quick_check": "NOT_RUN",
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT",
+    "synchronous": "NOT_RUN"
+  },
+  "downtime": {
+    "downtime_duration_ms": null,
+    "forced_termination_used": false,
+    "process_stopped_at_ms": null,
+    "restart_requested_at_ms": null,
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "initial_state": {
+    "backend_process_started": false,
+    "live_ready": false,
+    "runtime_path_contract": {
+      "backend_command": [
+        "CURRENT_SYS_EXECUTABLE",
+        "run_backend.py"
+      ],
+      "backend_entrypoint": "run_backend.py",
+      "blocker": "BLOCKED_RUNTIME_PATH_CONTRACT",
+      "configured_database_path": "data/runtime/btc_live_backend.sqlite3",
+      "required_acceptance_database_label": "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
+      "supported": false,
+      "supported_cli_path_parameters": [],
+      "supported_environment_path_variables": []
+    },
+    "status": "NOT_STARTED"
+  },
+  "outbox_replay": {
+    "proved": false,
+    "replayed_event_ids": [],
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "platform": "win32",
+  "polymarket_reconciliation": {
+    "historical_depth_classification": "NOT_RUN",
+    "reconciled": false,
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "python_version": "3.12.4",
+  "recovery": {
+    "post_restart_live_ready": false,
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "run_id": "C1-ACCEPTANCE-20260728T212826Z-4C5B0826",
+  "runtime_path_relative_label": "runtime-root/acceptance/<run_id>",
+  "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_DOWNTIME_ACCEPTANCE_V1",
+  "security": {
+    "backend_process_started": false,
+    "forced_termination_used": false,
+    "network_used": false,
+    "paper_execution": false,
+    "real_order_submission": false,
+    "registry_47_execution": false,
+    "unknown_process_stopped": false,
+    "wallet_or_signing": false
+  },
+  "single_instance": {
+    "status": "NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT"
+  },
+  "started_at_utc": "2026-07-28T21:28:26.563353Z",
+  "status": "BLOCKED_RUNTIME_PATH_CONTRACT",
+  "task_14_completed": true,
+  "task_14_started": true
+}

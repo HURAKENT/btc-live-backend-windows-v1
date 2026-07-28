@@ -33,7 +33,6 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Output "EXTERNAL_PROVIDER_CAPABILITY_NOT_RUN: Task 13 remains required."
-Write-Output "DOWNTIME_ACCEPTANCE_NOT_RUN: Task 14 remains required."
-Write-Output "C1 acceptance remains incomplete until Tasks 13 and 14 pass."
-exit 0
+& $PythonPath tools\simulate_downtime.py
+$AcceptanceExitCode = $LASTEXITCODE
+exit $AcceptanceExitCode

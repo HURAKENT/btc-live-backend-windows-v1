@@ -241,3 +241,17 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Task 13 status is `PASS` and gate `C1_PROVIDER_CAPABILITY_PASS` is reached. This is provider capability evidence only and is not trading approval.
 - Production scope changed only `src/polymarket_provider.py`; no authentication, cookies, secrets, wallet, user channel, order method, VPN/proxy bypass, Gamma rerun, or Binance rerun was used.
 - Task 14 was not started. Final C1 PASS is not claimed until Task 14 is completed.
+
+## Task 14 — C1 Intentional-Downtime Acceptance
+
+- Run ID: `C1-ACCEPTANCE-20260728T212826Z-4C5B0826`.
+- Final status: `BLOCKED_RUNTIME_PATH_CONTRACT`; gate: `NOT_REACHED`.
+- The mandatory offline pre-acceptance gate passed 65 targeted tests and 228 full-suite tests with one documented historical skip; `compileall` and `pip check` passed.
+- After blocked-report and pack contract coverage was added, the fresh final gate passed 72 targeted tests and 235 full-suite tests with the same one documented historical skip.
+- Acceptance-tool TDD began with the expected 24-test RED because `tools/simulate_downtime.py` did not exist, followed by 24/24 GREEN tests covering duration, fail-closed status, marker hashing, report policy, and safe ZIP behavior.
+- Exact blocker: `run_backend.py` fixes its database path at `data/runtime/btc_live_backend.sqlite3` and exposes no CLI or environment contract for the required isolated acceptance data/runtime roots. The frozen Task 14 instructions require `BLOCKED_RUNTIME_PATH_CONTRACT` in this condition and prohibit changing production code.
+- The backend was not started. Initial `LIVE_READY`, second-instance exit code, graceful stops, process/restart timestamps, real downtime duration, recovery, Binance continuity, Polymarket reconciliation, historical-depth classification, canary semantics, outbox replay, and runtime database-integrity checks are therefore explicitly `NOT_RUN_BLOCKED_RUNTIME_PATH_CONTRACT`, not simulated.
+- No network request, forced termination, unknown-process stop, wallet/signing, paper execution, Registry 47 execution, or real order action occurred.
+- Blocked evidence pack: `artifacts/C1_ACCEPTANCE_PACK.zip`; SHA-256 `5d009ff3563d793855f550ed5434a1ea2e54b2a39da20f91170faa691050a3dc`; 22,218 bytes; ZIP CRC PASS; internal `SHA256SUMS` PASS; path traversal, duplicate entries, missing hashes, SHA mismatches, raw SQLite/WAL/SHM, and raw WebSocket logs all equal zero.
+- `scripts/RUN_C1_ACCEPTANCE_SAFE.ps1` now invokes `tools\simulate_downtime.py` directly through the existing Windows `.venv` Python and propagates its exit code.
+- C2, C3 rollover, C4, C5, paper execution, and trading work were not started. Registry 47 remains non-executable. `BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS` and trading approval are not claimed.

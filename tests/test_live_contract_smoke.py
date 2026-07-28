@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import tomllib
 import unittest
+import zipfile
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import run_backend
 from src.app import (
@@ -24,6 +28,9 @@ EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
 EXPECTED_TASK_13_PROVIDER_BASE = "46e8f3ded26c31f77a79b5bbdb02a290e97ca45c"
 OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
+DOWNTIME_REPORT = PROJECT_ROOT / "reports" / "C1_DOWNTIME_ACCEPTANCE.json"
+FINAL_ACCEPTANCE_REPORT = PROJECT_ROOT / "reports" / "C1_FINAL_ACCEPTANCE.json"
+ACCEPTANCE_PACK = PROJECT_ROOT / "artifacts" / "C1_ACCEPTANCE_PACK.zip"
 LAUNCHERS = (
     PROJECT_ROOT / "scripts" / "RUN_BACKEND_SAFE.ps1",
     PROJECT_ROOT / "scripts" / "RUN_TESTS_SAFE.ps1",
@@ -117,11 +124,14 @@ class LiveContractSmokeTests(unittest.TestCase):
         self.assertIn("-m compileall -q src tests tools run_backend.py", text)
         self.assertIn("-m pip check", text)
 
-    def test_acceptance_launcher_is_offline_and_incomplete(self):
+    def test_acceptance_launcher_runs_acceptance_tool_directly(self):
         text = self._launcher(LAUNCHERS[2])
         self.assertIn("-m unittest discover -s tests -v", text)
-        self.assertIn("EXTERNAL_PROVIDER_CAPABILITY_NOT_RUN", text)
-        self.assertIn("DOWNTIME_ACCEPTANCE_NOT_RUN", text)
+        self.assertIn(
+            r"& $PythonPath tools\simulate_downtime.py",
+            text,
+        )
+        self.assertIn("exit $AcceptanceExitCode", text)
         self.assertNotIn("C1 PASS", text)
 
     def test_python_requirement_is_exact(self):
@@ -913,14 +923,191 @@ class LiveContractSmokeTests(unittest.TestCase):
                 with self.subTest(forbidden=forbidden):
                     self.assertNotIn(forbidden, keys)
 
-    def test_task_14_artifacts_do_not_exist(self):
-        forbidden = (
+    def test_task_14_acceptance_evidence_exists(self):
+        expected = (
             PROJECT_ROOT / "tools" / "simulate_downtime.py",
-            PROJECT_ROOT / "reports" / "C1_DOWNTIME_ACCEPTANCE.json",
-            PROJECT_ROOT / "reports" / "C1_FINAL_ACCEPTANCE.json",
-            PROJECT_ROOT / "artifacts" / "C1_ACCEPTANCE_PACK.zip",
+            DOWNTIME_REPORT,
+            FINAL_ACCEPTANCE_REPORT,
+            ACCEPTANCE_PACK,
         )
-        self.assertFalse([path for path in forbidden if path.exists()])
+        self.assertEqual(
+            [path for path in expected if path.is_file()],
+            list(expected),
+        )
+
+    def test_task_14_report_contract_and_run_identity_are_exact(self):
+        downtime, final = self._task_14_reports()
+        self.assertEqual(
+            downtime["schema_version"],
+            "BTC_LIVE_BACKEND_WINDOWS_V1_C1_DOWNTIME_ACCEPTANCE_V1",
+        )
+        self.assertEqual(
+            final["schema_version"],
+            "BTC_LIVE_BACKEND_WINDOWS_V1_C1_FINAL_ACCEPTANCE_V1",
+        )
+        self.assertEqual(downtime["run_id"], final["run_id"])
+        self.assertRegex(
+            downtime["run_id"],
+            r"^C1-ACCEPTANCE-\d{8}T\d{6}Z-[0-9A-F]{8}$",
+        )
+        self.assertEqual(
+            downtime["commit_sha"],
+            "de398ccb1762b02922f04341fcb6ed82c5a2e7b9",
+        )
+        self.assertEqual(final["commit_sha"], downtime["commit_sha"])
+
+    def test_task_14_runtime_path_blocker_is_fail_closed(self):
+        downtime, final = self._task_14_reports()
+        self.assertEqual(
+            downtime["status"],
+            "BLOCKED_RUNTIME_PATH_CONTRACT",
+        )
+        self.assertEqual(final["status"], downtime["status"])
+        self.assertEqual(final["gate"], "NOT_REACHED")
+        contract = downtime["initial_state"]["runtime_path_contract"]
+        self.assertFalse(contract["supported"])
+        self.assertEqual(
+            contract["configured_database_path"],
+            "data/runtime/btc_live_backend.sqlite3",
+        )
+        self.assertEqual(contract["supported_cli_path_parameters"], [])
+        self.assertEqual(contract["supported_environment_path_variables"], [])
+        self.assertEqual(
+            downtime["blocking_failures"][0]["code"],
+            "BLOCKED_RUNTIME_PATH_CONTRACT",
+        )
+
+    def test_task_14_blocker_prevented_backend_network_and_fake_downtime(self):
+        downtime, _ = self._task_14_reports()
+        self.assertTrue(downtime["task_14_started"])
+        self.assertTrue(downtime["task_14_completed"])
+        self.assertFalse(downtime["initial_state"]["backend_process_started"])
+        self.assertFalse(downtime["security"]["network_used"])
+        self.assertFalse(downtime["security"]["forced_termination_used"])
+        self.assertIsNone(downtime["downtime"]["downtime_duration_ms"])
+        self.assertIsNone(downtime["downtime"]["process_stopped_at_ms"])
+        self.assertIsNone(downtime["downtime"]["restart_requested_at_ms"])
+
+    def test_task_14_pass_contract_is_complete_when_status_is_pass(self):
+        downtime, final = self._task_14_reports()
+        if downtime["status"] != "PASS":
+            self.assertNotEqual(
+                final["gate"],
+                "BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS",
+            )
+            return
+        duration = downtime["downtime"]["downtime_duration_ms"]
+        self.assertGreaterEqual(duration, 600_000)
+        self.assertLessEqual(duration, 630_000)
+        self.assertEqual(
+            downtime["binance_continuity"]["missing_closed_minutes"],
+            0,
+        )
+        self.assertEqual(
+            downtime["binance_continuity"]["duplicate_natural_keys"],
+            0,
+        )
+        self.assertTrue(downtime["polymarket_reconciliation"]["reconciled"])
+        self.assertNotEqual(
+            downtime["polymarket_reconciliation"][
+                "historical_depth_classification"
+            ],
+            "",
+        )
+        self.assertTrue(downtime["outbox_replay"]["proved"])
+        self.assertEqual(
+            final["gate"],
+            "BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS",
+        )
+
+    def test_task_14_acceptance_pack_is_safe_and_self_verified(self):
+        from tools import simulate_downtime
+
+        _, final = self._task_14_reports()
+        evidence = simulate_downtime.validate_acceptance_pack(ACCEPTANCE_PACK)
+        self.assertEqual(evidence, final["acceptance_pack"])
+        self.assertEqual(
+            hashlib.sha256(ACCEPTANCE_PACK.read_bytes()).hexdigest(),
+            evidence["sha256"],
+        )
+        self.assertTrue(evidence["crc_pass"])
+        self.assertTrue(evidence["internal_sha256s_verified"])
+        self.assertEqual(evidence["path_traversal_entries"], 0)
+        self.assertEqual(evidence["duplicate_entries"], 0)
+        self.assertEqual(evidence["missing_sha_entries"], 0)
+        self.assertEqual(evidence["sha_mismatch"], 0)
+
+    def test_task_14_acceptance_pack_has_only_sanitized_evidence(self):
+        with zipfile.ZipFile(ACCEPTANCE_PACK, "r") as archive:
+            names = archive.namelist()
+        required = {
+            "MANIFEST.json",
+            "SHA256SUMS",
+            "contract/STRATEGY_REGISTRY_47_LIVE_BACKEND_LOCK.json",
+            "reports/EXECUTABLE_RULE_GAP_REPORT.json",
+            "reports/C1_OFFLINE_VERIFICATION.json",
+            "reports/C1_PROVIDER_CAPABILITY_SMOKE.json",
+            "reports/C1_DOWNTIME_ACCEPTANCE.json",
+            "reports/C1_FINAL_ACCEPTANCE.json",
+            "evidence/database_integrity.json",
+            "evidence/source_continuity.json",
+            "evidence/polymarket_reconciliation.json",
+            "evidence/canary_evaluation.json",
+            "evidence/outbox_replay.json",
+            "evidence/incident_summary.json",
+        }
+        self.assertTrue(required.issubset(names))
+        for name in names:
+            lowered = name.lower()
+            with self.subTest(name=name):
+                self.assertFalse(Path(name).is_absolute())
+                self.assertNotIn("..", PurePath(name).parts)
+                self.assertFalse(
+                    lowered.endswith(
+                        (
+                            ".sqlite",
+                            ".sqlite3",
+                            ".sqlite-wal",
+                            ".sqlite3-wal",
+                            ".sqlite-shm",
+                            ".sqlite3-shm",
+                        )
+                    )
+                )
+                self.assertNotIn("raw_ws", lowered)
+                self.assertNotIn("raw_websocket", lowered)
+
+    def test_task_14_security_and_scope_remain_disabled(self):
+        downtime, final = self._task_14_reports()
+        self.assertFalse(final["trading_approval"])
+        self.assertFalse(final["security_assertions"]["credentials_used"])
+        self.assertFalse(
+            final["security_assertions"]["real_order_submission"]
+        )
+        self.assertFalse(final["security_assertions"]["wallet_or_signing"])
+        self.assertEqual(
+            final["scope_assertions"],
+            {
+                "c2_started": False,
+                "c3_rollover_started": False,
+                "c4_started": False,
+                "c5_started": False,
+                "paper_execution": False,
+                "registry_47_execution": False,
+            },
+        )
+        self.assertFalse(downtime["security"]["paper_execution"])
+        self.assertFalse(downtime["security"]["registry_47_execution"])
+        serialized = json.dumps((downtime, final), sort_keys=True).lower()
+        for forbidden in (
+            "api_key",
+            "private_key",
+            "sign_order",
+            "place_order",
+            "cancel_order",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, serialized)
 
     @staticmethod
     def _launcher(path: Path) -> str:
@@ -933,6 +1120,13 @@ class LiveContractSmokeTests(unittest.TestCase):
             json.loads(PROVIDER_REPORT.read_text(encoding="utf-8")),
         )
 
+    @staticmethod
+    def _task_14_reports() -> tuple[dict, dict]:
+        return (
+            json.loads(DOWNTIME_REPORT.read_text(encoding="utf-8")),
+            json.loads(FINAL_ACCEPTANCE_REPORT.read_text(encoding="utf-8")),
+        )
+
     @classmethod
     def _nested_keys(cls, value):
         if isinstance(value, dict):
@@ -942,6 +1136,274 @@ class LiveContractSmokeTests(unittest.TestCase):
         elif isinstance(value, list):
             for item in value:
                 yield from cls._nested_keys(item)
+
+
+class DowntimeAcceptanceToolTests(unittest.TestCase):
+    @staticmethod
+    def _tool():
+        return importlib.import_module("tools.simulate_downtime")
+
+    @staticmethod
+    def _passing_evidence() -> dict:
+        return {
+            "downtime_duration_ms": 600_000,
+            "forced_termination_used": False,
+            "initial_backend_exit_code": 0,
+            "final_backend_exit_code": 0,
+            "post_restart_live_ready": True,
+            "missing_binance_closed_minutes": 0,
+            "duplicate_binance_natural_keys": 0,
+            "polymarket_reconciled": True,
+            "historical_depth_classification": "NOT_REQUIRED",
+            "current_post_restart_canary": True,
+            "recovered_execution_eligible": False,
+            "outbox_replay_proved": True,
+            "database_integrity_pass": True,
+            "second_instance_exit_code": 20,
+        }
+
+    def test_acceptance_tool_exists_and_import_has_no_network_side_effect(self):
+        module = self._tool()
+        self.assertTrue(callable(module.main))
+        self.assertFalse(module.IMPORT_PERFORMED_NETWORK_IO)
+
+    def test_acceptance_tool_requires_windows_runtime(self):
+        module = self._tool()
+        with self.assertRaisesRegex(
+            module.AcceptanceBlocked,
+            "BLOCKED_UNSUPPORTED_PLATFORM",
+        ):
+            module.require_windows("posix")
+        module.require_windows("nt")
+
+    def test_acceptance_tool_uses_current_python_executable(self):
+        module = self._tool()
+        self.assertEqual(
+            module.backend_command(),
+            [sys.executable, "run_backend.py"],
+        )
+
+    def test_acceptance_tool_has_no_powershell_child_process(self):
+        text = (
+            PROJECT_ROOT / "tools" / "simulate_downtime.py"
+        ).read_text(encoding="utf-8").lower()
+        for forbidden in ("powershell.exe", "pwsh", "start-process"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, text)
+
+    def test_acceptance_tool_has_no_order_wallet_or_auth_functionality(self):
+        text = (
+            PROJECT_ROOT / "tools" / "simulate_downtime.py"
+        ).read_text(encoding="utf-8").lower()
+        for forbidden in (
+            "authorization",
+            "private_key",
+            "sign_order",
+            "place_order",
+            "cancel_order",
+            "wallet_address",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, text)
+
+    def test_downtime_duration_uses_monotonic_nanoseconds(self):
+        module = self._tool()
+        self.assertEqual(
+            module.monotonic_duration_ms(
+                10_000_000_000,
+                610_000_000_000,
+            ),
+            600_000,
+        )
+
+    def test_integrity_marker_keeps_wall_clock_separate_from_duration(self):
+        module = self._tool()
+        marker = module.build_integrity_marker(
+            {
+                "run_id": "C1-ACCEPTANCE-20260729T000000Z-1234ABCD",
+                "stop_requested_at_ms": 1_000,
+                "process_stopped_at_ms": 2_000,
+                "restart_requested_at_ms": 602_000,
+                "downtime_duration_ms": 600_000,
+            }
+        )
+        self.assertEqual(marker["downtime_duration_ms"], 600_000)
+        self.assertEqual(marker["restart_requested_at_ms"], 602_000)
+        self.assertRegex(marker["marker_sha256"], r"^[0-9a-f]{64}$")
+        self.assertTrue(module.verify_integrity_marker(marker))
+
+    def test_pass_is_blocked_when_downtime_is_short(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["downtime_duration_ms"] = 599_999
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_DOWNTIME_TOO_SHORT",
+        )
+
+    def test_pass_is_blocked_when_downtime_is_long(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["downtime_duration_ms"] = 630_001
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_DOWNTIME_WINDOW",
+        )
+
+    def test_pass_is_blocked_after_forced_termination(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["forced_termination_used"] = True
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_GRACEFUL_SHUTDOWN",
+        )
+
+    def test_pass_is_blocked_for_nonzero_backend_exit(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["final_backend_exit_code"] = 1
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_GRACEFUL_SHUTDOWN",
+        )
+
+    def test_pass_is_blocked_without_post_restart_live_ready(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["post_restart_live_ready"] = False
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_RECOVERY",
+        )
+
+    def test_pass_is_blocked_for_missing_binance_minute(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["missing_binance_closed_minutes"] = 1
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_RECOVERY",
+        )
+
+    def test_pass_is_blocked_for_duplicate_binance_key(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["duplicate_binance_natural_keys"] = 1
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_RECOVERY",
+        )
+
+    def test_pass_is_blocked_without_polymarket_reconciliation(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["polymarket_reconciled"] = False
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_RECOVERY",
+        )
+
+    def test_pass_is_blocked_without_depth_classification(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["historical_depth_classification"] = ""
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_RECOVERY",
+        )
+
+    def test_pass_is_blocked_without_current_canary(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["current_post_restart_canary"] = False
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_CANARY_SEMANTICS",
+        )
+
+    def test_pass_is_blocked_for_execution_eligible_recovered_record(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["recovered_execution_eligible"] = True
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_CANARY_SEMANTICS",
+        )
+
+    def test_pass_is_blocked_without_outbox_replay(self):
+        module = self._tool()
+        evidence = self._passing_evidence()
+        evidence["outbox_replay_proved"] = False
+        self.assertEqual(
+            module.calculate_acceptance_status(evidence),
+            "BLOCKED_OUTBOX_REPLAY",
+        )
+
+    def test_zip_manifest_rejects_path_traversal(self):
+        module = self._tool()
+        with self.assertRaisesRegex(ValueError, "UNSAFE_ZIP_PATH"):
+            module.safe_zip_manifest({"../escape.json": b"{}"})
+
+    def test_acceptance_zip_has_crc_and_verified_sha256s(self):
+        module = self._tool()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "acceptance.zip"
+            module.build_acceptance_pack(
+                path,
+                {"reports/evidence.json": b'{"status":"BLOCKED"}\n'},
+                status="BLOCKED_RUNTIME_PATH_CONTRACT",
+            )
+            result = module.validate_acceptance_pack(path)
+            self.assertTrue(result["crc_pass"])
+            self.assertTrue(result["internal_sha256s_verified"])
+            self.assertEqual(result["path_traversal_entries"], 0)
+
+    def test_acceptance_zip_rejects_raw_runtime_data(self):
+        module = self._tool()
+        for path in (
+            "runtime/db.sqlite3",
+            "runtime/db.sqlite3-wal",
+            "runtime/db.sqlite3-shm",
+            "logs/raw_ws.log",
+        ):
+            with self.subTest(path=path):
+                with self.assertRaisesRegex(ValueError, "FORBIDDEN_PACK_ENTRY"):
+                    module.safe_zip_manifest({path: b"forbidden"})
+
+    def test_final_report_never_grants_trading_approval(self):
+        module = self._tool()
+        report = module.build_final_report(
+            run_id="C1-ACCEPTANCE-20260729T000000Z-1234ABCD",
+            commit_sha="a" * 40,
+            status="PASS",
+            pack_evidence={},
+        )
+        self.assertFalse(report["trading_approval"])
+        self.assertIn(
+            "C1 PASS is not trading approval.",
+            report["limitations"],
+        )
+
+    def test_task_14_pass_does_not_activate_later_scopes(self):
+        module = self._tool()
+        report = module.build_final_report(
+            run_id="C1-ACCEPTANCE-20260729T000000Z-1234ABCD",
+            commit_sha="a" * 40,
+            status="PASS",
+            pack_evidence={},
+        )
+        self.assertEqual(
+            report["scope_assertions"],
+            {
+                "c2_started": False,
+                "c3_rollover_started": False,
+                "c4_started": False,
+                "c5_started": False,
+                "paper_execution": False,
+                "registry_47_execution": False,
+            },
+        )
 
 
 if __name__ == "__main__":
