@@ -166,3 +166,14 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Tests use temporary SQLite databases and loopback aiohttp servers; no external provider request is made.
 - No trading, wallet/private-key, paper execution, dashboard, or Registry 47 execution code was added.
 - Task 11 was not started.
+
+## Windows delivery — Tasks 11–12
+
+- Gates: `C1_WINDOWS_LIFECYCLE_PASS` and `C1_SAFE_DELIVERY_PASS`.
+- Win32 named-mutex verification rejects a second instance with `BACKEND_ALREADY_RUNNING` and permits reacquisition after close.
+- Shutdown order is fixed: stop API acceptance, stop provider reconnects, drain the source queue, commit pending writes, flush outbox state, close reads, close the writer, and release the mutex last.
+- Process exit codes are `0` clean stop, `20` already running, `30` contract/configuration failure, and `40` database integrity failure.
+- Safe PowerShell 5.1 entry points: `RUN_BACKEND_SAFE.ps1`, `RUN_TESTS_SAFE.ps1`, and `RUN_C1_ACCEPTANCE_SAFE.ps1`.
+- Targeted verification passes 12 lifecycle tests and 20 offline smoke tests; smoke coverage includes launcher safety and frozen runtime invariants without dependency installation or forbidden PowerShell behavior.
+- Delivery remains loopback-only; real orders, wallet/private-key support, paper execution, and Registry 47 execution remain disabled.
+- Tasks 13–14 are not complete; Task 13 was not started.
