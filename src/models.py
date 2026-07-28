@@ -143,6 +143,10 @@ class StrategyEvaluation:
     execution_eligible: bool
     evaluated_at_ms: int
     payload_json: str
+    reason_code: str = ""
+    origin: str = "LIVE"
+    historical_signal_is_current_live_signal: bool = False
+    current_reevaluation_required: bool = False
 
     def __post_init__(self) -> None:
         for name in (
@@ -152,6 +156,8 @@ class StrategyEvaluation:
             "status",
             "input_snapshot_hash",
             "payload_json",
+            "reason_code",
+            "origin",
         ):
             _require_exact_type(name, getattr(self, name), str)
         _require_nonnegative_integer(
@@ -160,6 +166,10 @@ class StrategyEvaluation:
         _require_nonnegative_integer("evaluated_at_ms", self.evaluated_at_ms)
         if type(self.execution_eligible) is not bool:
             raise ValueError("INVALID_EXECUTION_ELIGIBILITY_TYPE")
+        if type(self.historical_signal_is_current_live_signal) is not bool:
+            raise ValueError("INVALID_HISTORICAL_SIGNAL_CURRENT_TYPE")
+        if type(self.current_reevaluation_required) is not bool:
+            raise ValueError("INVALID_CURRENT_REEVALUATION_TYPE")
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +180,9 @@ class SignalRecord:
     signal_type: str
     payload_json: str
     created_at_ms: int
+    origin: str = "LIVE"
+    execution_eligible: bool = False
+    infrastructure_only: bool = False
 
     def __post_init__(self) -> None:
         for name in (
@@ -178,11 +191,16 @@ class SignalRecord:
             "strategy_id",
             "signal_type",
             "payload_json",
+            "origin",
         ):
             _require_exact_type(name, getattr(self, name), str)
             if not getattr(self, name):
                 raise ValueError(f"INVALID_DOMAIN_VALUE: {name}")
         _require_nonnegative_integer("created_at_ms", self.created_at_ms)
+        if type(self.execution_eligible) is not bool:
+            raise ValueError("INVALID_EXECUTION_ELIGIBILITY_TYPE")
+        if type(self.infrastructure_only) is not bool:
+            raise ValueError("INVALID_INFRASTRUCTURE_ONLY_TYPE")
 
 
 @dataclass(frozen=True, slots=True)
