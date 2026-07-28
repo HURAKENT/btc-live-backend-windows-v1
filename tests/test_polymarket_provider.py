@@ -30,6 +30,34 @@ def load_fixture(name):
     return json.loads(Path(FIXTURES, name).read_text(encoding="utf-8"))
 
 
+def discovery_event(
+    *,
+    event_id: str,
+    end_date: str,
+    current_naming: bool,
+) -> dict:
+    event = copy.deepcopy(load_fixture("gamma_btc_daily_range.json")[0])
+    date = end_date[:10]
+    event["id"] = event_id
+    event["endDate"] = end_date
+    event["slug"] = f"bitcoin-price-on-{date}"
+    event["title"] = f"Bitcoin price on {date}?"
+    event["ticker"] = (
+        f"bitcoin-price-on-{date}"
+        if current_naming
+        else f"BTC-DAILY-RANGE-{date}"
+    )
+    for index, market in enumerate(event["markets"]):
+        market["id"] = f"{event_id}-bucket-{index:02d}"
+        market["clobTokenIds"] = json.dumps(
+            [
+                f"{event_id}-token-{index:02d}-yes",
+                f"{event_id}-token-{index:02d}-no",
+            ]
+        )
+    return event
+
+
 class FakeResponse:
     def __init__(self, payload, status=200):
         self.payload = payload
@@ -58,6 +86,206 @@ class FakeSession:
 
 
 class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
+    def test_current_gamma_naming_is_accepted(self):
+        event = discovery_event(
+            event_id="current-2026-07-29",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=True,
+        )
+
+        identity = discover_active_btc_daily_range(
+            [event],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.event_id, "current-2026-07-29")
+
+    def test_legacy_gamma_naming_remains_accepted(self):
+        event = discovery_event(
+            event_id="legacy-2026-07-29",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+
+        identity = discover_active_btc_daily_range(
+            [event],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.event_id, "legacy-2026-07-29")
+
+    def test_multiple_future_events_select_nearest_resolution(self):
+        events = [
+            discovery_event(
+                event_id="later",
+                end_date="2026-07-31T16:00:00Z",
+                current_naming=False,
+            ),
+            discovery_event(
+                event_id="nearest",
+                end_date="2026-07-29T16:00:00Z",
+                current_naming=False,
+            ),
+            discovery_event(
+                event_id="middle",
+                end_date="2026-07-30T16:00:00Z",
+                current_naming=False,
+            ),
+        ]
+
+        identity = discover_active_btc_daily_range(
+            events,
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.event_id, "nearest")
+
+    def test_nearest_selection_is_independent_of_input_order(self):
+        nearest = discovery_event(
+            event_id="nearest",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+        later = discovery_event(
+            event_id="later",
+            end_date="2026-07-30T16:00:00Z",
+            current_naming=False,
+        )
+        now = datetime(2026, 7, 29, 12, tzinfo=timezone.utc)
+
+        forward = discover_active_btc_daily_range(
+            [nearest, later],
+            now_utc=now,
+        )
+        reverse = discover_active_btc_daily_range(
+            [later, nearest],
+            now_utc=now,
+        )
+
+        self.assertEqual(forward, reverse)
+
+    def test_equal_nearest_resolution_is_ambiguous(self):
+        first = discovery_event(
+            event_id="first",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+        second = discovery_event(
+            event_id="second",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "AMBIGUOUS_BTC_DAILY_RANGE",
+        ):
+            discover_active_btc_daily_range(
+                [first, second],
+                now_utc=datetime(
+                    2026,
+                    7,
+                    29,
+                    12,
+                    tzinfo=timezone.utc,
+                ),
+            )
+
+    def test_later_valid_event_does_not_create_ambiguity(self):
+        nearest = discovery_event(
+            event_id="nearest",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+        later = discovery_event(
+            event_id="rollover",
+            end_date="2026-08-04T16:00:00Z",
+            current_naming=False,
+        )
+
+        identity = discover_active_btc_daily_range(
+            [nearest, later],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.event_id, "nearest")
+
+    def test_past_event_is_ignored(self):
+        past = discovery_event(
+            event_id="past",
+            end_date="2026-07-28T16:00:00Z",
+            current_naming=False,
+        )
+        future = discovery_event(
+            event_id="future",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+
+        identity = discover_active_btc_daily_range(
+            [past, future],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.event_id, "future")
+
+    def test_structurally_invalid_current_event_is_ignored(self):
+        invalid = discovery_event(
+            event_id="invalid-current",
+            end_date="2026-07-29T14:00:00Z",
+            current_naming=True,
+        )
+        invalid["markets"].pop()
+        valid = discovery_event(
+            event_id="valid-current",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=True,
+        )
+
+        identity = discover_active_btc_daily_range(
+            [invalid, valid],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.event_id, "valid-current")
+
+    def test_no_valid_event_preserves_data_gap(self):
+        invalid = discovery_event(
+            event_id="invalid-current",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=True,
+        )
+        invalid["markets"] = []
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "BTC_DAILY_RANGE_DATA_GAP",
+        ):
+            discover_active_btc_daily_range(
+                [invalid],
+                now_utc=datetime(
+                    2026,
+                    7,
+                    29,
+                    12,
+                    tzinfo=timezone.utc,
+                ),
+            )
+
+    def test_duplicate_event_id_does_not_create_false_ambiguity(self):
+        event = discovery_event(
+            event_id="same-id",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+
+        identity = discover_active_btc_daily_range(
+            [event, copy.deepcopy(event)],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.event_id, "same-id")
+
     def test_discovery_selects_one_active_future_resolution_event(self):
         identity = discover_active_btc_daily_range(
             load_fixture("gamma_btc_daily_range.json"),

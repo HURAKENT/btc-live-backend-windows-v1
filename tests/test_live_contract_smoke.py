@@ -21,7 +21,7 @@ from src.app import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
-EXPECTED_TASK_13_PROVIDER_BASE = "f2867f10a8bdff4b774e11700d1b539c6d57e98e"
+EXPECTED_TASK_13_PROVIDER_BASE = "da5a40a59ac0d463b557611cb4f104852cf95991"
 OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 LAUNCHERS = (
@@ -357,7 +357,12 @@ class LiveContractSmokeTests(unittest.TestCase):
             )
             self.assertTrue(provider["blocking_failures"])
 
-        if provider["status"] != "PASS":
+        if provider["status"] in {
+            "WAIT_EXTERNAL_INVENTORY",
+            "BLOCKED_DISCOVERY_SCHEMA",
+            "BLOCKED_AMBIGUOUS_DISCOVERY",
+            "BLOCKED_PROVIDER_NETWORK",
+        }:
             for name in (
                 "clob_books",
                 "clob_price_history",
@@ -368,6 +373,21 @@ class LiveContractSmokeTests(unittest.TestCase):
                     "SKIPPED_BLOCKED_UPSTREAM",
                 )
             self.assertEqual(provider["checks"]["clob_books"]["requested"], 0)
+        elif provider["status"] == "BLOCKED_PROVIDER_SCHEMA":
+            self.assertEqual(
+                provider["checks"]["gamma_discovery"]["status"],
+                "PASS",
+            )
+            self.assertEqual(provider["checks"]["clob_books"]["requested"], 22)
+            for name in (
+                "clob_books",
+                "clob_price_history",
+                "polymarket_websocket",
+            ):
+                self.assertEqual(
+                    provider["checks"][name]["status"],
+                    "BLOCKED_PROVIDER_SCHEMA",
+                )
 
     def test_task_13_keyset_diagnostic_contract_is_exact(self):
         _, provider = self._task_13_reports()
@@ -531,11 +551,23 @@ class LiveContractSmokeTests(unittest.TestCase):
                 2,
             )
             self.assertEqual(targeted["root_cause"], "AMBIGUOUS_DISCOVERY")
-        else:
+        elif status == "BLOCKED_PROVIDER_NETWORK":
             self.assertEqual(status, "BLOCKED_PROVIDER_NETWORK")
             self.assertEqual(
                 targeted["root_cause"],
                 "NETWORK_POLICY_OR_GEO_RESTRICTION",
+            )
+            self.assertTrue(provider["blocking_failures"])
+        else:
+            self.assertEqual(status, "BLOCKED_PROVIDER_SCHEMA")
+            remediation = provider["discovery_remediation"]
+            self.assertEqual(
+                remediation["selection_policy"],
+                "NEAREST_FUTURE_RESOLUTION",
+            )
+            self.assertEqual(
+                provider["checks"]["gamma_discovery"]["status"],
+                "PASS",
             )
             self.assertTrue(provider["blocking_failures"])
 
@@ -681,6 +713,96 @@ class LiveContractSmokeTests(unittest.TestCase):
                 == "NETWORK_POLICY_OR_GEO_RESTRICTION"
             ]
             self.assertTrue(restriction_evidence)
+
+    def test_task_13_discovery_remediation_contract_is_exact(self):
+        _, provider = self._task_13_reports()
+        remediation = provider["discovery_remediation"]
+        self.assertEqual(
+            remediation["root_cause"],
+            "LEGACY_IDENTIFIER_ONLY_AND_NO_NEAREST_FUTURE_POLICY",
+        )
+        self.assertTrue(remediation["legacy_identifier_supported"])
+        self.assertTrue(remediation["current_identifier_supported"])
+        self.assertEqual(
+            remediation["current_identifier_pattern"],
+            "bitcoin-price-on-YYYY-MM-DD",
+        )
+        self.assertEqual(
+            remediation["selection_policy"],
+            "NEAREST_FUTURE_RESOLUTION",
+        )
+        self.assertEqual(
+            remediation["tie_policy"],
+            "AMBIGUOUS_ONLY_AT_EQUAL_NEAREST_RESOLUTION",
+        )
+        self.assertTrue(remediation["red_test_confirmed"])
+        self.assertEqual(remediation["targeted_query_events"], 6)
+        self.assertEqual(remediation["valid_future_candidates"], 5)
+        self.assertEqual(remediation["later_valid_events_ignored"], 4)
+        self.assertEqual(remediation["markets"], 11)
+        self.assertEqual(remediation["unique_market_ids"], 11)
+        self.assertEqual(remediation["asset_ids"], 22)
+        self.assertEqual(remediation["unique_asset_ids"], 22)
+
+    def test_task_13_remediation_pass_requires_all_clob_checks(self):
+        _, provider = self._task_13_reports()
+        checks = provider["checks"]
+        if provider["status"] == "PASS":
+            books = checks["clob_books"]
+            websocket = checks["polymarket_websocket"]
+            self.assertEqual(books["successful"], 22)
+            self.assertEqual(books["failed"], 0)
+            self.assertEqual(checks["clob_price_history"]["status"], "PASS")
+            self.assertEqual(websocket["handshake"], "PASS")
+            self.assertTrue(websocket["ping_sent"])
+            self.assertTrue(websocket["pong_received"])
+            self.assertTrue(websocket["event_received"])
+            self.assertEqual(provider["gate"], "C1_PROVIDER_CAPABILITY_PASS")
+        else:
+            self.assertNotEqual(
+                provider.get("gate"),
+                "C1_PROVIDER_CAPABILITY_PASS",
+            )
+            self.assertTrue(provider["blocking_failures"])
+
+    def test_task_13_clob_schema_blocker_is_exact_and_hashed(self):
+        _, provider = self._task_13_reports()
+        if provider["status"] != "BLOCKED_PROVIDER_SCHEMA":
+            self.skipTest("provider schema blocker is not the current result")
+        books = provider["checks"]["clob_books"]
+        history = provider["checks"]["clob_price_history"]
+        websocket = provider["checks"]["polymarket_websocket"]
+        self.assertEqual(books["requested"], 22)
+        self.assertEqual(books["successful"], 0)
+        self.assertEqual(books["failed"], 22)
+        self.assertEqual(books["timestamp_observed_type"], "str")
+        self.assertEqual(books["timestamp_expected_type"], "int")
+        self.assertEqual(len(books["per_asset_payload_sha256"]), 22)
+        for payload_hash in books["per_asset_payload_sha256"]:
+            self.assertRegex(payload_hash, r"^[0-9a-f]{64}$")
+        self.assertEqual(history["http_status"], 200)
+        self.assertEqual(history["points_count"], 31)
+        self.assertEqual(history["timestamp_observed_type"], "int")
+        self.assertEqual(history["price_observed_type"], "float")
+        self.assertEqual(history["price_expected_type"], "str")
+        self.assertEqual(websocket["handshake"], "PASS")
+        self.assertTrue(websocket["subscription_sent"])
+        self.assertTrue(websocket["ping_sent"])
+        self.assertFalse(websocket["pong_received"])
+
+    def test_task_13_report_contains_no_raw_provider_dumps(self):
+        _, provider = self._task_13_reports()
+        keys = set(self._nested_keys(provider))
+        self.assertFalse(
+            keys
+            & {
+                "raw_book",
+                "raw_books",
+                "raw_gamma_page",
+                "raw_payload",
+                "raw_websocket_log",
+            }
+        )
 
     def test_task_13_payload_hashes_are_lowercase_sha256(self):
         _, provider = self._task_13_reports()

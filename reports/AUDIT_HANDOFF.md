@@ -217,3 +217,14 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - The existing adapter rejected all five with `BTC_DAILY_RANGE_DATA_GAP`; observed `ticker` values use `bitcoin-price-on-<date>` rather than `BTC-DAILY-RANGE-<date>`. This mismatch is recorded as evidence but does not override the higher-priority ambiguous-discovery classification.
 - No single Gamma identity was selected. CLOB books, price history, and market WebSocket remain `SKIPPED_BLOCKED_UPSTREAM`.
 - Requests used public read-only GET only, `DummyCookieJar`, `trust_env=False`, and no VPN/proxy bypass, authentication, cookies, wallet, or order method. Production code is unchanged. Task 14 was not started, and final C1 PASS is not claimed.
+
+### Task 13 — discovery remediation and CLOB capability
+
+- Confirmed root cause: discovery accepted only the legacy `BTC-DAILY-RANGE-<date>` ticker and treated every set of multiple future candidates as ambiguous. The pre-fix RED ran 10 focused tests and failed six exactly at current naming, nearest-future selection, and duplicate-ID handling.
+- Discovery now supports both legacy naming and the current `bitcoin-price-on-<date>` Gamma identifiers. It selects the minimum authoritative future `endDate`/resolution, and raises `AMBIGUOUS_BTC_DAILY_RANGE` only when different event IDs share that nearest resolution.
+- Targeted Query A returned six events. Five were valid future 11-market/22-asset candidates; event `733270`, slug `bitcoin-price-on-july-29-2026`, resolution `2026-07-29T16:00:00Z`, was selected and four later rollover candidates were ignored.
+- CLOB books are blocked by confirmed provider/adapter schema mismatch: all 22 public requests returned HTTP 200 with string price/size boundaries and string millisecond `timestamp`; existing `_parse_book` requires exact `int`, so successful/schema-valid adapter results are 0/22.
+- One-hour price history returned HTTP 200 with 31 points; `t` is `int` and `p` is `float`, while the existing adapter requires decimal-string `p`, so the check is `BLOCKED_PROVIDER_SCHEMA`.
+- Market WebSocket handshake, subscription, and literal `PING` succeeded. The initial event exposed the same string timestamp mismatch and was rejected before a `PONG` could be observed.
+- Only public read-only allowlisted endpoints were used, with `DummyCookieJar`, `trust_env=False`, redirect rejection, bounded timeouts/retries, and no VPN/proxy bypass, authentication, secrets, wallet, user channel, or order method.
+- Production changes are limited to `src/market_discovery.py`; the CLOB/provider adapter was not changed. Task 14 was not started. `C1_PROVIDER_CAPABILITY_PASS` and final C1 PASS are not claimed.
