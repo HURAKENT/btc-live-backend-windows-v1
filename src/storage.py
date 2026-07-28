@@ -78,6 +78,11 @@ class SqliteStore:
             self._connection.close()
             self._closed = True
 
+    def commit_pending(self) -> None:
+        if self._closed:
+            raise RuntimeError("SQLITE_STORE_CLOSED")
+        self._connection.commit()
+
     def migrate(self) -> None:
         self._connection.execute(
             """
