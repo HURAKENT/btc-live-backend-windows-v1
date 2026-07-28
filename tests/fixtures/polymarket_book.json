@@ -1,0 +1,27 @@
+{
+  "event_type": "book",
+  "asset_id": "token-00-yes",
+  "market": "bucket-00",
+  "timestamp": 1785556800000,
+  "hash": "bookhash-001",
+  "bids": [
+    {
+      "price": "0.45",
+      "size": "10.25"
+    },
+    {
+      "price": "0.40",
+      "size": "5"
+    }
+  ],
+  "asks": [
+    {
+      "price": "0.55",
+      "size": "8.5"
+    },
+    {
+      "price": "0.60",
+      "size": "4"
+    }
+  ]
+}

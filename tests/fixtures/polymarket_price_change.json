@@ -1,0 +1,21 @@
+{
+  "event_type": "price_change",
+  "market": "bucket-00",
+  "timestamp": 1785556801000,
+  "price_changes": [
+    {
+      "asset_id": "token-00-yes",
+      "price": "0.45",
+      "size": "0",
+      "side": "BUY",
+      "hash": "changehash-001"
+    },
+    {
+      "asset_id": "token-00-yes",
+      "price": "0.46",
+      "size": "3.5",
+      "side": "BUY",
+      "hash": "changehash-002"
+    }
+  ]
+}

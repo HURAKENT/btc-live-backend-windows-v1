@@ -1,0 +1,101 @@
+[
+  {
+    "id": "btc-daily-range-2026-08-01",
+    "ticker": "BTC-DAILY-RANGE-2026-08-01",
+    "slug": "bitcoin-price-on-august-1-2026",
+    "title": "Bitcoin price range on August 1, 2026",
+    "active": true,
+    "closed": false,
+    "endDate": "2026-08-02T04:00:00Z",
+    "markets": [
+      {
+        "id": "bucket-00",
+        "groupItemTitle": "Below 100000",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-00-yes\",\"token-00-no\"]"
+      },
+      {
+        "id": "bucket-01",
+        "groupItemTitle": "100000-102499",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-01-yes\",\"token-01-no\"]"
+      },
+      {
+        "id": "bucket-02",
+        "groupItemTitle": "102500-104999",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-02-yes\",\"token-02-no\"]"
+      },
+      {
+        "id": "bucket-03",
+        "groupItemTitle": "105000-107499",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-03-yes\",\"token-03-no\"]"
+      },
+      {
+        "id": "bucket-04",
+        "groupItemTitle": "107500-109999",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-04-yes\",\"token-04-no\"]"
+      },
+      {
+        "id": "bucket-05",
+        "groupItemTitle": "110000-112499",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-05-yes\",\"token-05-no\"]"
+      },
+      {
+        "id": "bucket-06",
+        "groupItemTitle": "112500-114999",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-06-yes\",\"token-06-no\"]"
+      },
+      {
+        "id": "bucket-07",
+        "groupItemTitle": "115000-117499",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-07-yes\",\"token-07-no\"]"
+      },
+      {
+        "id": "bucket-08",
+        "groupItemTitle": "117500-119999",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-08-yes\",\"token-08-no\"]"
+      },
+      {
+        "id": "bucket-09",
+        "groupItemTitle": "120000-122499",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-09-yes\",\"token-09-no\"]"
+      },
+      {
+        "id": "bucket-10",
+        "groupItemTitle": "122500 or above",
+        "active": true,
+        "closed": false,
+        "outcomes": "[\"Yes\",\"No\"]",
+        "clobTokenIds": "[\"token-10-yes\",\"token-10-no\"]"
+      }
+    ]
+  }
+]
