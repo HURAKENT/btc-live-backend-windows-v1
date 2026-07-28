@@ -1,0 +1,9 @@
+{
+  "bind_host": "127.0.0.1",
+  "bind_port": 8767,
+  "real_orders_enabled": false,
+  "wallet_enabled": false,
+  "paper_enabled": false,
+  "dashboard_enabled": false,
+  "database_writer_count": 1
+}

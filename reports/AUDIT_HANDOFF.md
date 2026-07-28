@@ -1,13 +1,111 @@
 # Audit Handoff
 
-Stage: Repository initialization
-Status: READY_FOR_AUDIT
-Implementation started: no
-Backend code created: no
-Tests run:
-- ZIP CRC
-- internal SHA-256
-- registry count
-- registry uniqueness
-Known gaps:
-- C0–C1 implementation not started
+## Task
+
+- Task ID: Task 1 — Freeze the Windows Environment and Package Contract
+- Gate: `C0_RUNTIME_FREEZE_PASS`
+- Source commit: `0c38069eb55703ae297967cffe25ff7d3f928380`
+- Branch: `codex/c0-c1`
+- Scope: Windows runtime/package freeze only
+- Status: PASS at the pre-commit verification gate
+
+Task 2 has not started.
+
+## Changed files
+
+- `pyproject.toml`
+- `requirements.in`
+- `requirements.lock`
+- `config/c0_c1_frozen_config.json`
+- `src/config.py`
+- `tests/test_config_registry.py`
+- `reports/AUDIT_HANDOFF.md`
+
+No file under `docs/frozen`, `contract`, or `registry` was changed.
+
+## Acceptance criteria mapping
+
+| Criterion | Evidence | Result |
+|---|---|---|
+| Dedicated Python 3.12.4 environment | `.venv\Scripts\python.exe --version` returned `Python 3.12.4` | PASS |
+| One direct runtime dependency | `pyproject.toml` and `requirements.in` contain only `aiohttp==3.14.3`; package-contract check exit 0 | PASS |
+| Resolved environment is locked | Sorted `pip freeze` equals `requirements.lock` exactly; 10 resolved distributions | PASS |
+| Dependency graph is consistent | `.venv\Scripts\python.exe -m pip check` returned `No broken requirements found.` | PASS |
+| Typed immutable runtime config | `RuntimeConfig` uses `@dataclass(frozen=True, slots=True)`; immutability test passes | PASS |
+| Loopback-only bind | Loaded config is `127.0.0.1:8767`; non-loopback and invalid-port tests pass | PASS |
+| Forbidden features remain disabled | Real orders, wallet, paper execution, and dashboard are false; enabled-value rejection tests pass | PASS |
+| Exactly one database writer | Config value is 1; non-1 rejection test passes | PASS |
+| Fail closed on malformed shape | Unknown, missing, and wrong-typed top-level values are rejected by passing tests | PASS |
+| Task 1 suite and full repository suite | 13 tests, 0 failures, 0 errors in both commands | PASS |
+
+## TDD red-green evidence
+
+1. Initial RED:
+   - Command: `& ".\.venv\Scripts\python.exe" -m unittest tests.test_config_registry.ConfigTests -v`
+   - Exit code: 1
+   - Expected cause: `ModuleNotFoundError: No module named 'src'`
+2. First GREEN:
+   - Same command
+   - Exit code: 0
+   - Result: 12 tests passed
+3. Invalid-type RED:
+   - Command: `& ".\.venv\Scripts\python.exe" -m unittest tests.test_config_registry.ConfigTests.test_incorrect_config_value_type_is_rejected -v`
+   - Exit code: 1
+   - Expected cause: unhandled `TypeError` for string port
+4. Invalid-type GREEN:
+   - Same command
+   - Exit code: 0
+   - Result: 1 test passed
+5. Final Task 1 GREEN:
+   - Command: `& ".\.venv\Scripts\python.exe" -m unittest tests.test_config_registry.ConfigTests -v`
+   - Exit code: 0
+   - Result: 13 tests passed
+
+No test is labeled a regression test.
+
+## Verification commands and results
+
+| Command | Key result | Exit |
+|---|---|---:|
+| `& ".\.venv\Scripts\python.exe" -m unittest tests.test_config_registry.ConfigTests -v` | 13 passed | 0 |
+| `& ".\.venv\Scripts\python.exe" -m unittest discover -s tests -v` | 13 passed | 0 |
+| Python AST parse and import of `src.config` interfaces | `SYNTAX_IMPORT_PASS files=2 interfaces=3` | 0 |
+| Python `tomllib` package-contract check | Python `==3.12.4`; one direct dependency | 0 |
+| `& ".\.venv\Scripts\python.exe" -m pip check` | No broken requirements | 0 |
+| Sorted `pip freeze` versus `requirements.lock` | Exact match, 10 lines | 0 |
+| Load `config/c0_c1_frozen_config.json` | Loopback, one writer, four false flags | 0 |
+| Registry/contract PowerShell verification | 47 unique; 34 V1; 13 V2; hashes and flags match | 0 |
+| `docs/frozen` SHA-256 baseline plus `git diff --exit-code -- docs/frozen` | 5 files bytewise unchanged | 0 |
+| Secret/runtime/forbidden-scope scan | 0 hits in every category | 0 |
+| `git diff --check` | No whitespace errors | 0 |
+
+PowerShell 5.1 script validation is not applicable because Task 1 created no PowerShell files.
+
+## Registry and contract verification
+
+- Registry rows: 47
+- Unique `strategy_id`: 47
+- V1: 34
+- V2: 13
+- CSV/JSON/XLSX content comparison: 0 mismatches
+- CSV SHA-256: `77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd`
+- JSON SHA-256: `88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f`
+- Both hashes match the Registry 47 lock, backend contract, frozen config, and plan verification.
+- `real_order_submission=false`
+- `executable_rule_pack_complete=false`
+
+## Security and forbidden-scope verification
+
+- Secret scan: 0 hits.
+- Runtime-data scan: 0 hits outside ignored `.venv`.
+- `.venv` is ignored by `.gitignore`.
+- Forbidden backend component scan: 0 hits.
+- Source modules created: only `src/config.py`.
+- PowerShell scripts created: 0.
+- No Binance, Polymarket, WebSocket, SQLite, recovery, outbox, replay, dashboard implementation, Strategy Registry execution, trading logic, wallet/signing, or order-submission code was created.
+
+## Known gaps and next step
+
+All live ingestion, persistence, recovery, outbox, API, canary, registry execution, paper, and trading capabilities remain absent by frozen Task 1 scope. Registry 47 remains non-executable.
+
+The exact next permissible step is an independent audit of Task 1 in ChatGPT Project. Task 2 is explicitly not started.
