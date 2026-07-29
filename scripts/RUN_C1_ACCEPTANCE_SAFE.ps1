@@ -1,38 +1,127 @@
+param(
+    [ValidateSet("Run", "Preflight")]
+    [string]$Mode = "Run",
+
+    [string]$PythonPath = ".\.venv\Scripts\python.exe"
+)
+
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 
-$PythonPath = ".\.venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $PythonPath -PathType Leaf)) {
-    Write-Error "Windows virtual environment is missing."
+    [Console]::Error.WriteLine("Windows virtual environment is missing: $PythonPath")
     exit 30
 }
 
 $env:PYTHONNOUSERSITE = "1"
 $env:PYTHONDONTWRITEBYTECODE = "1"
 
-$PythonVersion = & $PythonPath -c "import sys; print('.'.join(str(value) for value in sys.version_info[:3]))"
-if ($LASTEXITCODE -ne 0 -or $PythonVersion -notmatch '^3\.12\.') {
-    Write-Error "Python 3.12.x is required."
+function Invoke-NativePython {
+    param([string[]]$ChildArguments)
+
+    $ResolvedPython = (Resolve-Path -LiteralPath $PythonPath).Path
+    foreach ($Argument in $ChildArguments) {
+        if ($Argument -match '[\s"]') {
+            throw "Unsafe native child argument: $Argument"
+        }
+    }
+
+    $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $StartInfo.FileName = $ResolvedPython
+    $StartInfo.WorkingDirectory = $ProjectRoot
+    $StartInfo.UseShellExecute = $false
+    $StartInfo.RedirectStandardOutput = $true
+    $StartInfo.RedirectStandardError = $true
+    $StartInfo.CreateNoWindow = $true
+    $StartInfo.Arguments = ($ChildArguments -join " ")
+
+    $Process = New-Object System.Diagnostics.Process
+    $Process.StartInfo = $StartInfo
+    try {
+        if (-not $Process.Start()) {
+            throw "Native process did not start."
+        }
+        $StdOut = $Process.StandardOutput.ReadToEnd()
+        $StdErr = $Process.StandardError.ReadToEnd()
+        $Process.WaitForExit()
+        return [PSCustomObject]@{
+            ExitCode = $Process.ExitCode
+            StdOut = $StdOut
+            StdErr = $StdErr
+            Executable = $ResolvedPython
+        }
+    }
+    catch {
+        return [PSCustomObject]@{
+            ExitCode = 9009
+            StdOut = ""
+            StdErr = $_.Exception.Message
+            Executable = $ResolvedPython
+        }
+    }
+    finally {
+        $Process.Dispose()
+    }
+}
+
+function Write-ChildResult {
+    param($Result)
+    if (-not [string]::IsNullOrEmpty($Result.StdOut)) {
+        [Console]::Out.Write($Result.StdOut)
+    }
+    if (-not [string]::IsNullOrEmpty($Result.StdErr)) {
+        [Console]::Error.Write($Result.StdErr)
+    }
+}
+
+$VersionResult = Invoke-NativePython @("--version")
+Write-ChildResult $VersionResult
+$VersionLines = @(
+    $VersionResult.StdOut -split "\r?\n" |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+)
+Write-Output ("RAW_VERSION_COUNT=" + $VersionLines.Count)
+Write-Output ("child exit code=" + $VersionResult.ExitCode)
+if ($VersionResult.ExitCode -ne 0) {
+    [Console]::Error.WriteLine(
+        "Python execution failed: executable=$($VersionResult.Executable); " +
+        "child exit $($VersionResult.ExitCode); stderr=$($VersionResult.StdErr.Trim())"
+    )
+    exit 30
+}
+$PythonVersion = ""
+if (
+    $VersionLines.Count -eq 1 -and
+    $VersionLines[0] -match '^Python (?<Version>[0-9]+\.[0-9]+\.[0-9]+)$'
+) {
+    $PythonVersion = $Matches.Version
+}
+if ($PythonVersion -notmatch '^3\.12\.') {
+    [Console]::Error.WriteLine(
+        "Python 3.12.x is required; actual version: $PythonVersion"
+    )
     exit 30
 }
 
-& $PythonPath -m unittest discover -s tests -v
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+if ($Mode -eq "Preflight") {
+    exit 0
 }
 
-& $PythonPath -m compileall -q src tests tools run_backend.py
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+$Commands = @(
+    @("-m", "unittest", "discover", "-s", "tests", "-v"),
+    @("-m", "compileall", "-q", "src", "tests", "tools", "run_backend.py"),
+    @("-m", "pip", "check"),
+    @("tools\simulate_downtime.py")
+)
+
+foreach ($Command in $Commands) {
+    $Result = Invoke-NativePython $Command
+    Write-ChildResult $Result
+    if ($Result.ExitCode -ne 0) {
+        exit $Result.ExitCode
+    }
 }
 
-& $PythonPath -m pip check
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
-
-& $PythonPath tools\simulate_downtime.py
-$AcceptanceExitCode = $LASTEXITCODE
-exit $AcceptanceExitCode
+exit 0

@@ -127,12 +127,13 @@ class LiveContractSmokeTests(unittest.TestCase):
 
     def test_acceptance_launcher_runs_acceptance_tool_directly(self):
         text = self._launcher(LAUNCHERS[2])
-        self.assertIn("-m unittest discover -s tests -v", text)
+        self.assertIn("System.Diagnostics.ProcessStartInfo", text)
+        self.assertIn("Invoke-NativePython", text)
         self.assertIn(
-            r"& $PythonPath tools\simulate_downtime.py",
+            '@("tools\\simulate_downtime.py")',
             text,
         )
-        self.assertIn("exit $AcceptanceExitCode", text)
+        self.assertIn('[ValidateSet("Run", "Preflight")]', text)
         self.assertNotIn("C1 PASS", text)
 
     def test_python_requirement_is_exact(self):
@@ -951,22 +952,50 @@ class LiveContractSmokeTests(unittest.TestCase):
             downtime["run_id"],
             r"^C1-ACCEPTANCE-\d{8}T\d{6}Z-[0-9A-F]{8}$",
         )
-        self.assertEqual(
-            downtime["commit_sha"],
-            EXPECTED_TASK_14_COMMIT,
-        )
+        if downtime["status"] == "PASS":
+            self.assertRegex(downtime["commit_sha"], r"^[0-9a-f]{40}$")
+            self.assertEqual(
+                downtime["runtime_baseline_commit"],
+                "eec05197f05c3d6887bbc49a5edd125ad784cd46",
+            )
+            self.assertEqual(
+                downtime["acceptance_harness_commit"],
+                downtime["commit_sha"],
+            )
+            self.assertEqual(
+                downtime["source_commit"],
+                downtime["commit_sha"],
+            )
+        else:
+            self.assertEqual(
+                downtime["commit_sha"],
+                EXPECTED_TASK_14_COMMIT,
+            )
         self.assertEqual(final["commit_sha"], downtime["commit_sha"])
         self.assertEqual(
             downtime["commit_under_test"],
-            EXPECTED_TASK_14_COMMIT,
+            downtime["commit_sha"],
         )
-        self.assertEqual(
-            final["commit_under_test"],
-            EXPECTED_TASK_14_COMMIT,
-        )
+        self.assertEqual(final["commit_under_test"], downtime["commit_sha"])
 
     def test_task_14_runtime_path_contract_passed_before_live_ready_blocker(self):
         downtime, final = self._task_14_reports()
+        if downtime["status"] == "PASS":
+            self.assertEqual(
+                final["gate"],
+                "BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS",
+            )
+            self.assertTrue(
+                downtime["database_path_contract"][
+                    "same_path_for_initial_and_restart"
+                ]
+            )
+            self.assertTrue(
+                downtime["database_path_contract"][
+                    "default_database_unchanged"
+                ]
+            )
+            return
         self.assertEqual(
             downtime["status"],
             "BLOCKED_INITIAL_LIVE_READY",
@@ -998,6 +1027,13 @@ class LiveContractSmokeTests(unittest.TestCase):
 
     def test_task_14_initial_live_ready_blocker_stopped_before_fake_downtime(self):
         downtime, _ = self._task_14_reports()
+        if downtime["status"] == "PASS":
+            self.assertTrue(downtime["initial_state"]["live_ready"])
+            self.assertEqual(
+                downtime["downtime"]["initial_backend_exit_code"],
+                0,
+            )
+            return
         self.assertTrue(downtime["task_14_started"])
         self.assertTrue(downtime["task_14_completed"])
         self.assertTrue(downtime["initial_state"]["backend_process_started"])
@@ -1037,6 +1073,17 @@ class LiveContractSmokeTests(unittest.TestCase):
 
     def test_task_14_isolated_database_integrity_is_preserved(self):
         downtime, _ = self._task_14_reports()
+        if downtime["status"] == "PASS":
+            integrity = downtime["database_integrity"]
+            self.assertEqual(integrity["status"], "PASS")
+            self.assertEqual(integrity["quick_check"], "ok")
+            self.assertEqual(integrity["integrity_check"], "ok")
+            self.assertEqual(integrity["journal_mode"], "wal")
+            self.assertEqual(integrity["synchronous"], 2)
+            self.assertEqual(integrity["foreign_keys"], 1)
+            self.assertEqual(integrity["migration_version"], 2)
+            self.assertEqual(integrity["table_count"], 9)
+            return
         self.assertEqual(
             downtime["database_integrity"],
             {
@@ -1061,11 +1108,15 @@ class LiveContractSmokeTests(unittest.TestCase):
         self.assertGreaterEqual(duration, 600_000)
         self.assertLessEqual(duration, 630_000)
         self.assertEqual(
-            downtime["binance_continuity"]["missing_closed_minutes"],
+            downtime["binance_continuity"][
+                "missing_binance_closed_minutes"
+            ],
             0,
         )
         self.assertEqual(
-            downtime["binance_continuity"]["duplicate_natural_keys"],
+            downtime["binance_continuity"][
+                "duplicate_binance_natural_keys"
+            ],
             0,
         )
         self.assertTrue(downtime["polymarket_reconciliation"]["reconciled"])
