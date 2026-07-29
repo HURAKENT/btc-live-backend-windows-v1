@@ -309,3 +309,16 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Final verification: 15/15 adversarial tests, 159/159 targeted runtime/storage/recovery/API tests, and 363 full-suite tests passed with one historical conditional skip. `compileall`, `pip check`, `git diff --check`, secret scan, and forbidden execution-surface scan passed.
 - SQLite remained at migration version 2 and the same nine tables: `quick_check=ok`, `integrity_check=ok`, `journal_mode=wal`, `synchronous=2`, and `foreign_keys=1`. Migrations, provider production files, frozen/contract/registry/config/package files, `run_backend.py`, tools, and scripts are unchanged.
 - Wave 2 and Wave 3 were not started. The backend, provider network, and Task 14 were not run. Registry execution, orders, paper fills, wallet/signing, authentication, and secrets remain absent.
+
+## C1 Runtime Integration — Wave 2 Process Integration
+
+- Base commit: `8eac311fe819499a9c0825f53fbde1dd04222c54`. Restart-identity bundle SHA-256: `5fee4e57c8c247d7cf50ea552f2607d3c72b5a2bce3bb4af3dd3d73b49790aed`; applied fix-only patch SHA-256: `d4f6b63ab4a047a92c2ed9981d0a6027705041b76cbdeb3189916daffe8f0338`.
+- Root cause: `POLYMARKET_BOOK` natural identity is source/asset/book-hash, but storage previously treated a later observation timestamp as a conflicting identity field. TDD RED reproduced `SOURCE_EVENT_CONFLICT`; GREEN accepts an identical canonical hashed book replay while preserving conflicts for changed levels and strict timestamp identity for non-book events.
+- Focused Windows verification passed 47 real-provider/storage tests, 24 reconnect/lifecycle/process-targeted tests, and the one-test cross-platform same-DB restart module. The full Windows suite passed 408 tests with one historical conditional skip; `compileall` and `pip check` passed.
+- Polymarket reconnect is owned by the stream, uses bounded exponential backoff with jitter, cancels the previous heartbeat, reports transient disconnects, propagates cancellation, and leaves malformed payloads fail-closed.
+- The local integration contract accepts only an absolute exact-schema JSON file with loopback HTTP/WS endpoints. The process gate used only dynamic `127.0.0.1` aiohttp fake endpoints; external provider endpoint calls were zero.
+- The real Windows `run_backend.py` subprocess exposed API `STARTING`, then `PASS` with Binance and Polymarket `LIVE`, 11 markets, and 22 assets. The intentional local Polymarket disconnect reconnected and committed subsequent evidence.
+- A simultaneous second backend exited 20. Outbox replay returned strictly increasing unique event IDs. The first `CTRL_BREAK_EVENT` produced exit 0 and released the API port and named mutex.
+- Same-DB restart reached `PASS` without `SOURCE_EVENT_CONFLICT` or `RECOVERY_BLOCKED`; identical market/book identity replay remained idempotent and new live events continued to commit. The second `CTRL_BREAK_EVENT` also produced exit 0.
+- Fresh SQLite evidence remained migration version 2 with nine tables, `quick_check=ok`, `integrity_check=ok`, `journal_mode=wal`, `synchronous=2`, and `foreign_keys=1`.
+- Registry execution, real orders, paper fills, wallet/signing, credentials, and secrets remain absent. Wave 3 and Task 14 were not started in this integration cycle. Gate: `C1_PROCESS_INTEGRATION_PASS`.
