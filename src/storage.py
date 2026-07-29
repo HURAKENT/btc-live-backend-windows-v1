@@ -811,6 +811,182 @@ class SqliteStore:
             broker.publish_committed(outbox_id)
         return signal_id, outbox_id
 
+    def commit_evaluation_signal_and_outbox(
+        self,
+        evaluation: StrategyEvaluation,
+        signal: SignalRecord,
+        *,
+        topic: str,
+        broker: CommittedPublisher | None = None,
+    ) -> tuple[int, int, int]:
+        if type(evaluation) is not StrategyEvaluation:
+            raise ValueError("INVALID_STRATEGY_EVALUATION_TYPE")
+        if type(signal) is not SignalRecord:
+            raise ValueError("INVALID_SIGNAL_TYPE")
+        if type(topic) is not str or not topic:
+            raise ValueError("INVALID_OUTBOX_TOPIC")
+        if evaluation.execution_eligible or signal.execution_eligible:
+            raise ValueError("CANARY_EXECUTION_ELIGIBILITY_FORBIDDEN")
+        if not signal.infrastructure_only:
+            raise ValueError("CANARY_INFRASTRUCTURE_ONLY_REQUIRED")
+        if signal.evaluation_key != evaluation.evaluation_key:
+            raise ValueError("CANARY_EVALUATION_SIGNAL_MISMATCH")
+        canonical_evaluation = _canonical_json(
+            evaluation.payload_json,
+            "INVALID_STRATEGY_EVALUATION_JSON",
+        )
+        canonical_signal = _canonical_json(
+            signal.payload_json,
+            "INVALID_SIGNAL_JSON",
+        )
+        if canonical_evaluation != evaluation.payload_json:
+            raise ValueError("NONCANONICAL_STRATEGY_EVALUATION_JSON")
+        if canonical_signal != signal.payload_json:
+            raise ValueError("NONCANONICAL_SIGNAL_JSON")
+        if (
+            evaluation.origin == "RECOVERED_AFTER_DOWNTIME"
+            and evaluation.execution_eligible
+        ):
+            raise ValueError("RECOVERED_EVALUATION_EXECUTION_FORBIDDEN")
+
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            evaluation_cursor = self._connection.execute(
+                """
+                INSERT INTO strategy_evaluations(
+                    evaluation_key, strategy_id, strategy_version, status,
+                    input_snapshot_hash, evaluation_revision,
+                    execution_eligible, evaluated_at_ms, payload_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(evaluation_key) DO NOTHING
+                """,
+                (
+                    evaluation.evaluation_key,
+                    evaluation.strategy_id,
+                    evaluation.strategy_version,
+                    evaluation.status,
+                    evaluation.input_snapshot_hash,
+                    evaluation.evaluation_revision,
+                    int(evaluation.execution_eligible),
+                    evaluation.evaluated_at_ms,
+                    evaluation.payload_json,
+                ),
+            )
+            evaluation_inserted = evaluation_cursor.rowcount == 1
+            stored_evaluation = self._connection.execute(
+                """
+                SELECT evaluation_id, strategy_id, strategy_version, status,
+                       input_snapshot_hash, evaluation_revision,
+                       execution_eligible, evaluated_at_ms, payload_json
+                FROM strategy_evaluations WHERE evaluation_key = ?
+                """,
+                (evaluation.evaluation_key,),
+            ).fetchone()
+            expected_evaluation = (
+                evaluation.strategy_id,
+                evaluation.strategy_version,
+                evaluation.status,
+                evaluation.input_snapshot_hash,
+                evaluation.evaluation_revision,
+                int(evaluation.execution_eligible),
+                evaluation.evaluated_at_ms,
+                evaluation.payload_json,
+            )
+            if (
+                stored_evaluation is None
+                or tuple(stored_evaluation[1:]) != expected_evaluation
+            ):
+                raise ValueError("STRATEGY_EVALUATION_CONFLICT")
+
+            signal_cursor = self._connection.execute(
+                """
+                INSERT INTO signals(
+                    identity_key, evaluation_key, strategy_id, signal_type,
+                    payload_json, created_at_ms
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(identity_key) DO NOTHING
+                """,
+                (
+                    signal.identity_key,
+                    signal.evaluation_key,
+                    signal.strategy_id,
+                    signal.signal_type,
+                    signal.payload_json,
+                    signal.created_at_ms,
+                ),
+            )
+            signal_inserted = signal_cursor.rowcount == 1
+            stored_signal = self._connection.execute(
+                """
+                SELECT signal_id, evaluation_key, strategy_id, signal_type,
+                       payload_json, created_at_ms
+                FROM signals WHERE identity_key = ?
+                """,
+                (signal.identity_key,),
+            ).fetchone()
+            expected_signal = (
+                signal.evaluation_key,
+                signal.strategy_id,
+                signal.signal_type,
+                signal.payload_json,
+                signal.created_at_ms,
+            )
+            if stored_signal is None or tuple(stored_signal[1:]) != expected_signal:
+                raise ValueError("SIGNAL_IDENTITY_CONFLICT")
+
+            signal_id = stored_signal[0]
+            outbox_cursor = self._connection.execute(
+                """
+                INSERT INTO outbox_events(
+                    signal_id, topic, payload_json, created_at_ms
+                )
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(signal_id) DO NOTHING
+                """,
+                (
+                    signal_id,
+                    topic,
+                    signal.payload_json,
+                    signal.created_at_ms,
+                ),
+            )
+            outbox_inserted = outbox_cursor.rowcount == 1
+            stored_outbox = self._connection.execute(
+                """
+                SELECT event_id, topic, payload_json, created_at_ms
+                FROM outbox_events WHERE signal_id = ?
+                """,
+                (signal_id,),
+            ).fetchone()
+            expected_outbox = (
+                topic,
+                signal.payload_json,
+                signal.created_at_ms,
+            )
+            if stored_outbox is None or tuple(stored_outbox[1:]) != expected_outbox:
+                raise ValueError("OUTBOX_SIGNAL_CONFLICT")
+            if len(
+                {
+                    evaluation_inserted,
+                    signal_inserted,
+                    outbox_inserted,
+                }
+            ) != 1:
+                raise RuntimeError("CANARY_ATOMICITY_VIOLATION")
+            evaluation_id = stored_evaluation[0]
+            outbox_id = stored_outbox[0]
+            self._connection.commit()
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+        if outbox_inserted and broker is not None:
+            broker.publish_committed(outbox_id)
+        return evaluation_id, signal_id, outbox_id
+
     def read_outbox_after(
         self,
         event_id: int,

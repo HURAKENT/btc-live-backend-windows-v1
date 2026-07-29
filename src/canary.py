@@ -100,6 +100,8 @@ def evaluate_canary(snapshot: CanonicalSnapshot) -> StrategyEvaluation:
     evaluation_payload = {
         **identity,
         "canary_infrastructure_only": True,
+        "current_reevaluation_required": recovered,
+        "execution_eligible": False,
         "historical_signal_is_current_live_signal": False,
         "paper_or_live_eligible": False,
         "reason_code": reason_code,
@@ -176,8 +178,8 @@ def commit_canary_if_new(
         execution_eligible=False,
         infrastructure_only=True,
     )
-    commit_signal_and_outbox(
-        store,
+    store.commit_evaluation_signal_and_outbox(
+        evaluation,
         signal,
         topic="signal.created",
         broker=broker,
