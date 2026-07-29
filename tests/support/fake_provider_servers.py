@@ -12,9 +12,15 @@ MINUTE_MS = 60_000
 
 
 class FakeProviderServer:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        startup_barrier: asyncio.Event | None = None,
+    ) -> None:
         self._runner: web.AppRunner | None = None
         self.port: int | None = None
+        self.startup_barrier = startup_barrier
+        self.startup_barrier_reached = asyncio.Event()
         self.polymarket_connections = 0
         self.binance_connections = 0
         self.observed_subscriptions: list[dict] = []
@@ -67,6 +73,12 @@ class FakeProviderServer:
         }
 
     async def _gamma(self, request: web.Request) -> web.Response:
+        if (
+            self.startup_barrier is not None
+            and not self.startup_barrier.is_set()
+        ):
+            self.startup_barrier_reached.set()
+            await self.startup_barrier.wait()
         return web.json_response({"events": [self.event], "next_cursor": ""})
 
     async def _binance_rest(self, request: web.Request) -> web.Response:

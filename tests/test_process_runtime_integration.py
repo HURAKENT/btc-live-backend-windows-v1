@@ -158,7 +158,10 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.server = FakeProviderServer()
+        self.startup_barrier = asyncio.Event()
+        self.server = FakeProviderServer(
+            startup_barrier=self.startup_barrier,
+        )
         await self.server.start()
         self.api_port = self._free_port()
         self.database_path = self.root / "runtime.sqlite3"
@@ -168,6 +171,8 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
             encoding="utf-8",
         )
         self.processes = []
+        self.status_timeline = []
+        self.timeline_started_at = time.monotonic()
 
     async def asyncTearDown(self):
         for process in self.processes:
@@ -180,8 +185,27 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_real_process_starting_pass_reconnect_mutex_and_restart(self):
         started = time.monotonic()
         first = self._spawn()
-        observed_starting, health = await self._wait_for_pass(first)
+        await asyncio.wait_for(
+            self.server.startup_barrier_reached.wait(),
+            timeout=10,
+        )
+        starting_health = await self._wait_for_health(first)
+        self.assertEqual(starting_health["status"], "STARTING")
+        self.assertIsNone(first.poll())
+        self.assertFalse(self.startup_barrier.is_set())
+        self.assertNotEqual(starting_health["status"], "PASS")
+
+        self.startup_barrier.set()
+        observed_starting, health = await self._wait_for_pass(
+            first,
+            observed_starting=True,
+        )
         self.assertTrue(observed_starting)
+        self.assertEqual(
+            [entry["status"] for entry in self.status_timeline[:2]],
+            ["STARTING", "PASS"],
+            self.status_timeline,
+        )
         readiness = health["runtime_readiness"]
         self.assertTrue(readiness["live_ready"])
         self.assertEqual(readiness["market_count"], 11)
@@ -217,11 +241,43 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self._integrity(), ("ok", "ok", "wal", 2, 1))
 
         first_counts = self._database_counts()
+        self.startup_barrier.clear()
+        self.server.startup_barrier_reached.clear()
         restarted = self._spawn()
-        _, restarted_health = await self._wait_for_pass(restarted)
+        await asyncio.wait_for(
+            self.server.startup_barrier_reached.wait(),
+            timeout=10,
+        )
+        restart_starting_health = await self._wait_for_health(
+            restarted,
+            phase="restart",
+        )
+        self.assertEqual(restart_starting_health["status"], "STARTING")
+        self.assertIsNone(restarted.poll())
+        self.startup_barrier.set()
+        restart_observed_starting, restarted_health = await self._wait_for_pass(
+            restarted,
+            observed_starting=True,
+            phase="restart",
+        )
+        self.assertTrue(restart_observed_starting)
         self.assertEqual(restarted_health["status"], "PASS")
+        self.assertEqual(
+            [
+                entry["status"]
+                for entry in self.status_timeline
+                if entry["phase"] == "restart"
+            ][:2],
+            ["STARTING", "PASS"],
+            self.status_timeline,
+        )
+        self.assertEqual(self._blocking_incidents(), ())
         await self._ctrl_break(restarted)
         self.assertEqual(restarted.returncode, 0)
+        self.assertTrue(self._port_is_free(self.api_port))
+        self.assertTrue(
+            all(process.poll() is not None for process in self.processes)
+        )
         restarted_counts = self._database_counts()
         self.assertEqual(restarted_counts["market_catalog"], 1)
         self.assertEqual(restarted_counts["duplicate_natural_keys"], 0)
@@ -231,8 +287,29 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertLess(time.monotonic() - started, 120)
 
-    async def _wait_for_pass(self, process):
-        observed_starting = False
+    async def _wait_for_health(self, process, *, phase="initial"):
+        deadline = time.monotonic() + 10
+        url = f"http://127.0.0.1:{self.api_port}/api/v1/health"
+        async with ClientSession() as session:
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    self.fail(f"backend exited early: {process.returncode}")
+                try:
+                    async with session.get(url) as response:
+                        payload = await response.json()
+                    self._record_status(phase, payload)
+                    return payload
+                except OSError:
+                    await asyncio.sleep(0)
+        self.fail("backend API did not become available")
+
+    async def _wait_for_pass(
+        self,
+        process,
+        *,
+        observed_starting=False,
+        phase="initial",
+    ):
         deadline = time.monotonic() + 45
         url = f"http://127.0.0.1:{self.api_port}/api/v1/health"
         async with ClientSession() as session:
@@ -242,6 +319,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 try:
                     async with session.get(url) as response:
                         payload = await response.json()
+                    self._record_status(phase, payload)
                     observed_starting |= payload["status"] in {
                         "STARTING",
                         "DEGRADED",
@@ -252,6 +330,28 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     pass
                 await asyncio.sleep(0.05)
         self.fail("backend did not reach PASS")
+
+    def _record_status(self, phase, payload):
+        status = payload["status"]
+        if (
+            self.status_timeline
+            and self.status_timeline[-1]["phase"] == phase
+            and self.status_timeline[-1]["status"] == status
+        ):
+            return
+        self.status_timeline.append(
+            {
+                "elapsed_ms": int(
+                    (time.monotonic() - self.timeline_started_at) * 1000
+                ),
+                "phase": phase,
+                "status": status,
+            }
+        )
+
+    def test_fake_provider_default_has_no_startup_barrier(self):
+        server = FakeProviderServer()
+        self.assertIsNone(server.startup_barrier)
 
     async def _wait_for_polymarket_reconnect(self):
         deadline = time.monotonic() + 10
@@ -337,6 +437,31 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
             )
         finally:
             connection.close()
+
+    def _blocking_incidents(self):
+        connection = sqlite3.connect(
+            f"file:{self.database_path.as_posix()}?mode=ro",
+            uri=True,
+        )
+        try:
+            text = "\n".join(
+                f"{row[0]}\n{row[1]}"
+                for row in connection.execute(
+                    "SELECT status, payload_json FROM incidents"
+                )
+            )
+        finally:
+            connection.close()
+        return tuple(
+            code
+            for code in (
+                "SOURCE_EVENT_CONFLICT",
+                "RECOVERY_BLOCKED",
+                "WRITER_FAILED",
+                "UNEXPECTED_PROVIDER_STREAM_EXIT",
+            )
+            if code in text
+        )
 
     @staticmethod
     def _free_port():
