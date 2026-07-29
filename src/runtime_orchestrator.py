@@ -958,6 +958,7 @@ async def build_default_runtime_orchestrator(
     *,
     store: SqliteStore,
     broker: OutboxBroker,
+    integration_endpoints: Any = None,
 ) -> C1RuntimeOrchestrator:
     session = aiohttp.ClientSession(
         cookie_jar=aiohttp.DummyCookieJar(),
@@ -994,8 +995,13 @@ async def build_default_runtime_orchestrator(
             "ascending": "true",
             "limit": 500,
         }
+        gamma_url = (
+            "https://gamma-api.polymarket.com/events/keyset"
+            if integration_endpoints is None
+            else integration_endpoints.gamma_events_url
+        )
         async with session.get(
-            "https://gamma-api.polymarket.com/events/keyset",
+            gamma_url,
             params=params,
             allow_redirects=False,
         ) as response:
@@ -1009,16 +1015,42 @@ async def build_default_runtime_orchestrator(
             raise ValueError("INVALID_GAMMA_DISCOVERY_RESPONSE")
         return events
 
+    binance_stream = BinanceStream(
+        connect=lambda _url: session.ws_connect(
+            (
+                "wss://stream.binance.com:9443/ws/btcusdt@kline_1m"
+                if integration_endpoints is None
+                else integration_endpoints.binance_websocket_url
+            )
+        )
+    )
     binance = BinanceRuntimeAdapter(
         session=session,
-        stream=BinanceStream(connect=session.ws_connect),
+        stream=binance_stream,
+        rest_bases=(
+            None
+            if integration_endpoints is None
+            else integration_endpoints.binance_rest_bases
+        ),
     )
     polymarket = PolymarketRuntimeAdapter(
         session=session,
-        stream=PolymarketStream(session),
+        stream=PolymarketStream(
+            session,
+            websocket_url=(
+                "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+                if integration_endpoints is None
+                else integration_endpoints.polymarket_websocket_url
+            ),
+        ),
         event_loader=load_events,
         now_utc=lambda: datetime.now(timezone.utc),
         close_session=session.close,
+        clob_base_url=(
+            None
+            if integration_endpoints is None
+            else integration_endpoints.polymarket_clob_base_url
+        ),
     )
     now_seconds = int(now.timestamp())
     return C1RuntimeOrchestrator(

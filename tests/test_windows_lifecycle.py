@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+import asyncio
+import signal
+import unittest
+from unittest.mock import AsyncMock, patch
+
+from src import app
+
+
+class _Backend:
+    def __init__(self, *, stop_error: BaseException | None = None):
+        self.stop_calls = 0
+        self.stop_error = stop_error
+
+    async def start(self):
+        return None
+
+    async def stop(self):
+        self.stop_calls += 1
+        if self.stop_error is not None:
+            raise self.stop_error
+
+
+class WindowsSignalLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_sigint_requests_shutdown_and_restores_handler(self):
+        await self._assert_signal_requests_shutdown(signal.SIGINT)
+
+    async def test_sigbreak_requests_shutdown_when_available(self):
+        if not hasattr(signal, "SIGBREAK"):
+            self.skipTest("SIGBREAK unavailable")
+        await self._assert_signal_requests_shutdown(signal.SIGBREAK)
+
+    async def test_repeated_signal_causes_one_backend_stop(self):
+        backend = _Backend()
+
+        async def trigger():
+            await asyncio.sleep(0)
+            for handler in installed.values():
+                handler(0, None)
+                handler(0, None)
+
+        installed = {}
+        with patch.object(signal, "getsignal", return_value="previous"), patch.object(
+            signal,
+            "signal",
+            side_effect=lambda sig, handler: installed.__setitem__(sig, handler),
+        ):
+            trigger_task = asyncio.create_task(trigger())
+            exit_code = await app.run_backend(backend)
+            await trigger_task
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(backend.stop_calls, 1)
+
+    async def test_failed_stop_returns_nonzero(self):
+        backend = _Backend(stop_error=RuntimeError("stop failed"))
+        with patch.object(
+            app,
+            "_wait_for_shutdown_signal",
+            new=AsyncMock(return_value=None),
+        ):
+            exit_code = await app.run_backend(backend)
+        self.assertNotEqual(exit_code, 0)
+        self.assertEqual(backend.stop_calls, 2)
+
+    async def _assert_signal_requests_shutdown(self, target):
+        installed = {}
+        restored = []
+
+        def set_handler(sig, handler):
+            if handler == "previous":
+                restored.append(sig)
+            else:
+                installed[sig] = handler
+
+        with patch.object(signal, "getsignal", return_value="previous"), patch.object(
+            signal,
+            "signal",
+            side_effect=set_handler,
+        ):
+            task = asyncio.create_task(app._wait_for_shutdown_signal())
+            await asyncio.sleep(0)
+            installed[target](target, None)
+            await asyncio.wait_for(task, timeout=1)
+
+        self.assertIn(target, restored)
+
+
+if __name__ == "__main__":
+    unittest.main()

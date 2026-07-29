@@ -66,7 +66,12 @@ class RuntimeLifecycle(Protocol):
 
 
 class BackendRuntime:
-    def __init__(self, *, orchestrator_factory=None) -> None:
+    def __init__(
+        self,
+        *,
+        orchestrator_factory=None,
+        api_bind_override: tuple[str, int] | None = None,
+    ) -> None:
         self._store: SqliteStore | None = None
         self._read_store: SqliteReadStore | None = None
         self._broker: OutboxBroker | None = None
@@ -76,6 +81,7 @@ class BackendRuntime:
         self._config: RuntimeConfig | None = None
         self._orchestrator_factory = orchestrator_factory
         self._orchestrator = None
+        self._api_bind_override = api_bind_override
 
     def initialize(
         self,
@@ -123,6 +129,8 @@ class BackendRuntime:
     async def start_api(self, host: str, port: int) -> None:
         if self._read_store is None or self._broker is None:
             raise RuntimeError("BACKEND_RUNTIME_NOT_INITIALIZED")
+        if self._api_bind_override is not None:
+            host, port = self._api_bind_override
         app = create_api_app(
             self._read_store,
             self._broker,
@@ -324,7 +332,7 @@ async def run_backend(
     try:
         await backend.start()
         if wait_for_stop:
-            await _wait_for_sigint()
+            await _wait_for_shutdown_signal()
         await backend.stop()
         return CLEAN_STOP_EXIT
     except AlreadyRunningError:
@@ -348,16 +356,27 @@ async def _stop_after_failure(backend) -> None:
         pass
 
 
-async def _wait_for_sigint() -> None:
+async def _wait_for_shutdown_signal() -> None:
     loop = asyncio.get_running_loop()
     requested = asyncio.Event()
-    previous = signal.getsignal(signal.SIGINT)
+    signals = [signal.SIGINT]
+    if hasattr(signal, "SIGBREAK"):
+        signals.append(signal.SIGBREAK)
+    previous = {
+        shutdown_signal: signal.getsignal(shutdown_signal)
+        for shutdown_signal in signals
+    }
 
     def request_stop(signum, frame) -> None:
         loop.call_soon_threadsafe(requested.set)
 
-    signal.signal(signal.SIGINT, request_stop)
+    for shutdown_signal in signals:
+        signal.signal(shutdown_signal, request_stop)
     try:
         await requested.wait()
     finally:
-        signal.signal(signal.SIGINT, previous)
+        for shutdown_signal in signals:
+            signal.signal(shutdown_signal, previous[shutdown_signal])
+
+
+_wait_for_sigint = _wait_for_shutdown_signal

@@ -204,6 +204,7 @@ async def _fetch_kline_page(
     *,
     start_ms: int,
     end_ms: int,
+    rest_bases: tuple[str, ...] = BINANCE_REST_BASES,
 ) -> list[Any]:
     params = {
         "symbol": BINANCE_SYMBOL,
@@ -213,7 +214,7 @@ async def _fetch_kline_page(
         "limit": 1000,
     }
     statuses: list[int] = []
-    for base in BINANCE_REST_BASES:
+    for base in rest_bases:
         try:
             async with session.get(
                 f"{base}{BINANCE_KLINES_PATH}",
@@ -235,6 +236,8 @@ async def iter_binance_backfill(
     session: Any,
     start_ms: int,
     end_ms: int,
+    *,
+    rest_bases: tuple[str, ...] = BINANCE_REST_BASES,
 ) -> AsyncIterator[SourceEvent]:
     _require_type(start_ms, int, "start_ms")
     _require_type(end_ms, int, "end_ms")
@@ -251,6 +254,7 @@ async def iter_binance_backfill(
             session,
             start_ms=next_start_ms,
             end_ms=end_ms,
+            rest_bases=rest_bases,
         )
         if not page:
             return

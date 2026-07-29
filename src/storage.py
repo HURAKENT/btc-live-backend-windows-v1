@@ -195,22 +195,43 @@ class SqliteStore:
 
             # Acquisition metadata may legitimately differ when the same
             # authoritative event is observed through REST backfill and a live
-            # stream.  Natural key + canonical payload define event identity;
+            # stream. Natural key + canonical payload define event identity;
             # received timestamp and recovery origin describe how it arrived.
-            stored_authoritative = (
-                stored[1],
-                stored[2],
-                stored[4],
-                stored[5],
-                stored[6],
-            )
-            expected_authoritative = (
-                event.source,
-                event.source_timestamp_ms,
-                event.event_type,
-                event.payload_json,
-                event.payload_sha256,
-            )
+            #
+            # A Polymarket book natural key is asset_id + provider book hash.
+            # Re-observing that exact hashed state later is therefore an
+            # idempotent replay even when the provider observation timestamp
+            # advances. Other event types retain strict source-timestamp
+            # equality because their frozen identities do not make that
+            # timestamp redundant.
+            if stored[4] == event.event_type == "POLYMARKET_BOOK":
+                stored_authoritative = (
+                    stored[1],
+                    stored[4],
+                    stored[5],
+                    stored[6],
+                )
+                expected_authoritative = (
+                    event.source,
+                    event.event_type,
+                    event.payload_json,
+                    event.payload_sha256,
+                )
+            else:
+                stored_authoritative = (
+                    stored[1],
+                    stored[2],
+                    stored[4],
+                    stored[5],
+                    stored[6],
+                )
+                expected_authoritative = (
+                    event.source,
+                    event.source_timestamp_ms,
+                    event.event_type,
+                    event.payload_json,
+                    event.payload_sha256,
+                )
             if stored_authoritative != expected_authoritative:
                 raise ValueError("SOURCE_EVENT_CONFLICT")
 

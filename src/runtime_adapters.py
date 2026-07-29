@@ -48,6 +48,7 @@ class BinanceRuntimeAdapter:
         "_session",
         "_stream",
         "_stream_ready",
+        "_rest_bases",
     )
 
     def __init__(
@@ -60,6 +61,7 @@ class BinanceRuntimeAdapter:
         ]
         | None = iter_binance_backfill,
         close_session: Callable[[], Awaitable[None] | None] | None = None,
+        rest_bases: tuple[str, ...] | None = None,
     ) -> None:
         self._session = session
         self._stream = stream
@@ -67,6 +69,7 @@ class BinanceRuntimeAdapter:
         self._close_session = close_session
         self._closed = False
         self._stream_ready = asyncio.Event()
+        self._rest_bases = rest_bases
 
     async def recover(
         self,
@@ -78,10 +81,14 @@ class BinanceRuntimeAdapter:
             raise RuntimeError("RUNTIME_BINANCE_BACKFILL_UNAVAILABLE")
         recovered: list[SourceEvent] = []
         try:
+            kwargs = {}
+            if self._rest_bases is not None:
+                kwargs["rest_bases"] = self._rest_bases
             async for item in self._backfill(
                 self._session,
                 start_ms,
                 end_ms,
+                **kwargs,
             ):
                 if (
                     type(item) is not SourceEvent
@@ -134,6 +141,7 @@ class PolymarketRuntimeAdapter:
         "_session",
         "_stream",
         "_stream_ready",
+        "_clob_base_url",
     )
 
     def __init__(
@@ -153,6 +161,7 @@ class PolymarketRuntimeAdapter:
             iter_price_history
         ),
         close_session: Callable[[], Awaitable[None] | None] | None = None,
+        clob_base_url: str | None = None,
     ) -> None:
         self._session = session
         self._stream = stream
@@ -164,6 +173,7 @@ class PolymarketRuntimeAdapter:
         self._close_session = close_session
         self._closed = False
         self._stream_ready = asyncio.Event()
+        self._clob_base_url = clob_base_url
 
     async def discover_market(self) -> MarketDiscovery:
         try:
@@ -214,9 +224,13 @@ class PolymarketRuntimeAdapter:
         if type(discovery) is not MarketDiscovery:
             raise ValueError("INVALID_MARKET_DISCOVERY")
         try:
+            kwargs = {}
+            if self._clob_base_url is not None:
+                kwargs["clob_base_url"] = self._clob_base_url
             books = await self._fetch_books(
                 self._session,
                 discovery.asset_ids,
+                **kwargs,
             )
             observed_assets = tuple(
                 json.loads(item.payload_json).get("asset_id")
@@ -272,11 +286,15 @@ class PolymarketRuntimeAdapter:
             raise ValueError("INVALID_MARKET_RECONCILIATION")
         recovered: list[SourceEvent] = []
         for asset_id in reconciliation.asset_ids:
+            kwargs = {}
+            if self._clob_base_url is not None:
+                kwargs["clob_base_url"] = self._clob_base_url
             async for item in self._history(
                 self._session,
                 asset_id=asset_id,
                 start_ts=start_ts,
                 end_ts=end_ts,
+                **kwargs,
             ):
                 if type(item) is not SourceEvent:
                     raise ValueError("INVALID_POLYMARKET_HISTORY_EVENT")

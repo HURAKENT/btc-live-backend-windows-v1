@@ -7,6 +7,8 @@ import unittest
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 from aiohttp import ClientSession, WSMsgType, web
 
@@ -21,6 +23,10 @@ from src.polymarket_provider import (
     iter_price_history,
     parse_market_ws_message,
 )
+try:
+    from src.polymarket_provider import ReconnectPolicy
+except ImportError:
+    ReconnectPolicy = None
 
 
 FIXTURES = Path("tests/fixtures")
@@ -215,6 +221,239 @@ class PolymarketWireBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["provider_point"]["p"], "0.456")
         self.assertEqual(session.response.read_calls, 1)
         self.assertEqual(session.response.json_calls, 0)
+
+
+class _ReconnectWebSocket:
+    def __init__(self, messages=(), *, error=None):
+        self._messages = list(messages)
+        self._error = error
+        self.sent_json = []
+        self.sent_text = []
+
+    async def send_json(self, value):
+        self.sent_json.append(value)
+
+    async def send_str(self, value):
+        self.sent_text.append(value)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        await asyncio.sleep(0)
+        if self._messages:
+            return self._messages.pop(0)
+        if self._error is not None:
+            error, self._error = self._error, None
+            raise error
+        raise StopAsyncIteration
+
+
+class _ReconnectContext:
+    def __init__(self, websocket):
+        self.websocket = websocket
+
+    async def __aenter__(self):
+        return self.websocket
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        return False
+
+
+class _ReconnectSession:
+    def __init__(self, websockets):
+        self.websockets = list(websockets)
+        self.connect_calls = 0
+
+    def ws_connect(self, url):
+        self.connect_calls += 1
+        if not self.websockets:
+            raise asyncio.CancelledError
+        return _ReconnectContext(self.websockets.pop(0))
+
+
+class PolymarketReconnectTests(unittest.IsolatedAsyncioTestCase):
+    async def test_normal_close_reconnects_and_reports_incident(self):
+        first = _ReconnectWebSocket()
+        second = _ReconnectWebSocket()
+        session = _ReconnectSession([first, second])
+        incidents = []
+        delays = []
+
+        async def sleep(delay):
+            delays.append(delay)
+            if len(delays) == 2:
+                raise asyncio.CancelledError
+
+        stream = PolymarketStream(
+            session,
+            incident_sink=incidents.append,
+            sleep=sleep,
+            jitter=lambda: 1.0,
+        )
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(["yes", "no"], asyncio.Queue())
+
+        self.assertEqual(session.connect_calls, 2)
+        self.assertEqual(delays, [1.0, 2.0])
+        self.assertEqual(
+            [item["code"] for item in incidents],
+            ["POLYMARKET_STREAM_DISCONNECTED"] * 2,
+        )
+
+    async def test_transient_connection_errors_reconnect(self):
+        session = _ReconnectSession(
+            [_ReconnectWebSocket(error=OSError("offline"))]
+        )
+        delays = []
+
+        async def sleep(delay):
+            delays.append(delay)
+            raise asyncio.CancelledError
+
+        stream = PolymarketStream(
+            session,
+            sleep=sleep,
+            jitter=lambda: 1.0,
+        )
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(["yes", "no"], asyncio.Queue())
+        self.assertEqual(delays, [1.0])
+
+    def test_backoff_is_exponential_and_capped_with_jitter(self):
+        policy = ReconnectPolicy(jitter=lambda: 1.0)
+        self.assertEqual(
+            [policy.next_delay() for _ in range(7)],
+            [1.0, 2.0, 4.0, 8.0, 16.0, 30.0, 30.0],
+        )
+
+    def test_healthy_connection_resets_backoff(self):
+        policy = ReconnectPolicy(jitter=lambda: 1.0)
+        self.assertEqual(policy.next_delay(), 1.0)
+        self.assertEqual(policy.next_delay(), 2.0)
+        policy.record_healthy_duration(300.0)
+        self.assertEqual(policy.next_delay(), 1.0)
+
+    async def test_ready_is_set_only_after_subscription(self):
+        websocket = _ReconnectWebSocket()
+        session = _ReconnectSession([websocket])
+        ready = asyncio.Event()
+
+        async def sleep(_delay):
+            raise asyncio.CancelledError
+
+        stream = PolymarketStream(session, sleep=sleep)
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(["yes", "no"], asyncio.Queue(), ready_event=ready)
+        self.assertTrue(ready.is_set())
+        self.assertEqual(len(websocket.sent_json), 1)
+
+    async def test_heartbeat_is_cancelled_before_reconnect(self):
+        websocket = _ReconnectWebSocket()
+        session = _ReconnectSession([websocket])
+        cancelled = asyncio.Event()
+
+        async def heartbeat(_websocket):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        async def sleep(_delay):
+            raise asyncio.CancelledError
+
+        stream = PolymarketStream(session, sleep=sleep)
+        stream._heartbeat = heartbeat
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(["yes", "no"], asyncio.Queue())
+        self.assertTrue(cancelled.is_set())
+
+    async def test_cancellation_is_immediate_and_has_no_incident(self):
+        incidents = []
+        session = _ReconnectSession([])
+        stream = PolymarketStream(session, incident_sink=incidents.append)
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(["yes", "no"], asyncio.Queue())
+        self.assertEqual(incidents, [])
+
+    async def test_malformed_json_propagates_without_reconnect(self):
+        message = SimpleNamespace(type=WSMsgType.TEXT, data="{")
+        session = _ReconnectSession([_ReconnectWebSocket([message])])
+        stream = PolymarketStream(session)
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_WS_JSON"):
+            await stream.run(["yes", "no"], asyncio.Queue())
+        self.assertEqual(session.connect_calls, 1)
+
+    async def test_reconnected_event_reaches_runtime_queue(self):
+        payload = load_fixture("polymarket_book.json")
+        message = SimpleNamespace(
+            type=WSMsgType.TEXT,
+            data=json.dumps(payload),
+        )
+        session = _ReconnectSession(
+            [_ReconnectWebSocket(), _ReconnectWebSocket([message])]
+        )
+        queue = asyncio.Queue()
+
+        async def sleep(_delay):
+            return None
+
+        stream = PolymarketStream(
+            session,
+            sleep=sleep,
+            jitter=lambda: 1.0,
+        )
+        task = asyncio.create_task(stream.run(["yes", "no"], queue))
+        event = await asyncio.wait_for(queue.get(), timeout=1)
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertEqual(event.event_type, "POLYMARKET_BOOK")
+
+    async def test_reconnect_does_not_leave_duplicate_heartbeat_tasks(self):
+        session = _ReconnectSession(
+            [_ReconnectWebSocket(), _ReconnectWebSocket()]
+        )
+        active = 0
+        maximum = 0
+
+        async def heartbeat(_websocket):
+            nonlocal active, maximum
+            active += 1
+            maximum = max(maximum, active)
+            try:
+                await asyncio.Event().wait()
+            finally:
+                active -= 1
+
+        calls = 0
+
+        async def sleep(_delay):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise asyncio.CancelledError
+
+        stream = PolymarketStream(session, sleep=sleep)
+        stream._heartbeat = heartbeat
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(["yes", "no"], asyncio.Queue())
+        self.assertEqual(maximum, 1)
+        self.assertEqual(active, 0)
+
+
+class PolymarketHistoryBoundaryTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    async def _history_events(session):
+        return [
+            event
+            async for event in iter_price_history(
+                session,
+                asset_id="token-00-yes",
+                start_ts=100,
+                end_ts=100,
+            )
+        ]
 
     async def test_history_decimal_price_is_accepted(self):
         events = await self._history_events(
@@ -657,6 +896,7 @@ class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_local_websocket_subscription_and_ping_pong(self):
         observed = {}
+        ping_received = asyncio.Event()
 
         async def handler(request):
             websocket = web.WebSocketResponse()
@@ -665,6 +905,7 @@ class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
             observed["subscription"] = subscription
             ping = await websocket.receive(timeout=1)
             observed["ping"] = ping.data
+            ping_received.set()
             await websocket.send_str("PONG")
             await websocket.close()
             return websocket
@@ -685,14 +926,20 @@ class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
                     heartbeat_interval=0.05,
                 )
                 ready = asyncio.Event()
-                await asyncio.wait_for(
+                task = asyncio.create_task(
                     stream.run(
                         ["token-00-yes", "token-00-no"],
                         asyncio.Queue(),
                         ready_event=ready,
-                    ),
-                    timeout=2,
+                    )
                 )
+                try:
+                    await asyncio.wait_for(ready.wait(), timeout=1)
+                    await asyncio.wait_for(ping_received.wait(), timeout=1)
+                finally:
+                    task.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await task
                 self.assertTrue(ready.is_set())
         finally:
             await runner.cleanup()

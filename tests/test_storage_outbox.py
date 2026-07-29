@@ -210,6 +210,94 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(first.event_id, second.event_id)
         self.assertEqual(self.store.count("source_events"), 1)
 
+    def test_polymarket_book_reobservation_with_later_timestamp_is_idempotent(self):
+        from src.polymarket_provider import _parse_book
+
+        payload = {
+            "event_type": "book",
+            "asset_id": "asset-00",
+            "market": "bucket",
+            "timestamp": "1000",
+            "hash": "same-book",
+            "bids": [{"price": "0.45", "size": "10"}],
+            "asks": [{"price": "0.55", "size": "10"}],
+        }
+        first = _parse_book(payload, recovery_origin="REST_BACKFILL")
+        replay = _parse_book(
+            {**payload, "timestamp": "2000"},
+            recovery_origin="LIVE",
+        )
+
+        inserted = self.store.append_source_event(first)
+        duplicate = self.store.append_source_event(replay)
+
+        self.assertTrue(inserted.inserted)
+        self.assertFalse(duplicate.inserted)
+        self.assertEqual(inserted.event_id, duplicate.event_id)
+        self.assertEqual(self.store.count("source_events"), 1)
+
+    def test_polymarket_book_same_hash_with_changed_levels_is_conflict(self):
+        from src.polymarket_provider import _parse_book
+
+        payload = {
+            "event_type": "book",
+            "asset_id": "asset-00",
+            "market": "bucket",
+            "timestamp": "1000",
+            "hash": "same-book",
+            "bids": [{"price": "0.45", "size": "10"}],
+            "asks": [{"price": "0.55", "size": "10"}],
+        }
+        first = _parse_book(payload, recovery_origin="REST_BACKFILL")
+        changed = _parse_book(
+            {
+                **payload,
+                "timestamp": "2000",
+                "bids": [{"price": "0.46", "size": "10"}],
+            },
+            recovery_origin="LIVE",
+        )
+
+        self.store.append_source_event(first)
+        with self.assertRaisesRegex(ValueError, "SOURCE_EVENT_CONFLICT"):
+            self.store.append_source_event(changed)
+
+    def test_non_book_timestamp_change_remains_a_conflict(self):
+        self.store.append_source_event(self.event)
+        changed = dataclasses.replace(
+            self.event,
+            source_timestamp_ms=self.event.source_timestamp_ms + 1,
+        )
+
+        with self.assertRaisesRegex(ValueError, "SOURCE_EVENT_CONFLICT"):
+            self.store.append_source_event(changed)
+
+    def test_polymarket_book_new_hash_is_a_new_event(self):
+        from src.polymarket_provider import _parse_book
+
+        payload = {
+            "event_type": "book",
+            "asset_id": "asset-00",
+            "market": "bucket",
+            "timestamp": "1000",
+            "hash": "book-v1",
+            "bids": [{"price": "0.45", "size": "10"}],
+            "asks": [{"price": "0.55", "size": "10"}],
+        }
+        first = _parse_book(payload, recovery_origin="REST_BACKFILL")
+        second = _parse_book(
+            {**payload, "timestamp": "2000", "hash": "book-v2"},
+            recovery_origin="LIVE",
+        )
+
+        first_result = self.store.append_source_event(first)
+        second_result = self.store.append_source_event(second)
+
+        self.assertTrue(first_result.inserted)
+        self.assertTrue(second_result.inserted)
+        self.assertNotEqual(first_result.event_id, second_result.event_id)
+        self.assertEqual(self.store.count("source_events"), 2)
+
     def test_payload_hash_is_persisted(self):
         result = self.store.append_source_event(self.event)
         stored_hash = self.store.scalar(

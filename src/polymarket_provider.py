@@ -4,7 +4,10 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import random
+import time
 from collections.abc import AsyncIterator, Callable, Sequence
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -26,6 +29,30 @@ _SUPPORTED_PASSTHROUGH_EVENTS = frozenset(
         "market_resolved",
     }
 )
+
+
+@dataclass(slots=True)
+class ReconnectPolicy:
+    initial_delay: float = 1.0
+    maximum_delay: float = 30.0
+    healthy_reset_seconds: float = 300.0
+    jitter: Callable[[], float] = field(
+        default=lambda: random.uniform(0.8, 1.2),
+        repr=False,
+    )
+    _attempt: int = field(default=0, init=False, repr=False)
+
+    def next_delay(self) -> float:
+        delay = min(
+            self.maximum_delay,
+            self.initial_delay * (2**self._attempt),
+        )
+        self._attempt += 1
+        return delay * self.jitter()
+
+    def record_healthy_duration(self, duration: float) -> None:
+        if duration >= self.healthy_reset_seconds:
+            self._attempt = 0
 
 
 def _require_type(
@@ -392,12 +419,14 @@ class MarketBook:
 async def fetch_current_books(
     session: Any,
     asset_ids: Sequence[str],
+    *,
+    clob_base_url: str = CLOB_BASE_URL,
 ) -> list[SourceEvent]:
     events: list[SourceEvent] = []
     for asset_id in asset_ids:
         _require_type(asset_id, str, "asset_id")
         async with session.get(
-            f"{CLOB_BASE_URL}/book",
+            f"{clob_base_url}/book",
             params={"token_id": asset_id},
         ) as response:
             if response.status != 200:
@@ -419,6 +448,7 @@ async def iter_price_history(
     asset_id: str,
     start_ts: int,
     end_ts: int,
+    clob_base_url: str = CLOB_BASE_URL,
 ) -> AsyncIterator[SourceEvent]:
     _require_type(asset_id, str, "asset_id")
     _require_type(start_ts, int, "start_ts")
@@ -430,7 +460,7 @@ async def iter_price_history(
     seen: set[int] = set()
     while next_start <= end_ts:
         async with session.get(
-            f"{CLOB_BASE_URL}/prices-history",
+            f"{clob_base_url}/prices-history",
             params={
                 "market": asset_id,
                 "startTs": next_start,
@@ -503,11 +533,20 @@ class PolymarketStream:
         websocket_url: str = MARKET_WEBSOCKET_URL,
         heartbeat_interval: float = 10,
         incident_sink: Callable[[dict[str, str]], None] | None = None,
+        sleep: Callable[[float], Any] = asyncio.sleep,
+        policy: ReconnectPolicy | None = None,
+        jitter: Callable[[], float] | None = None,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._session = session
         self._websocket_url = websocket_url
         self._heartbeat_interval = heartbeat_interval
         self._incident_sink = incident_sink
+        self._sleep = sleep
+        self._policy = policy or ReconnectPolicy(
+            jitter=jitter or (lambda: random.uniform(0.8, 1.2))
+        )
+        self._monotonic = monotonic
 
     async def _heartbeat(self, websocket: Any) -> None:
         while True:
@@ -528,29 +567,63 @@ class PolymarketStream:
             "type": "market",
             "custom_feature_enabled": True,
         }
-        async with self._session.ws_connect(
-            self._websocket_url
-        ) as websocket:
-            await websocket.send_json(subscription)
-            if ready_event is not None:
-                ready_event.set()
-            heartbeat = asyncio.create_task(self._heartbeat(websocket))
+        while True:
+            connected_at = self._monotonic()
             try:
-                async for message in websocket:
-                    if message.type != WSMsgType.TEXT:
-                        continue
-                    if message.data == "PONG":
-                        continue
+                async with self._session.ws_connect(
+                    self._websocket_url
+                ) as websocket:
+                    await websocket.send_json(subscription)
+                    if ready_event is not None:
+                        ready_event.set()
+                    heartbeat = asyncio.create_task(
+                        self._heartbeat(websocket)
+                    )
                     try:
-                        payload = json.loads(message.data)
-                    except json.JSONDecodeError:
-                        raise ValueError("POLYMARKET_INVALID_WS_JSON") from None
-                    for event in parse_market_ws_message(
-                        payload,
-                        incident_sink=self._incident_sink,
-                    ):
-                        await buffer.put(event)
-            finally:
-                heartbeat.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await heartbeat
+                        async for message in websocket:
+                            if message.type != WSMsgType.TEXT:
+                                continue
+                            if message.data == "PONG":
+                                continue
+                            try:
+                                payload = json.loads(message.data)
+                            except json.JSONDecodeError:
+                                raise ValueError(
+                                    "POLYMARKET_INVALID_WS_JSON"
+                                ) from None
+                            for event in parse_market_ws_message(
+                                payload,
+                                incident_sink=self._incident_sink,
+                            ):
+                                await buffer.put(event)
+                            self._policy.record_healthy_duration(
+                                self._monotonic() - connected_at
+                            )
+                    finally:
+                        heartbeat.cancel()
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await heartbeat
+                error: BaseException = ConnectionError("stream ended")
+            except asyncio.CancelledError:
+                raise
+            except ValueError:
+                raise
+            except (OSError, TimeoutError) as caught:
+                error = caught
+            except Exception as caught:
+                from aiohttp import ClientError
+
+                if not isinstance(caught, ClientError):
+                    raise
+                error = caught
+
+            if self._incident_sink is not None:
+                self._incident_sink(
+                    {
+                        "severity": "WARNING",
+                        "source": "polymarket",
+                        "code": "POLYMARKET_STREAM_DISCONNECTED",
+                        "detail": str(error),
+                    }
+                )
+            await self._sleep(self._policy.next_delay())
