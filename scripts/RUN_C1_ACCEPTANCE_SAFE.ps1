@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("Run", "Preflight")]
+    [ValidateSet("Run", "Preflight", "Offline")]
     [string]$Mode = "Run",
 
     [string]$PythonPath = ".\.venv\Scripts\python.exe"
@@ -43,9 +43,11 @@ function Invoke-NativePython {
         if (-not $Process.Start()) {
             throw "Native process did not start."
         }
-        $StdOut = $Process.StandardOutput.ReadToEnd()
-        $StdErr = $Process.StandardError.ReadToEnd()
+        $StdOutTask = $Process.StandardOutput.ReadToEndAsync()
+        $StdErrTask = $Process.StandardError.ReadToEndAsync()
         $Process.WaitForExit()
+        $StdOut = $StdOutTask.GetAwaiter().GetResult()
+        $StdErr = $StdErrTask.GetAwaiter().GetResult()
         return [PSCustomObject]@{
             ExitCode = $Process.ExitCode
             StdOut = $StdOut
@@ -110,11 +112,14 @@ if ($Mode -eq "Preflight") {
 }
 
 $Commands = @(
+    @("-m", "unittest", "tests.test_process_runtime_integration", "-v"),
     @("-m", "unittest", "discover", "-s", "tests", "-v"),
     @("-m", "compileall", "-q", "src", "tests", "tools", "run_backend.py"),
-    @("-m", "pip", "check"),
-    @("tools\simulate_downtime.py")
+    @("-m", "pip", "check")
 )
+if ($Mode -eq "Run") {
+    $Commands += ,@("tools\simulate_downtime.py")
+}
 
 foreach ($Command in $Commands) {
     $Result = Invoke-NativePython $Command

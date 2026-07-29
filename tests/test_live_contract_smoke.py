@@ -129,11 +129,15 @@ class LiveContractSmokeTests(unittest.TestCase):
         text = self._launcher(LAUNCHERS[2])
         self.assertIn("System.Diagnostics.ProcessStartInfo", text)
         self.assertIn("Invoke-NativePython", text)
+        self.assertEqual(text.count("ReadToEndAsync()"), 2)
         self.assertIn(
             '@("tools\\simulate_downtime.py")',
             text,
         )
-        self.assertIn('[ValidateSet("Run", "Preflight")]', text)
+        self.assertIn(
+            '[ValidateSet("Run", "Preflight", "Offline")]',
+            text,
+        )
         self.assertNotIn("C1 PASS", text)
 
     def test_python_requirement_is_exact(self):

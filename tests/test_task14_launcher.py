@@ -30,6 +30,68 @@ class Task14LauncherTests(unittest.TestCase):
             "deliberate child failure",
             7,
         )
+        spaced_root = cls.root / "path with spaces"
+        spaced_root.mkdir()
+        cls.large_stderr = cls._compile_source(
+            spaced_root,
+            "large_stderr",
+            """
+using System;
+public static class Program {
+    public static int Main(string[] args) {
+        bool version = args.Length == 1 && args[0] == "--version";
+        if (version) {
+            Console.Out.WriteLine("Python 3.12.4");
+            Console.Error.Write(new string('E', 1048576));
+            return 0;
+        }
+        Console.Out.WriteLine("STDOUT_MARKER");
+        Console.Error.WriteLine("STDERR_MARKER");
+        Console.Error.Write(new string('E', 1048576));
+        return 0;
+    }
+}
+""",
+        )
+        cls.large_both_failure = cls._compile_source(
+            spaced_root,
+            "large_both_failure",
+            """
+using System;
+public static class Program {
+    public static int Main(string[] args) {
+        bool version = args.Length == 1 && args[0] == "--version";
+        if (version) {
+            Console.Out.WriteLine("Python 3.12.4");
+            return 0;
+        }
+        Console.Out.WriteLine("STDOUT_MARKER");
+        Console.Out.Write(new string('O', 1048576));
+        Console.Error.WriteLine("STDERR_MARKER");
+        Console.Error.Write(new string('E', 1048576));
+        return 7;
+    }
+}
+""",
+        )
+        cls.command_recorder = cls._compile_source(
+            spaced_root,
+            "command_recorder",
+            """
+using System;
+public static class Program {
+    public static int Main(string[] args) {
+        bool version = args.Length == 1 && args[0] == "--version";
+        if (version) {
+            Console.Out.WriteLine("Python 3.12.4");
+            return 0;
+        }
+        Console.Out.WriteLine("ARGS:" + string.Join("|", args));
+        return 0;
+    }
+}
+""",
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -63,7 +125,54 @@ class Task14LauncherTests(unittest.TestCase):
         self.assertIn("RAW_VERSION_COUNT=1", result.stdout)
         self.assertIn("child exit code=0", result.stdout)
 
-    def _run(self, executable: Path) -> subprocess.CompletedProcess[str]:
+    def test_large_stderr_is_drained_while_stdout_is_captured(self):
+        result = self._run(self.large_stderr, mode="Run", timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+        self.assertEqual(result.stdout.count("STDOUT_MARKER"), 5)
+        self.assertEqual(result.stderr.count("STDERR_MARKER"), 5)
+        self.assertGreaterEqual(result.stderr.count("E"), 6 * 1048576)
+
+    def test_large_stdout_and_stderr_preserve_exit_and_both_streams(self):
+        result = self._run(
+            self.large_both_failure,
+            mode="Run",
+            timeout=15,
+        )
+        self.assertEqual(result.returncode, 7)
+        self.assertEqual(result.stdout.count("STDOUT_MARKER"), 1)
+        self.assertEqual(result.stderr.count("STDERR_MARKER"), 1)
+        self.assertGreaterEqual(result.stdout.count("O"), 1048576)
+        self.assertGreaterEqual(result.stderr.count("E"), 1048576)
+
+    def test_offline_mode_runs_all_gates_without_acceptance_runner(self):
+        result = self._run(
+            self.command_recorder,
+            mode="Offline",
+            timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "ARGS:-m|unittest|tests.test_process_runtime_integration|-v",
+            result.stdout,
+        )
+        self.assertIn(
+            "ARGS:-m|unittest|discover|-s|tests|-v",
+            result.stdout,
+        )
+        self.assertIn(
+            "ARGS:-m|compileall|-q|src|tests|tools|run_backend.py",
+            result.stdout,
+        )
+        self.assertIn("ARGS:-m|pip|check", result.stdout)
+        self.assertNotIn("simulate_downtime.py", result.stdout)
+
+    def _run(
+        self,
+        executable: Path,
+        *,
+        mode: str = "Preflight",
+        timeout: int = 30,
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
                 str(POWERSHELL),
@@ -73,14 +182,14 @@ class Task14LauncherTests(unittest.TestCase):
                 "-File",
                 str(LAUNCHER),
                 "-Mode",
-                "Preflight",
+                mode,
                 "-PythonPath",
                 str(executable),
             ],
             cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=timeout,
             check=False,
         )
 
@@ -102,6 +211,36 @@ class Task14LauncherTests(unittest.TestCase):
             f"return {exit_code}; "
             "} }"
         )
+        source_path.write_text(source, encoding="utf-8")
+        command = (
+            f"Add-Type -Path '{source_path}' "
+            f"-OutputType ConsoleApplication -OutputAssembly '{path}'"
+        )
+        result = subprocess.run(
+            [
+                str(POWERSHELL),
+                "-NoProfile",
+                "-Command",
+                command,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr)
+        return path
+
+    @classmethod
+    def _compile_source(
+        cls,
+        root: Path,
+        name: str,
+        source: str,
+    ) -> Path:
+        path = root / f"{name}.exe"
+        source_path = root / f"{name}.cs"
         source_path.write_text(source, encoding="utf-8")
         command = (
             f"Add-Type -Path '{source_path}' "
