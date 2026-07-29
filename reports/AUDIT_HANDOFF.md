@@ -267,3 +267,14 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Cleanup used `CTRL_BREAK_EVENT` and no forced termination, but the observed Windows process exit code was `3221225786`, not clean exit `0`; this is separately recorded as `BLOCKED_GRACEFUL_SHUTDOWN` evidence and was not fixed.
 - Isolated SQLite evidence remained valid: `quick_check=ok`, `integrity_check=ok`, `journal_mode=wal`, `synchronous=2`, and `foreign_keys=1`. Final state: backend absent, mutex free, and port 8767 free.
 - The replacement blocked acceptance pack is sanitized and self-verifying; no raw database/WAL/SHM or raw WebSocket log is included. C2/C3, paper execution, Registry 47 execution, wallet/signing, and trading were not started. Final C1 PASS is not claimed.
+
+## C1 Runtime Integration — Task 1 Persistence Seams
+
+- Gate: `C1_RUNTIME_PERSISTENCE_PASS`.
+- TDD RED: the new 34-test runtime-persistence module produced 36 expected `AttributeError` errors across 31 feature tests because the persistence/read seams did not exist; three schema/security baselines passed and no production file had changed before the RED.
+- `SqliteStore` now provides source-cursor upsert/read, immutable market identity, canonical snapshot, strategy evaluation, append-only incident, and lifecycle-state persistence primitives with exact replay idempotency, monotonic cursor handling, fail-closed identity conflicts, canonical JSON, and SHA-256 validation.
+- `SqliteReadStore` now provides latest lifecycle state, latest canonical snapshot, and bounded strategy-evaluation reads. Lifecycle transitions map to `incidents`; `RECOVERY_BLOCKED` is `CRITICAL` and requires the persisted run's current next sequence index.
+- Targeted GREEN: 35 runtime-persistence, 30 domain/storage/outbox, 21 canary/API, and 14 recovery tests passed. The full offline suite passed 289 tests with one historical conditional skip; `compileall` and `pip check` passed.
+- Schema and migrations are unchanged at version 2 with the same nine required tables. Fresh SQLite evidence is `quick_check=ok`, `integrity_check=ok`, `journal_mode=wal`, `synchronous=2`, and `foreign_keys=1`.
+- Every new write uses the existing `SqliteStore._connection`; no persistence method opens another write connection. Read seams remain on the query-only `SqliteReadStore` connection, and `WriteCommand`/`SqliteWriter.run()` were not expanded.
+- Tasks 2–9 of C1 Runtime Integration were not started. The backend was not run and no network was used. Trading, authentication, wallet/signing, order, paper execution, provider, orchestration, frozen, contract, registry, config, package, and migration scope is unchanged.

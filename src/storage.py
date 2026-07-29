@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Self
 
-from src.models import OutboxEvent, SignalRecord, SourceEvent
+from src.lifecycle import STARTUP_SEQUENCE
+from src.models import (
+    CanonicalSnapshot,
+    OutboxEvent,
+    SignalRecord,
+    SourceEvent,
+    StrategyEvaluation,
+)
 
 
 _MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
@@ -29,6 +38,12 @@ _COUNTABLE_TABLES = frozenset(
 @dataclass(frozen=True, slots=True)
 class AppendResult:
     event_id: int
+    inserted: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PersistResult:
+    row_id: int
     inserted: bool
 
 
@@ -196,6 +211,489 @@ class SqliteStore:
             if self._connection.in_transaction:
                 self._connection.rollback()
             raise
+
+    def upsert_source_cursor(
+        self,
+        *,
+        source: str,
+        cursor_json: str,
+        updated_at_ms: int,
+    ) -> bool:
+        _require_nonempty_string(source, "INVALID_SOURCE_CURSOR_SOURCE")
+        canonical_cursor = _canonical_json(
+            cursor_json,
+            "INVALID_CURSOR_JSON",
+        )
+        _require_nonnegative_integer(
+            updated_at_ms,
+            "INVALID_SOURCE_CURSOR_TIMESTAMP",
+        )
+
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            stored = self._connection.execute(
+                """
+                SELECT cursor_json, updated_at_ms
+                FROM source_cursors
+                WHERE source = ?
+                """,
+                (source,),
+            ).fetchone()
+            if stored is None:
+                self._connection.execute(
+                    """
+                    INSERT INTO source_cursors(
+                        source,
+                        cursor_json,
+                        updated_at_ms
+                    )
+                    VALUES (?, ?, ?)
+                    """,
+                    (source, canonical_cursor, updated_at_ms),
+                )
+                changed = True
+            else:
+                stored_cursor, stored_timestamp = stored
+                if updated_at_ms < stored_timestamp:
+                    raise ValueError("SOURCE_CURSOR_REGRESSION")
+                if updated_at_ms == stored_timestamp:
+                    if canonical_cursor != stored_cursor:
+                        raise ValueError("SOURCE_CURSOR_CONFLICT")
+                    changed = False
+                else:
+                    self._connection.execute(
+                        """
+                        UPDATE source_cursors
+                        SET cursor_json = ?, updated_at_ms = ?
+                        WHERE source = ?
+                        """,
+                        (canonical_cursor, updated_at_ms, source),
+                    )
+                    changed = True
+            self._connection.commit()
+            return changed
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def read_source_cursor(
+        self,
+        source: str,
+    ) -> dict[str, Any] | None:
+        _require_nonempty_string(source, "INVALID_SOURCE_CURSOR_SOURCE")
+        stored = self._connection.execute(
+            """
+            SELECT source, cursor_json, updated_at_ms
+            FROM source_cursors
+            WHERE source = ?
+            """,
+            (source,),
+        ).fetchone()
+        if stored is None:
+            return None
+        return {
+            "source": stored[0],
+            "cursor": _decode_stored_json(stored[1]),
+            "cursor_json": stored[1],
+            "updated_at_ms": stored[2],
+        }
+
+    def persist_market_identity(
+        self,
+        *,
+        market_id: str,
+        payload_json: str,
+        payload_sha256: str,
+        updated_at_ms: int,
+    ) -> PersistResult:
+        _require_nonempty_string(
+            market_id,
+            "INVALID_MARKET_IDENTITY_ID",
+        )
+        canonical_payload = _canonical_json(
+            payload_json,
+            "INVALID_MARKET_IDENTITY_JSON",
+        )
+        _require_payload_hash(canonical_payload, payload_sha256)
+        _require_nonnegative_integer(
+            updated_at_ms,
+            "INVALID_MARKET_IDENTITY_TIMESTAMP",
+        )
+
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            cursor = self._connection.execute(
+                """
+                INSERT INTO market_catalog(
+                    market_id,
+                    payload_json,
+                    payload_sha256,
+                    updated_at_ms
+                )
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(market_id) DO NOTHING
+                """,
+                (
+                    market_id,
+                    canonical_payload,
+                    payload_sha256,
+                    updated_at_ms,
+                ),
+            )
+            inserted = cursor.rowcount == 1
+            stored = self._connection.execute(
+                """
+                SELECT rowid, payload_json, payload_sha256, updated_at_ms
+                FROM market_catalog
+                WHERE market_id = ?
+                """,
+                (market_id,),
+            ).fetchone()
+            if stored is None:
+                raise RuntimeError("MARKET_IDENTITY_INSERT_MISSING")
+            expected = (
+                canonical_payload,
+                payload_sha256,
+                updated_at_ms,
+            )
+            if tuple(stored[1:]) != expected:
+                raise ValueError("MARKET_IDENTITY_CONFLICT")
+            self._connection.commit()
+            return PersistResult(row_id=stored[0], inserted=inserted)
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def append_canonical_snapshot(
+        self,
+        snapshot: CanonicalSnapshot,
+    ) -> PersistResult:
+        if type(snapshot) is not CanonicalSnapshot:
+            raise ValueError("INVALID_CANONICAL_SNAPSHOT_TYPE")
+        canonical_payload = _canonical_json(
+            snapshot.payload_json,
+            "INVALID_CANONICAL_SNAPSHOT_JSON",
+        )
+        if canonical_payload != snapshot.payload_json:
+            raise ValueError("NONCANONICAL_SNAPSHOT_JSON")
+        _require_payload_hash(
+            snapshot.payload_json,
+            snapshot.payload_sha256,
+        )
+        source_event_ids_json = json.dumps(
+            list(snapshot.source_event_ids),
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        )
+
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            cursor = self._connection.execute(
+                """
+                INSERT INTO canonical_state(
+                    snapshot_key,
+                    source_event_ids_json,
+                    payload_json,
+                    payload_sha256,
+                    recovery_origin,
+                    created_at_ms
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(snapshot_key) DO NOTHING
+                """,
+                (
+                    snapshot.snapshot_key,
+                    source_event_ids_json,
+                    snapshot.payload_json,
+                    snapshot.payload_sha256,
+                    snapshot.recovery_origin,
+                    snapshot.created_at_ms,
+                ),
+            )
+            inserted = cursor.rowcount == 1
+            stored = self._connection.execute(
+                """
+                SELECT
+                    snapshot_id,
+                    source_event_ids_json,
+                    payload_json,
+                    payload_sha256,
+                    recovery_origin,
+                    created_at_ms
+                FROM canonical_state
+                WHERE snapshot_key = ?
+                """,
+                (snapshot.snapshot_key,),
+            ).fetchone()
+            if stored is None:
+                raise RuntimeError("CANONICAL_SNAPSHOT_INSERT_MISSING")
+            expected = (
+                source_event_ids_json,
+                snapshot.payload_json,
+                snapshot.payload_sha256,
+                snapshot.recovery_origin,
+                snapshot.created_at_ms,
+            )
+            if tuple(stored[1:]) != expected:
+                raise ValueError("CANONICAL_SNAPSHOT_CONFLICT")
+            self._connection.commit()
+            return PersistResult(row_id=stored[0], inserted=inserted)
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def append_strategy_evaluation(
+        self,
+        evaluation: StrategyEvaluation,
+    ) -> PersistResult:
+        if type(evaluation) is not StrategyEvaluation:
+            raise ValueError("INVALID_STRATEGY_EVALUATION_TYPE")
+        canonical_payload = _canonical_json(
+            evaluation.payload_json,
+            "INVALID_STRATEGY_EVALUATION_JSON",
+        )
+        if canonical_payload != evaluation.payload_json:
+            raise ValueError("NONCANONICAL_STRATEGY_EVALUATION_JSON")
+        if (
+            evaluation.origin == "RECOVERED_AFTER_DOWNTIME"
+            and evaluation.execution_eligible
+        ):
+            raise ValueError("RECOVERED_EVALUATION_EXECUTION_FORBIDDEN")
+
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            cursor = self._connection.execute(
+                """
+                INSERT INTO strategy_evaluations(
+                    evaluation_key,
+                    strategy_id,
+                    strategy_version,
+                    status,
+                    input_snapshot_hash,
+                    evaluation_revision,
+                    execution_eligible,
+                    evaluated_at_ms,
+                    payload_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(evaluation_key) DO NOTHING
+                """,
+                (
+                    evaluation.evaluation_key,
+                    evaluation.strategy_id,
+                    evaluation.strategy_version,
+                    evaluation.status,
+                    evaluation.input_snapshot_hash,
+                    evaluation.evaluation_revision,
+                    int(evaluation.execution_eligible),
+                    evaluation.evaluated_at_ms,
+                    evaluation.payload_json,
+                ),
+            )
+            inserted = cursor.rowcount == 1
+            stored = self._connection.execute(
+                """
+                SELECT
+                    evaluation_id,
+                    strategy_id,
+                    strategy_version,
+                    status,
+                    input_snapshot_hash,
+                    evaluation_revision,
+                    execution_eligible,
+                    evaluated_at_ms,
+                    payload_json
+                FROM strategy_evaluations
+                WHERE evaluation_key = ?
+                """,
+                (evaluation.evaluation_key,),
+            ).fetchone()
+            if stored is None:
+                raise RuntimeError("STRATEGY_EVALUATION_INSERT_MISSING")
+            expected = (
+                evaluation.strategy_id,
+                evaluation.strategy_version,
+                evaluation.status,
+                evaluation.input_snapshot_hash,
+                evaluation.evaluation_revision,
+                int(evaluation.execution_eligible),
+                evaluation.evaluated_at_ms,
+                evaluation.payload_json,
+            )
+            if tuple(stored[1:]) != expected:
+                raise ValueError("STRATEGY_EVALUATION_CONFLICT")
+            self._connection.commit()
+            return PersistResult(row_id=stored[0], inserted=inserted)
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def append_incident(
+        self,
+        *,
+        incident_key: str,
+        severity: str,
+        status: str,
+        payload_json: str,
+        created_at_ms: int,
+    ) -> PersistResult:
+        _require_nonempty_string(incident_key, "INVALID_INCIDENT_KEY")
+        _require_nonempty_string(severity, "INVALID_INCIDENT_SEVERITY")
+        _require_nonempty_string(status, "INVALID_INCIDENT_STATUS")
+        canonical_payload = _canonical_json(
+            payload_json,
+            "INVALID_INCIDENT_JSON",
+        )
+        _require_nonnegative_integer(
+            created_at_ms,
+            "INVALID_INCIDENT_TIMESTAMP",
+        )
+
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            cursor = self._connection.execute(
+                """
+                INSERT INTO incidents(
+                    incident_key,
+                    severity,
+                    status,
+                    payload_json,
+                    created_at_ms
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(incident_key) DO NOTHING
+                """,
+                (
+                    incident_key,
+                    severity,
+                    status,
+                    canonical_payload,
+                    created_at_ms,
+                ),
+            )
+            inserted = cursor.rowcount == 1
+            stored = self._connection.execute(
+                """
+                SELECT
+                    incident_id,
+                    severity,
+                    status,
+                    payload_json,
+                    created_at_ms
+                FROM incidents
+                WHERE incident_key = ?
+                """,
+                (incident_key,),
+            ).fetchone()
+            if stored is None:
+                raise RuntimeError("INCIDENT_INSERT_MISSING")
+            expected = (
+                severity,
+                status,
+                canonical_payload,
+                created_at_ms,
+            )
+            if tuple(stored[1:]) != expected:
+                raise ValueError("INCIDENT_CONFLICT")
+            self._connection.commit()
+            return PersistResult(row_id=stored[0], inserted=inserted)
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def append_lifecycle_state(
+        self,
+        *,
+        run_id: str,
+        state: str,
+        sequence_index: int,
+        created_at_ms: int,
+        detail: str | None = None,
+    ) -> PersistResult:
+        _require_nonempty_string(run_id, "INVALID_LIFECYCLE_RUN_ID")
+        _require_nonempty_string(state, "INVALID_LIFECYCLE_STATE")
+        _require_nonnegative_integer(
+            sequence_index,
+            "INVALID_LIFECYCLE_SEQUENCE_INDEX",
+        )
+        _require_nonnegative_integer(
+            created_at_ms,
+            "INVALID_LIFECYCLE_TIMESTAMP",
+        )
+        if detail is not None and type(detail) is not str:
+            raise ValueError("INVALID_LIFECYCLE_DETAIL")
+
+        incident_key = f"lifecycle:{run_id}:{sequence_index}:{state}"
+        if state == "RECOVERY_BLOCKED":
+            existing = self.scalar(
+                "SELECT 1 FROM incidents WHERE incident_key = ?",
+                (incident_key,),
+            )
+            if (
+                existing is None
+                and sequence_index
+                != self._next_lifecycle_sequence_index(run_id)
+            ):
+                raise ValueError("INVALID_LIFECYCLE_SEQUENCE_INDEX")
+            severity = "CRITICAL"
+        else:
+            if (
+                state not in STARTUP_SEQUENCE
+                or sequence_index >= len(STARTUP_SEQUENCE)
+                or STARTUP_SEQUENCE[sequence_index] != state
+            ):
+                raise ValueError("INVALID_LIFECYCLE_SEQUENCE_INDEX")
+            severity = "INFO"
+
+        payload = {
+            "record_type": "LIFECYCLE_STATE",
+            "run_id": run_id,
+            "state": state,
+            "sequence_index": sequence_index,
+        }
+        if detail is not None:
+            payload["detail"] = detail
+        return self.append_incident(
+            incident_key=incident_key,
+            severity=severity,
+            status=state,
+            payload_json=json.dumps(
+                payload,
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            created_at_ms=created_at_ms,
+        )
+
+    def _next_lifecycle_sequence_index(self, run_id: str) -> int:
+        pattern = f"lifecycle:{_escape_like(run_id)}:%"
+        rows = self.rows(
+            """
+            SELECT payload_json
+            FROM incidents
+            WHERE incident_key LIKE ? ESCAPE '\\'
+            """,
+            (pattern,),
+        )
+        observed_indices = []
+        for row in rows:
+            payload = _decode_stored_json(row[0])
+            if (
+                type(payload) is dict
+                and payload.get("record_type") == "LIFECYCLE_STATE"
+                and payload.get("state") in STARTUP_SEQUENCE
+                and type(payload.get("sequence_index")) is int
+            ):
+                observed_indices.append(payload["sequence_index"])
+        return max(observed_indices, default=-1) + 1
 
     def commit_signal_and_outbox(
         self,
@@ -554,6 +1052,117 @@ class SqliteReadStore:
             "updated_at_ms": row[2],
         }
 
+    def latest_lifecycle_state(
+        self,
+        *,
+        run_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if run_id is not None:
+            _require_nonempty_string(run_id, "INVALID_LIFECYCLE_RUN_ID")
+            escaped_run_id = _escape_like(run_id)
+            pattern = f"lifecycle:{escaped_run_id}:%"
+        else:
+            pattern = "lifecycle:%"
+        row = self._connection.execute(
+            """
+            SELECT severity, status, payload_json, created_at_ms
+            FROM incidents
+            WHERE incident_key LIKE ? ESCAPE '\\'
+            ORDER BY created_at_ms DESC, incident_id DESC
+            LIMIT 1
+            """,
+            (pattern,),
+        ).fetchone()
+        if row is None:
+            return None
+        payload = _decode_stored_json(row[2])
+        if (
+            type(payload) is not dict
+            or payload.get("record_type") != "LIFECYCLE_STATE"
+        ):
+            raise ValueError("INVALID_STORED_LIFECYCLE_STATE")
+        return {
+            **payload,
+            "severity": row[0],
+            "status": row[1],
+            "created_at_ms": row[3],
+        }
+
+    def latest_canonical_snapshot(self) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            """
+            SELECT
+                snapshot_id,
+                snapshot_key,
+                source_event_ids_json,
+                payload_json,
+                payload_sha256,
+                recovery_origin,
+                created_at_ms
+            FROM canonical_state
+            ORDER BY created_at_ms DESC, snapshot_id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return None
+        source_event_ids = _decode_stored_json(row[2])
+        if (
+            type(source_event_ids) is not list
+            or any(type(event_id) is not int for event_id in source_event_ids)
+        ):
+            raise ValueError("INVALID_STORED_SOURCE_EVENT_IDS")
+        return {
+            "snapshot_id": row[0],
+            "snapshot_key": row[1],
+            "source_event_ids": source_event_ids,
+            "payload": _decode_stored_json(row[3]),
+            "payload_sha256": row[4],
+            "recovery_origin": row[5],
+            "created_at_ms": row[6],
+        }
+
+    def strategy_evaluations(
+        self,
+        *,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        _validate_read_limit(limit)
+        rows = self.rows(
+            """
+            SELECT
+                evaluation_id,
+                evaluation_key,
+                strategy_id,
+                strategy_version,
+                status,
+                input_snapshot_hash,
+                evaluation_revision,
+                execution_eligible,
+                evaluated_at_ms,
+                payload_json
+            FROM strategy_evaluations
+            ORDER BY evaluated_at_ms DESC, evaluation_id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [
+            {
+                "evaluation_id": row[0],
+                "evaluation_key": row[1],
+                "strategy_id": row[2],
+                "strategy_version": row[3],
+                "status": row[4],
+                "input_snapshot_hash": row[5],
+                "evaluation_revision": row[6],
+                "execution_eligible": bool(row[7]),
+                "evaluated_at_ms": row[8],
+                "payload": _decode_stored_json(row[9]),
+            }
+            for row in rows
+        ]
+
     def last_event_id(self) -> int:
         return self.scalar(
             "SELECT COALESCE(MAX(event_id), 0) FROM outbox_events"
@@ -597,9 +1206,52 @@ def _validate_read_limit(limit: int) -> None:
         raise ValueError("INVALID_READ_LIMIT")
 
 
-def _decode_stored_json(value: str) -> Any:
-    import json
+def _require_nonempty_string(value: Any, error_code: str) -> None:
+    if type(value) is not str or not value:
+        raise ValueError(error_code)
 
+
+def _require_nonnegative_integer(value: Any, error_code: str) -> None:
+    if type(value) is not int or value < 0:
+        raise ValueError(error_code)
+
+
+def _canonical_json(value: Any, error_code: str) -> str:
+    if type(value) is not str:
+        raise ValueError(error_code)
+    try:
+        decoded = json.loads(
+            value,
+            parse_constant=lambda constant: (_ for _ in ()).throw(
+                ValueError(constant)
+            ),
+        )
+        return json.dumps(
+            decoded,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (json.JSONDecodeError, TypeError, ValueError):
+        raise ValueError(error_code) from None
+
+
+def _require_payload_hash(value: str, expected_hash: Any) -> None:
+    if (
+        type(expected_hash) is not str
+        or len(expected_hash) != 64
+        or any(character not in "0123456789abcdef" for character in expected_hash)
+        or hashlib.sha256(value.encode("utf-8")).hexdigest() != expected_hash
+    ):
+        raise ValueError("PAYLOAD_SHA256_MISMATCH")
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _decode_stored_json(value: str) -> Any:
     return json.loads(value)
 
 
