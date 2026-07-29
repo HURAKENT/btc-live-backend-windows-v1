@@ -684,13 +684,16 @@ class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
                     websocket_url=f"http://127.0.0.1:{port}/ws/market",
                     heartbeat_interval=0.05,
                 )
+                ready = asyncio.Event()
                 await asyncio.wait_for(
                     stream.run(
                         ["token-00-yes", "token-00-no"],
                         asyncio.Queue(),
+                        ready_event=ready,
                     ),
                     timeout=2,
                 )
+                self.assertTrue(ready.is_set())
         finally:
             await runner.cleanup()
 

@@ -22,6 +22,15 @@ from src.polymarket_provider import (
 
 
 @dataclass(frozen=True, slots=True)
+class MarketDiscovery:
+    market_identity_json: str
+    market_id: str
+    market_ids: tuple[str, ...]
+    asset_ids: tuple[str, ...]
+    historical_depth: str
+
+
+@dataclass(frozen=True, slots=True)
 class MarketReconciliation:
     market_identity_json: str
     market_id: str
@@ -38,6 +47,7 @@ class BinanceRuntimeAdapter:
         "_close_session",
         "_session",
         "_stream",
+        "_stream_ready",
     )
 
     def __init__(
@@ -56,6 +66,7 @@ class BinanceRuntimeAdapter:
         self._backfill = backfill
         self._close_session = close_session
         self._closed = False
+        self._stream_ready = asyncio.Event()
 
     async def recover(
         self,
@@ -91,7 +102,15 @@ class BinanceRuntimeAdapter:
         self,
         queue: asyncio.Queue[SourceEvent],
     ) -> None:
-        await self._stream.run(queue)
+        parameters = inspect.signature(self._stream.run).parameters
+        if "ready_event" in parameters:
+            await self._stream.run(queue, ready_event=self._stream_ready)
+        else:
+            self._stream_ready.set()
+            await self._stream.run(queue)
+
+    async def wait_stream_ready(self) -> None:
+        await self._stream_ready.wait()
 
     async def close(self) -> None:
         if self._closed:
@@ -114,6 +133,7 @@ class PolymarketRuntimeAdapter:
         "_now_utc",
         "_session",
         "_stream",
+        "_stream_ready",
     )
 
     def __init__(
@@ -143,28 +163,19 @@ class PolymarketRuntimeAdapter:
         self._history = history
         self._close_session = close_session
         self._closed = False
+        self._stream_ready = asyncio.Event()
 
-    async def discover_and_reconcile(self) -> MarketReconciliation:
+    async def discover_market(self) -> MarketDiscovery:
         try:
             payload = await self._event_loader()
             identity = self._discover(payload, now_utc=self._now_utc())
-            books = await self._fetch_books(
-                self._session,
-                identity.asset_ids,
-            )
-            observed_assets = tuple(
-                json.loads(item.payload_json).get("asset_id")
-                for item in books
-            )
             if (
                 len(identity.market_ids) != 11
                 or len(identity.asset_ids) != 22
                 or len(set(identity.asset_ids)) != 22
-                or len(books) != len(identity.asset_ids)
-                or set(observed_assets) != set(identity.asset_ids)
             ):
                 raise ValueError(
-                    "RUNTIME_POLYMARKET_INCOMPLETE_BOOK_SET"
+                    "RUNTIME_POLYMARKET_INCOMPLETE_MARKET_IDENTITY"
                 )
             identity_json = json.dumps(
                 {
@@ -180,12 +191,11 @@ class PolymarketRuntimeAdapter:
                 sort_keys=True,
                 separators=(",", ":"),
             )
-            return MarketReconciliation(
+            return MarketDiscovery(
                 market_identity_json=identity_json,
                 market_id=identity.event_id,
                 market_ids=identity.market_ids,
                 asset_ids=identity.asset_ids,
-                current_events=tuple(books),
                 historical_depth="NOT_AVAILABLE_NOT_REQUIRED",
             )
         except asyncio.CancelledError:
@@ -196,6 +206,60 @@ class PolymarketRuntimeAdapter:
             raise RuntimeError(
                 "RUNTIME_POLYMARKET_DISCOVERY_FAILED"
             ) from error
+
+    async def reconcile_current_books(
+        self,
+        discovery: MarketDiscovery,
+    ) -> MarketReconciliation:
+        if type(discovery) is not MarketDiscovery:
+            raise ValueError("INVALID_MARKET_DISCOVERY")
+        try:
+            books = await self._fetch_books(
+                self._session,
+                discovery.asset_ids,
+            )
+            observed_assets = tuple(
+                json.loads(item.payload_json).get("asset_id")
+                for item in books
+            )
+            if (
+                len(books) != len(discovery.asset_ids)
+                or set(observed_assets) != set(discovery.asset_ids)
+            ):
+                raise ValueError(
+                    "RUNTIME_POLYMARKET_INCOMPLETE_BOOK_SET"
+                )
+            return MarketReconciliation(
+                market_identity_json=discovery.market_identity_json,
+                market_id=discovery.market_id,
+                market_ids=discovery.market_ids,
+                asset_ids=discovery.asset_ids,
+                current_events=tuple(books),
+                historical_depth=discovery.historical_depth,
+            )
+        except asyncio.CancelledError:
+            raise
+        except ValueError:
+            raise
+        except Exception as error:
+            raise RuntimeError(
+                "RUNTIME_POLYMARKET_BOOK_RECONCILIATION_FAILED"
+            ) from error
+
+    async def discover_and_reconcile(self) -> MarketReconciliation:
+        try:
+            discovery = await self.discover_market()
+            return await self.reconcile_current_books(discovery)
+        except asyncio.CancelledError:
+            raise
+        except ValueError:
+            raise
+        except RuntimeError as error:
+            if str(error) == "RUNTIME_POLYMARKET_DISCOVERY_FAILED":
+                raise
+            raise RuntimeError(
+                "RUNTIME_POLYMARKET_DISCOVERY_FAILED"
+            ) from (error.__cause__ or error)
 
     async def recover(
         self,
@@ -225,7 +289,19 @@ class PolymarketRuntimeAdapter:
         asset_ids: tuple[str, ...],
         queue: asyncio.Queue[SourceEvent],
     ) -> None:
-        await self._stream.run(asset_ids, queue)
+        parameters = inspect.signature(self._stream.run).parameters
+        if "ready_event" in parameters:
+            await self._stream.run(
+                asset_ids,
+                queue,
+                ready_event=self._stream_ready,
+            )
+        else:
+            self._stream_ready.set()
+            await self._stream.run(asset_ids, queue)
+
+    async def wait_stream_ready(self) -> None:
+        await self._stream_ready.wait()
 
     async def close(self) -> None:
         if self._closed:

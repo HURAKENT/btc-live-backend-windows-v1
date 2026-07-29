@@ -193,16 +193,25 @@ class SqliteStore:
             if stored is None:
                 raise RuntimeError("SOURCE_EVENT_INSERT_MISSING")
 
-            expected = (
+            # Acquisition metadata may legitimately differ when the same
+            # authoritative event is observed through REST backfill and a live
+            # stream.  Natural key + canonical payload define event identity;
+            # received timestamp and recovery origin describe how it arrived.
+            stored_authoritative = (
+                stored[1],
+                stored[2],
+                stored[4],
+                stored[5],
+                stored[6],
+            )
+            expected_authoritative = (
                 event.source,
                 event.source_timestamp_ms,
-                event.received_timestamp_ms,
                 event.event_type,
                 event.payload_json,
                 event.payload_sha256,
-                event.recovery_origin,
             )
-            if tuple(stored[1:]) != expected:
+            if stored_authoritative != expected_authoritative:
                 raise ValueError("SOURCE_EVENT_CONFLICT")
 
             self._connection.commit()

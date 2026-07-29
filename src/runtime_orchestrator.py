@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -19,6 +20,7 @@ from src.polymarket_provider import PolymarketStream
 from src.recovery import reconcile_binance_minutes, reconcile_polymarket_state
 from src.runtime_adapters import (
     BinanceRuntimeAdapter,
+    MarketDiscovery,
     MarketReconciliation,
     PolymarketRuntimeAdapter,
 )
@@ -32,6 +34,11 @@ from src.storage import PersistResult, SqliteStore
 
 
 _STOP = object()
+DEFAULT_WRITE_QUEUE_MAXSIZE = 4096
+DEFAULT_LIVE_BUFFER_MAX_EVENTS = 8192
+MAX_BINANCE_BOUNDARY_REFRESHES = 4
+DEFAULT_STREAM_READY_TIMEOUT_SECONDS = 15.0
+DEFAULT_LIVE_EVIDENCE_TIMEOUT_SECONDS = 75.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +114,15 @@ class C1RuntimeOrchestrator:
         history_start_ts: int,
         history_end_ts: int,
         clock_ms: Any = lambda: time.time_ns() // 1_000_000,
+        binance_end_resolver: Callable[[], int] | None = None,
+        write_queue_maxsize: int = DEFAULT_WRITE_QUEUE_MAXSIZE,
+        live_buffer_max_events: int = DEFAULT_LIVE_BUFFER_MAX_EVENTS,
+        stream_ready_timeout_seconds: float = (
+            DEFAULT_STREAM_READY_TIMEOUT_SECONDS
+        ),
+        live_evidence_timeout_seconds: float = (
+            DEFAULT_LIVE_EVIDENCE_TIMEOUT_SECONDS
+        ),
     ) -> None:
         if type(run_id) is not str or not run_id:
             raise ValueError("INVALID_RUNTIME_RUN_ID")
@@ -137,10 +153,44 @@ class C1RuntimeOrchestrator:
         self._binance_start_ms = binance_start_ms
         self._binance_end_ms = binance_end_ms
         self._history_start_ts = history_start_ts
+        if type(write_queue_maxsize) is not int or write_queue_maxsize <= 0:
+            raise ValueError("INVALID_RUNTIME_WRITE_QUEUE_MAXSIZE")
+        if (
+            type(live_buffer_max_events) is not int
+            or live_buffer_max_events <= 0
+        ):
+            raise ValueError("INVALID_RUNTIME_LIVE_BUFFER_MAX_EVENTS")
+        if (
+            binance_end_resolver is not None
+            and not callable(binance_end_resolver)
+        ):
+            raise ValueError("INVALID_RUNTIME_BINANCE_END_RESOLVER")
+        if (
+            type(stream_ready_timeout_seconds) not in (int, float)
+            or type(stream_ready_timeout_seconds) is bool
+            or stream_ready_timeout_seconds <= 0
+        ):
+            raise ValueError("INVALID_RUNTIME_STREAM_READY_TIMEOUT")
+        if (
+            type(live_evidence_timeout_seconds) not in (int, float)
+            or type(live_evidence_timeout_seconds) is bool
+            or live_evidence_timeout_seconds <= 0
+        ):
+            raise ValueError("INVALID_RUNTIME_LIVE_EVIDENCE_TIMEOUT")
         self._history_end_ts = history_end_ts
         self._clock_ms = clock_ms
-        self._write_queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._binance_end_resolver = binance_end_resolver
+        self._stream_ready_timeout_seconds = float(
+            stream_ready_timeout_seconds
+        )
+        self._live_evidence_timeout_seconds = float(
+            live_evidence_timeout_seconds
+        )
+        self._write_queue: asyncio.Queue[Any] = asyncio.Queue(
+            maxsize=write_queue_maxsize
+        )
         self._live_buffer: list[tuple[str, SourceEvent]] = []
+        self._live_buffer_max_events = live_buffer_max_events
         self._buffering_live = True
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._lifecycle = LifecycleStateMachine()
@@ -220,12 +270,10 @@ class C1RuntimeOrchestrator:
                 await self._transition(state)
                 self._ensure_running()
 
-            self._market = await self._polymarket.discover_and_reconcile()
-            self._validate_market(self._market)
-            await self._submit_write("SET_MARKET", self._market)
-            await self._submit_write("MARKET_IDENTITY", self._market)
-            self._ensure_running()
-
+            # Binance buffering begins before the comparatively slow Polymarket
+            # discovery/book reconciliation.  This prevents a closed minute from
+            # falling between the initially captured backfill boundary and the
+            # actual live subscription.
             await self._transition("LIVE_BUFFERING")
             self._tasks["binance_stream"] = asyncio.create_task(
                 self._provider_stream(
@@ -234,26 +282,77 @@ class C1RuntimeOrchestrator:
                 ),
                 name=f"{self._run_id}:binance",
             )
-            self._tasks["polymarket_stream"] = asyncio.create_task(
-                self._provider_stream(
-                    "polymarket",
-                    self._polymarket.stream(
-                        asset_ids=self._market.asset_ids,
-                        queue=_LiveIngress(self, "polymarket"),
-                    ),
-                ),
-                name=f"{self._run_id}:polymarket",
+            await self._wait_adapter_stream_ready(
+                self._binance,
+                "binance",
             )
-            await asyncio.sleep(0)
+
+            discover_market = getattr(self._polymarket, "discover_market", None)
+            reconcile_current_books = getattr(
+                self._polymarket, "reconcile_current_books", None
+            )
+            if callable(discover_market) and callable(reconcile_current_books):
+                discovery = await discover_market()
+                self._validate_market_discovery(discovery)
+                self._tasks["polymarket_stream"] = asyncio.create_task(
+                    self._provider_stream(
+                        "polymarket",
+                        self._polymarket.stream(
+                            asset_ids=discovery.asset_ids,
+                            queue=_LiveIngress(self, "polymarket"),
+                        ),
+                    ),
+                    name=f"{self._run_id}:polymarket",
+                )
+                await self._wait_adapter_stream_ready(
+                    self._polymarket,
+                    "polymarket",
+                )
+                self._market = await reconcile_current_books(discovery)
+            else:
+                # Backward-compatible seam for existing fake adapters.
+                self._market = await self._polymarket.discover_and_reconcile()
+                self._tasks["polymarket_stream"] = asyncio.create_task(
+                    self._provider_stream(
+                        "polymarket",
+                        self._polymarket.stream(
+                            asset_ids=self._market.asset_ids,
+                            queue=_LiveIngress(self, "polymarket"),
+                        ),
+                    ),
+                    name=f"{self._run_id}:polymarket",
+                )
+                await self._wait_adapter_stream_ready(
+                    self._polymarket,
+                    "polymarket",
+                )
+
+            self._validate_market(self._market)
+            await self._submit_write("SET_MARKET", self._market)
+            await self._submit_write("MARKET_IDENTITY", self._market)
             self._ensure_running()
 
             await self._transition("BINANCE_BACKFILL")
-            recovered = tuple(
-                await self._binance.recover(
-                    start_ms=self._binance_start_ms,
-                    end_ms=self._binance_end_ms,
+            recovered_events: list[SourceEvent] = []
+            recovery_start_ms = self._binance_start_ms
+            effective_end_ms = self._resolve_binance_end_ms()
+            refresh_count = 0
+            while recovery_start_ms <= effective_end_ms:
+                recovered_events.extend(
+                    await self._binance.recover(
+                        start_ms=recovery_start_ms,
+                        end_ms=effective_end_ms,
+                    )
                 )
-            )
+                refreshed_end_ms = self._resolve_binance_end_ms()
+                if refreshed_end_ms <= effective_end_ms:
+                    break
+                refresh_count += 1
+                if refresh_count > MAX_BINANCE_BOUNDARY_REFRESHES:
+                    raise RuntimeError("BINANCE_CUTOVER_BOUNDARY_UNSTABLE")
+                recovery_start_ms = effective_end_ms + MINUTE_MS
+                effective_end_ms = refreshed_end_ms
+            recovered = tuple(recovered_events)
             for event in recovered:
                 await self._submit_source(
                     event,
@@ -264,7 +363,7 @@ class C1RuntimeOrchestrator:
                 last_committed_open_ms=(
                     self._binance_start_ms - MINUTE_MS
                 ),
-                current_open_ms=self._binance_end_ms + MINUTE_MS,
+                current_open_ms=effective_end_ms + MINUTE_MS,
                 recovered_events=recovered,
             )
             if continuity.blocker:
@@ -315,7 +414,13 @@ class C1RuntimeOrchestrator:
 
             await self._transition("STRATEGY_REPLAY")
             await self._drain_live_buffer()
-            await self._wait_for_live_evidence()
+            try:
+                await asyncio.wait_for(
+                    self._wait_for_live_evidence(),
+                    timeout=self._live_evidence_timeout_seconds,
+                )
+            except TimeoutError:
+                raise RuntimeError("LIVE_EVIDENCE_TIMEOUT") from None
             await self._submit_write("SET_LIVE_READY", None)
             await self._submit_write(
                 "BUILD_SNAPSHOT",
@@ -420,6 +525,12 @@ class C1RuntimeOrchestrator:
             )
             return
         if self._buffering_live:
+            if len(self._live_buffer) >= self._live_buffer_max_events:
+                await self._fail(
+                    f"LIVE_BUFFER_OVERFLOW: limit={self._live_buffer_max_events}",
+                    source=source,
+                )
+                return
             self._live_buffer.append((source, event))
             return
         result = await self._submit_source(event)
@@ -718,6 +829,12 @@ class C1RuntimeOrchestrator:
                     },
                     allow_failed=True,
                 )
+            except asyncio.CancelledError:
+                if self._lifecycle.current_state != "RECOVERY_BLOCKED":
+                    self._lifecycle.fail_closed(sanitized)
+                self._ready.set()
+                self._progress.set()
+                raise
             except BaseException:
                 if self._lifecycle.current_state != "RECOVERY_BLOCKED":
                     self._lifecycle.fail_closed(sanitized)
@@ -774,6 +891,56 @@ class C1RuntimeOrchestrator:
         if writer is not None and writer.done() and not self._stopping:
             raise RuntimeError("RUNTIME_WRITER_EXITED")
 
+    async def _wait_adapter_stream_ready(
+        self,
+        adapter: Any,
+        source: str,
+    ) -> None:
+        wait_ready = getattr(adapter, "wait_stream_ready", None)
+        if callable(wait_ready):
+            try:
+                await asyncio.wait_for(
+                    wait_ready(),
+                    timeout=self._stream_ready_timeout_seconds,
+                )
+            except TimeoutError:
+                raise RuntimeError(
+                    f"{source.upper()}_STREAM_READY_TIMEOUT"
+                ) from None
+        else:
+            await asyncio.sleep(0)
+        self._ensure_running()
+        task = self._tasks.get(f"{source}_stream")
+        if task is None or task.done():
+            raise RuntimeError(
+                f"UNEXPECTED_PROVIDER_STREAM_EXIT: {source}"
+            )
+
+    def _resolve_binance_end_ms(self) -> int:
+        value = (
+            self._binance_end_ms
+            if self._binance_end_resolver is None
+            else self._binance_end_resolver()
+        )
+        if (
+            type(value) is not int
+            or value < self._binance_end_ms
+            or value % MINUTE_MS != 0
+        ):
+            raise ValueError("INVALID_RUNTIME_DYNAMIC_BINANCE_BOUNDARY")
+        return value
+
+    @staticmethod
+    def _validate_market_discovery(discovery: MarketDiscovery) -> None:
+        if (
+            type(discovery) is not MarketDiscovery
+            or len(discovery.market_ids) != 11
+            or len(set(discovery.market_ids)) != 11
+            or len(discovery.asset_ids) != 22
+            or len(set(discovery.asset_ids)) != 22
+        ):
+            raise ValueError("INCOMPLETE_MARKET_DISCOVERY")
+
     @staticmethod
     def _validate_market(market: MarketReconciliation) -> None:
         if (
@@ -797,8 +964,16 @@ async def build_default_runtime_orchestrator(
         trust_env=False,
     )
     now = datetime.now(timezone.utc)
-    current_open_ms = int(now.timestamp() * 1000) // MINUTE_MS * MINUTE_MS
-    end_ms = current_open_ms - MINUTE_MS
+
+    def resolve_closed_minute_end_ms() -> int:
+        current_open_ms = (
+            int(datetime.now(timezone.utc).timestamp() * 1000)
+            // MINUTE_MS
+            * MINUTE_MS
+        )
+        return current_open_ms - MINUTE_MS
+
+    end_ms = resolve_closed_minute_end_ms()
     cursor = store.read_source_cursor("binance")
     start_ms = (
         end_ms
@@ -856,4 +1031,5 @@ async def build_default_runtime_orchestrator(
         binance_end_ms=end_ms,
         history_start_ts=max(0, now_seconds - 3600),
         history_end_ts=now_seconds,
+        binance_end_resolver=resolve_closed_minute_end_ms,
     )

@@ -103,7 +103,9 @@ class BinanceProviderTests(unittest.IsolatedAsyncioTestCase):
             event.natural_key,
             "binance:BTCUSDT:1m:1720000000000",
         )
-        self.assertIn('"c":"60010.00000000"', event.payload_json)
+        payload = json.loads(event.payload_json)
+        self.assertEqual(payload["close"], "60010")
+        self.assertEqual(payload["open_time_ms"], 1720000000000)
 
     def test_open_fixture_is_not_canonical_history(self):
         event = parse_binance_kline_message(
@@ -229,6 +231,18 @@ class BinanceProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(queue.qsize(), 1)
         event = queue.get_nowait()
         self.assertEqual(event.event_type, "BINANCE_KLINE_CLOSED")
+
+    async def test_stream_ready_event_is_set_after_websocket_connects(self):
+        ready = asyncio.Event()
+
+        def connect(_url):
+            return FakeWebSocketContext([])
+
+        stream = BinanceStream(connect=connect)
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(asyncio.Queue(), ready_event=ready)
+
+        self.assertTrue(ready.is_set())
 
     async def test_disconnect_reports_incident_without_sqlite_write(self):
         incidents = []

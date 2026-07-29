@@ -69,9 +69,11 @@ class _FakeRuntime:
         trace: list[str],
         *,
         fail_initialize: bool = False,
+        fail_start: bool = False,
     ) -> None:
         self.trace = trace
         self.fail_initialize = fail_initialize
+        self.fail_start = fail_start
         self.api_started = False
 
     def initialize(self, config, store) -> None:
@@ -81,6 +83,8 @@ class _FakeRuntime:
 
     async def start_runtime_tasks(self) -> None:
         self.trace.append("start runtime tasks")
+        if self.fail_start:
+            raise RuntimeError("runtime start failed")
 
     async def start_api(self, host: str, port: int) -> None:
         self.trace.append("start API")
@@ -151,6 +155,18 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         self.temp_directory.cleanup()
 
+    async def test_api_starts_before_runtime_recovery_after_integrity_gate(self):
+        trace: list[str] = []
+        backend = self._backend(trace)
+
+        await backend.start()
+
+        self.assertLess(
+            trace.index("start API"),
+            trace.index("start runtime tasks"),
+        )
+        await backend.stop()
+
     async def test_shutdown_order_is_exact_and_mutex_is_last(self):
         trace: list[str] = []
         backend = self._backend(trace)
@@ -172,6 +188,25 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         await backend.stop()
 
         self.assertEqual(tuple(trace), EXPECTED_SHUTDOWN_ORDER)
+
+    async def test_runtime_start_failure_stops_api_and_partial_providers(self):
+        trace: list[str] = []
+        runtime = _FakeRuntime(trace, fail_start=True)
+        backend = self._backend(trace, runtime=runtime)
+
+        with self.assertRaisesRegex(RuntimeError, "runtime start failed"):
+            await backend.start()
+
+        self.assertLess(
+            trace.index("start API"),
+            trace.index("start runtime tasks"),
+        )
+        self.assertIn("stop accepting API connections", trace)
+        self.assertIn("stop provider reconnect loops", trace)
+        self.assertLess(
+            trace.index("stop accepting API connections"),
+            trace.index("stop provider reconnect loops"),
+        )
 
     async def test_partial_start_rolls_back_acquired_resources(self):
         trace: list[str] = []

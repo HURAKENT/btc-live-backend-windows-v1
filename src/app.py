@@ -103,18 +103,30 @@ class BackendRuntime:
         self._orchestrator = orchestrator
         await self._orchestrator.start()
 
+    def runtime_status(self) -> Any:
+        if self._orchestrator is None:
+            return {
+                "state": "BOOTING",
+                "live_ready": False,
+                "source_health": (
+                    ("binance", "STARTING"),
+                    ("polymarket", "STARTING"),
+                ),
+                "market_id": None,
+                "market_count": 0,
+                "asset_count": 0,
+                "last_event_id": 0,
+                "failure": None,
+            }
+        return self._orchestrator.status()
+
     async def start_api(self, host: str, port: int) -> None:
         if self._read_store is None or self._broker is None:
             raise RuntimeError("BACKEND_RUNTIME_NOT_INITIALIZED")
-        runtime_status = (
-            None
-            if self._orchestrator is None
-            else self._orchestrator.status
-        )
         app = create_api_app(
             self._read_store,
             self._broker,
-            runtime_status=runtime_status,
+            runtime_status=self.runtime_status,
         )
         runner = web.AppRunner(app)
         await runner.setup()
@@ -225,13 +237,13 @@ class LiveBackend:
 
             self._runtime_initialized = True
             self._runtime.initialize(config, self._store)
-            await self._runtime.start_runtime_tasks()
-            self._runtime_tasks_started = True
             await self._runtime.start_api(
                 config.bind_host,
                 config.bind_port,
             )
             self._api_started = True
+            self._runtime_tasks_started = True
+            await self._runtime.start_runtime_tasks()
             self._started = True
         except BaseException as error:
             try:

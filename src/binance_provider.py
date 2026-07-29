@@ -5,6 +5,7 @@ import json
 import random
 import time
 from collections.abc import AsyncIterator, Callable
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from src.models import SourceEvent
@@ -59,6 +60,64 @@ def _event_payload_bytes(payload: dict[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
+def _canonical_decimal_text(value: str, field: str) -> str:
+    _require_type(value, str, field)
+    try:
+        decimal_value = Decimal(value)
+    except InvalidOperation:
+        raise ValueError(f"BINANCE_INVALID_DECIMAL: {field}") from None
+    if not decimal_value.is_finite():
+        raise ValueError(f"BINANCE_INVALID_DECIMAL: {field}")
+    if decimal_value == 0:
+        return "0"
+    canonical = format(decimal_value, "f")
+    if "." in canonical:
+        canonical = canonical.rstrip("0").rstrip(".")
+    return canonical or "0"
+
+
+def _canonical_closed_kline_payload(
+    *,
+    open_time_ms: int,
+    close_time_ms: int,
+    open_price: str,
+    high_price: str,
+    low_price: str,
+    close_price: str,
+    volume: str,
+    quote_asset_volume: str,
+    number_of_trades: int,
+    taker_buy_base_asset_volume: str,
+    taker_buy_quote_asset_volume: str,
+) -> dict[str, Any]:
+    _require_type(open_time_ms, int, "open_time_ms")
+    _require_type(close_time_ms, int, "close_time_ms")
+    _require_type(number_of_trades, int, "number_of_trades")
+    if open_time_ms < 0 or close_time_ms < open_time_ms or number_of_trades < 0:
+        raise ValueError("BINANCE_INVALID_CLOSED_KLINE")
+    return {
+        "close": _canonical_decimal_text(close_price, "close"),
+        "close_time_ms": close_time_ms,
+        "high": _canonical_decimal_text(high_price, "high"),
+        "interval": BINANCE_INTERVAL,
+        "low": _canonical_decimal_text(low_price, "low"),
+        "number_of_trades": number_of_trades,
+        "open": _canonical_decimal_text(open_price, "open"),
+        "open_time_ms": open_time_ms,
+        "quote_asset_volume": _canonical_decimal_text(
+            quote_asset_volume, "quote_asset_volume"
+        ),
+        "symbol": BINANCE_SYMBOL,
+        "taker_buy_base_asset_volume": _canonical_decimal_text(
+            taker_buy_base_asset_volume, "taker_buy_base_asset_volume"
+        ),
+        "taker_buy_quote_asset_volume": _canonical_decimal_text(
+            taker_buy_quote_asset_volume, "taker_buy_quote_asset_volume"
+        ),
+        "volume": _canonical_decimal_text(volume, "volume"),
+    }
+
+
 def parse_binance_kline_message(
     payload: dict[str, Any],
 ) -> SourceEvent | None:
@@ -83,11 +142,24 @@ def parse_binance_kline_message(
     if not kline["x"]:
         return None
 
+    canonical_payload = _canonical_closed_kline_payload(
+        open_time_ms=kline["t"],
+        close_time_ms=kline["T"],
+        open_price=kline["o"],
+        high_price=kline["h"],
+        low_price=kline["l"],
+        close_price=kline["c"],
+        volume=kline["v"],
+        quote_asset_volume=kline["q"],
+        number_of_trades=kline["n"],
+        taker_buy_base_asset_volume=kline["V"],
+        taker_buy_quote_asset_volume=kline["Q"],
+    )
     return SourceEvent.binance_closed_kline(
         symbol=BINANCE_SYMBOL,
         interval=BINANCE_INTERVAL,
         open_time_ms=kline["t"],
-        payload=_event_payload_bytes(payload),
+        payload=_event_payload_bytes(canonical_payload),
         received_timestamp_ms=payload["E"],
         recovery_origin="LIVE",
     )
@@ -104,22 +176,19 @@ def _parse_rest_kline(row: Any) -> SourceEvent:
         _require_type(row[index], str, f"rest.kline[{index}]")
     _reject_floats(row, "rest.kline")
 
-    audit_payload = {
-        "close": row[4],
-        "close_time_ms": row[6],
-        "high": row[2],
-        "interval": BINANCE_INTERVAL,
-        "low": row[3],
-        "number_of_trades": row[8],
-        "open": row[1],
-        "open_time_ms": row[0],
-        "quote_asset_volume": row[7],
-        "symbol": BINANCE_SYMBOL,
-        "taker_buy_base_asset_volume": row[9],
-        "taker_buy_quote_asset_volume": row[10],
-        "unused": row[11],
-        "volume": row[5],
-    }
+    audit_payload = _canonical_closed_kline_payload(
+        open_time_ms=row[0],
+        close_time_ms=row[6],
+        open_price=row[1],
+        high_price=row[2],
+        low_price=row[3],
+        close_price=row[4],
+        volume=row[5],
+        quote_asset_volume=row[7],
+        number_of_trades=row[8],
+        taker_buy_base_asset_volume=row[9],
+        taker_buy_quote_asset_volume=row[10],
+    )
     return SourceEvent.binance_closed_kline(
         symbol=BINANCE_SYMBOL,
         interval=BINANCE_INTERVAL,
@@ -244,11 +313,18 @@ class BinanceStream:
         self._policy = policy or ReconnectPolicy()
         self._monotonic = monotonic
 
-    async def run(self, buffer: asyncio.Queue[SourceEvent]) -> None:
+    async def run(
+        self,
+        buffer: asyncio.Queue[SourceEvent],
+        *,
+        ready_event: asyncio.Event | None = None,
+    ) -> None:
         while True:
             connected_at = self._monotonic()
             try:
                 async with self._connect(BINANCE_WEBSOCKET_URL) as websocket:
+                    if ready_event is not None:
+                        ready_event.set()
                     async for message in websocket:
                         payload = (
                             message

@@ -154,7 +154,11 @@ def _parse_levels(levels: Any, field: str) -> list[dict[str, int]]:
     ]
 
 
-def _parse_book(payload: dict[str, Any]) -> SourceEvent:
+def _parse_book(
+    payload: dict[str, Any],
+    *,
+    recovery_origin: str = "LIVE",
+) -> SourceEvent:
     asset_id = _require_type(payload.get("asset_id"), str, "asset_id")
     book_hash = _require_type(payload.get("hash"), str, "hash")
     timestamp_ms = _normalize_timestamp_ms(payload.get("timestamp"), "timestamp")
@@ -180,7 +184,6 @@ def _parse_book(payload: dict[str, Any]) -> SourceEvent:
         "bids": bids,
         "book_hash": book_hash,
         "event_type": "book",
-        "provider_payload": payload,
         "spread_micros": (
             None
             if best_bid is None or best_ask is None
@@ -192,11 +195,12 @@ def _parse_book(payload: dict[str, Any]) -> SourceEvent:
         natural_key=f"polymarket:{asset_id}:book:{book_hash}",
         timestamp_ms=timestamp_ms,
         payload=normalized,
+        recovery_origin=recovery_origin,
     )
 
 
 def _parse_price_changes(payload: dict[str, Any]) -> list[SourceEvent]:
-    timestamp_ms = _require_type(payload.get("timestamp"), int, "timestamp")
+    timestamp_ms = _normalize_timestamp_ms(payload.get("timestamp"), "timestamp")
     changes = _require_type(
         payload.get("price_changes"),
         list,
@@ -290,7 +294,7 @@ def parse_market_ws_message(
         return _parse_price_changes(payload)
 
     asset_id = _require_type(payload.get("asset_id"), str, "asset_id")
-    timestamp_ms = _require_type(payload.get("timestamp"), int, "timestamp")
+    timestamp_ms = _normalize_timestamp_ms(payload.get("timestamp"), "timestamp")
     canonical = _canonical_json(payload)
     identity_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     if event_type in _SUPPORTED_PASSTHROUGH_EVENTS:
@@ -370,6 +374,7 @@ class MarketBook:
                 side.pop(payload["price_micros"], None)
             else:
                 side[payload["price_micros"]] = payload["size_micros"]
+            book_hash = payload["hash"]
         else:
             raise ValueError("POLYMARKET_EVENT_NOT_BOOK_MUTATION")
 
@@ -398,7 +403,10 @@ async def fetch_current_books(
             if response.status != 200:
                 raise ValueError(f"POLYMARKET_BOOK_HTTP_ERROR: {response.status}")
             payload = await response.json()
-        event = _parse_book(_require_type(payload, dict, "book.response"))
+        event = _parse_book(
+            _require_type(payload, dict, "book.response"),
+            recovery_origin="REST_BACKFILL",
+        )
         if json.loads(event.payload_json)["asset_id"] != asset_id:
             raise ValueError("POLYMARKET_BOOK_ASSET_MISMATCH")
         events.append(event)
@@ -510,6 +518,8 @@ class PolymarketStream:
         self,
         asset_ids: Sequence[str],
         buffer: asyncio.Queue[SourceEvent],
+        *,
+        ready_event: asyncio.Event | None = None,
     ) -> None:
         if len(set(asset_ids)) != len(asset_ids):
             raise ValueError("DUPLICATE_MARKET_ASSET_ID")
@@ -522,6 +532,8 @@ class PolymarketStream:
             self._websocket_url
         ) as websocket:
             await websocket.send_json(subscription)
+            if ready_event is not None:
+                ready_event.set()
             heartbeat = asyncio.create_task(self._heartbeat(websocket))
             try:
                 async for message in websocket:
