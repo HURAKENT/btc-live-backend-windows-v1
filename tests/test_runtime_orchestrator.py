@@ -27,7 +27,44 @@ def runtime_event(
     asset_id: str | None = None,
 ) -> SourceEvent:
     value = {"event_type": event_type}
-    if asset_id is not None:
+    if event_type == "BINANCE_KLINE_CLOSED":
+        value.update(
+            {
+                "close": "101.000000",
+                "high": "102.000000",
+                "interval": "1m",
+                "low": "99.000000",
+                "open": "100.000000",
+                "open_time_ms": timestamp,
+                "symbol": "BTCUSDT",
+                "volume": "2.500000",
+            }
+        )
+    elif event_type == "POLYMARKET_BOOK":
+        if asset_id is None:
+            raise ValueError("asset_id required for book fixture")
+        value.update(
+            {
+                "asset_id": asset_id,
+                "asks": [
+                    {
+                        "price_micros": 600_000,
+                        "size_micros": 2_000_000,
+                    }
+                ],
+                "best_ask_micros": 600_000,
+                "best_bid_micros": 400_000,
+                "bids": [
+                    {
+                        "price_micros": 400_000,
+                        "size_micros": 1_000_000,
+                    }
+                ],
+                "book_hash": f"hash-{asset_id}-{timestamp}",
+                "spread_micros": 200_000,
+            }
+        )
+    elif asset_id is not None:
         value["asset_id"] = asset_id
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
     return SourceEvent(
@@ -70,7 +107,6 @@ class FakeBinanceRuntimeAdapter:
     async def stream(self, queue):
         if self.fail_stream:
             raise RuntimeError("binance stream failed")
-        await self.release.wait()
         await queue.put(self.live_event)
         await asyncio.Event().wait()
 
@@ -108,6 +144,13 @@ class FakePolymarketRuntimeAdapter:
             historical_depth="NOT_AVAILABLE_NOT_REQUIRED",
         )
         self.stream_assets = None
+        self.live_event = runtime_event(
+            "polymarket",
+            "book:asset-0:live",
+            "POLYMARKET_BOOK",
+            120_001,
+            asset_id=self.assets[0],
+        )
 
     async def discover_and_reconcile(self):
         return self.reconciliation
@@ -119,6 +162,7 @@ class FakePolymarketRuntimeAdapter:
         self.stream_assets = asset_ids
         if self.fail_stream:
             raise RuntimeError("polymarket stream failed")
+        await queue.put(self.live_event)
         await asyncio.Event().wait()
 
     async def close(self):
@@ -206,10 +250,10 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
         await self.runtime.start()
         self.binance.release.set()
         await self.runtime.wait_for_source_idle()
-        self.assertEqual(self.store.count("canonical_state"), 1)
-        self.assertEqual(self.store.count("strategy_evaluations"), 1)
-        self.assertEqual(self.store.count("signals"), 1)
-        self.assertEqual(self.store.count("outbox_events"), 1)
+        self.assertEqual(self.store.count("canonical_state"), 2)
+        self.assertEqual(self.store.count("strategy_evaluations"), 2)
+        self.assertEqual(self.store.count("signals"), 2)
+        self.assertEqual(self.store.count("outbox_events"), 2)
 
     async def test_wait_ready_returns_only_after_live_ready(self):
         waiter = asyncio.create_task(self.runtime.wait_ready())

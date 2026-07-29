@@ -54,32 +54,65 @@ def _snapshot_payload(snapshot: CanonicalSnapshot) -> dict[str, Any]:
         "trigger_committed_after_live_ready",
     ):
         _require_payload_field(payload, field, bool)
+    canonical_state_hash = payload.get(
+        "canonical_state_hash",
+        snapshot.payload_sha256,
+    )
+    if (
+        type(canonical_state_hash) is not str
+        or len(canonical_state_hash) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in canonical_state_hash
+        )
+    ):
+        raise ValueError(
+            "INVALID_CANARY_SNAPSHOT_VALUE: canonical_state_hash"
+        )
+    evaluation_origin = payload.get(
+        "evaluation_origin",
+        snapshot.recovery_origin,
+    )
+    if evaluation_origin not in {
+        "LIVE",
+        "RECOVERED_AFTER_DOWNTIME",
+        "CURRENT_LIVE_REEVALUATION",
+    }:
+        raise ValueError(
+            "INVALID_CANARY_SNAPSHOT_VALUE: evaluation_origin"
+        )
+    payload["canonical_state_hash"] = canonical_state_hash
+    payload["evaluation_origin"] = evaluation_origin
     return payload
 
 
-def _reason_code(payload: dict[str, Any]) -> str:
+def _reason_code(
+    payload: dict[str, Any],
+    *,
+    recovered: bool,
+) -> str:
     if not payload["binance_ready"]:
         return "BINANCE_NOT_LIVE_READY"
     if not payload["polymarket_ready"]:
         return "POLYMARKET_NOT_RECONCILED"
     if not payload["canonical"]:
         return "SNAPSHOT_NOT_CANONICAL"
-    if not payload["trigger_committed_after_live_ready"]:
+    if not recovered and not payload["trigger_committed_after_live_ready"]:
         return "NO_NEW_CLOSED_KLINE_AFTER_LIVE_READY"
     return "CANARY_READY"
 
 
 def evaluate_canary(snapshot: CanonicalSnapshot) -> StrategyEvaluation:
     payload = _snapshot_payload(snapshot)
-    reason_code = _reason_code(payload)
-    recovered = snapshot.recovery_origin == "RECOVERED_AFTER_DOWNTIME"
+    evaluation_origin = payload["evaluation_origin"]
+    recovered = evaluation_origin == "RECOVERED_AFTER_DOWNTIME"
+    reason_code = _reason_code(payload, recovered=recovered)
     identity = {
-        "backend_session_id": payload["backend_session_id"],
         "canary_id": CANARY_ID,
         "canary_version": CANARY_VERSION,
+        "canonical_state_hash": payload["canonical_state_hash"],
         "market_identity": payload["market_identity"],
-        "origin": snapshot.recovery_origin,
-        "snapshot_hash": snapshot.payload_sha256,
+        "origin": evaluation_origin,
         "triggering_event_natural_key": payload[
             "triggering_event_natural_key"
         ],
@@ -106,13 +139,14 @@ def evaluate_canary(snapshot: CanonicalSnapshot) -> StrategyEvaluation:
         "paper_or_live_eligible": False,
         "reason_code": reason_code,
         "status": status,
+        "trading_eligible": False,
     }
     return StrategyEvaluation(
         evaluation_key=f"canary-evaluation:{identity_hash}",
         strategy_id=CANARY_ID,
         strategy_version=CANARY_VERSION,
         status=status,
-        input_snapshot_hash=snapshot.payload_sha256,
+        input_snapshot_hash=payload["canonical_state_hash"],
         evaluation_revision=1,
         execution_eligible=False,
         evaluated_at_ms=snapshot.created_at_ms,
@@ -122,7 +156,7 @@ def evaluate_canary(snapshot: CanonicalSnapshot) -> StrategyEvaluation:
             separators=(",", ":"),
         ),
         reason_code=reason_code,
-        origin=snapshot.recovery_origin,
+        origin=evaluation_origin,
         historical_signal_is_current_live_signal=False,
         current_reevaluation_required=recovered,
     )
@@ -162,6 +196,7 @@ def commit_canary_if_new(
         "paper_or_live_eligible": False,
         "reason_code": evaluation.reason_code,
         "status": evaluation.status,
+        "trading_eligible": False,
     }
     signal = SignalRecord(
         identity_key=identity_key,

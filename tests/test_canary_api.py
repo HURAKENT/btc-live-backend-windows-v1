@@ -149,10 +149,14 @@ class CanaryTests(unittest.TestCase):
     def test_evaluation_identity_is_deterministic(self):
         first = evaluate_canary(self._snapshot())
         second = evaluate_canary(self._snapshot())
-        changed = evaluate_canary(
+        restarted = evaluate_canary(
             self._snapshot(backend_session_id="session-002")
         )
+        changed = evaluate_canary(
+            self._snapshot(canonical_state_hash="b" * 64)
+        )
         self.assertEqual(first.evaluation_key, second.evaluation_key)
+        self.assertEqual(first.evaluation_key, restarted.evaluation_key)
         self.assertNotEqual(first.evaluation_key, changed.evaluation_key)
 
     @staticmethod
@@ -166,11 +170,18 @@ class CanaryTests(unittest.TestCase):
         triggering_event_natural_key="binance:BTCUSDT:1m:1720000000000",
         recovery_origin="LIVE",
         snapshot_key="snapshot:001",
+        canonical_state_hash="a" * 64,
     ):
         payload = {
             "backend_session_id": backend_session_id,
             "binance_ready": binance_ready,
             "canonical": canonical,
+            "canonical_state_hash": canonical_state_hash,
+            "evaluation_origin": (
+                "RECOVERED_AFTER_DOWNTIME"
+                if recovery_origin == "RECOVERED_AFTER_DOWNTIME"
+                else "CURRENT_LIVE_REEVALUATION"
+            ),
             "market_identity": market_identity,
             "polymarket_ready": polymarket_ready,
             "trigger_committed_after_live_ready": True,

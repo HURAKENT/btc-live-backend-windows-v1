@@ -33,7 +33,44 @@ def source_event(
     origin: str = "LIVE",
 ) -> SourceEvent:
     payload_value = {"event_type": event_type}
-    if asset_id is not None:
+    if event_type == "BINANCE_KLINE_CLOSED":
+        payload_value.update(
+            {
+                "close": "101.000000",
+                "high": "102.000000",
+                "interval": "1m",
+                "low": "99.000000",
+                "open": "100.000000",
+                "open_time_ms": timestamp,
+                "symbol": "BTCUSDT",
+                "volume": "2.500000",
+            }
+        )
+    elif event_type == "POLYMARKET_BOOK":
+        if asset_id is None:
+            raise ValueError("asset_id required for book fixture")
+        payload_value.update(
+            {
+                "asset_id": asset_id,
+                "asks": [
+                    {
+                        "price_micros": 600_000,
+                        "size_micros": 2_000_000,
+                    }
+                ],
+                "best_ask_micros": 600_000,
+                "best_bid_micros": 400_000,
+                "bids": [
+                    {
+                        "price_micros": 400_000,
+                        "size_micros": 1_000_000,
+                    }
+                ],
+                "book_hash": f"hash-{asset_id}-{timestamp}",
+                "spread_micros": 200_000,
+            }
+        )
+    elif asset_id is not None:
         payload_value["asset_id"] = asset_id
     payload = json.dumps(
         payload_value,
@@ -283,10 +320,21 @@ class AtomicCanaryPersistenceTests(unittest.TestCase):
         self.assertFalse(payload["paper_or_live_eligible"])
 
     def test_recovered_and_current_payload_fields_are_preserved(self):
-        recovered = dataclasses.replace(
-            self.snapshot,
-            snapshot_key="recovered",
-            recovery_origin="RECOVERED_AFTER_DOWNTIME",
+        helper = RuntimeProjectionTests()
+        helper.assets = tuple(f"asset-{index}" for index in range(22))
+        projector = CanonicalProjector(backend_session_id="session-1")
+        projector.set_market_identity(helper._reconciliation())
+        for committed in helper._books(origin="REST_BACKFILL"):
+            projector.apply(committed)
+        projector.apply(
+            helper._binance(
+                100,
+                origin="RECOVERED_AFTER_DOWNTIME",
+            )
+        )
+        recovered = projector.build_snapshot(
+            evaluation_origin="RECOVERED_AFTER_DOWNTIME",
+            trigger_committed_after_live_ready=False,
         )
         commit_canary_if_new(self.store, recovered)
         row = self.store.rows(

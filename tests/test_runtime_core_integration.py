@@ -54,10 +54,10 @@ class RuntimeCoreIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.binance.release.set()
         await self.runtime.wait_for_source_idle()
         self.assertEqual(self.store.count("market_catalog"), 1)
-        self.assertEqual(self.store.count("canonical_state"), 1)
-        self.assertEqual(self.store.count("strategy_evaluations"), 1)
-        self.assertEqual(self.store.count("signals"), 1)
-        self.assertEqual(self.store.count("outbox_events"), 1)
+        self.assertEqual(self.store.count("canonical_state"), 2)
+        self.assertEqual(self.store.count("strategy_evaluations"), 2)
+        self.assertEqual(self.store.count("signals"), 2)
+        self.assertEqual(self.store.count("outbox_events"), 2)
 
     async def test_duplicate_redelivery_is_ignored_and_database_is_valid(self):
         await self.runtime.start()
@@ -65,7 +65,7 @@ class RuntimeCoreIntegrationTests(unittest.IsolatedAsyncioTestCase):
         await self.runtime.wait_for_source_idle()
         await self.runtime.enqueue(self.binance.live_event)
         await self.runtime.wait_for_source_idle()
-        self.assertEqual(self.store.count("canonical_state"), 1)
+        self.assertEqual(self.store.count("canonical_state"), 2)
         self.assertEqual(self.store.integrity_report()["status"], "PASS")
 
     async def test_api_is_not_pass_while_runtime_is_starting(self):
