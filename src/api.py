@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from typing import Any
+from typing import Any, Callable
 
 from aiohttp import WSMsgType, web
 
@@ -81,6 +81,8 @@ def _outbox_message(event: OutboxEvent) -> dict[str, Any]:
 def create_api_app(
     read_store: SqliteReadStore,
     outbox_broker: OutboxBroker,
+    *,
+    runtime_status: Callable[[], Any] | None = None,
 ) -> web.Application:
     if type(read_store) is not SqliteReadStore:
         raise ValueError("INVALID_API_READ_STORE")
@@ -92,6 +94,7 @@ def create_api_app(
     app["bind_port"] = API_BIND_PORT
     app["read_store"] = read_store
     app["outbox_broker"] = outbox_broker
+    app["runtime_status"] = runtime_status or _starting_runtime_status
     app.router.add_get("/api/v1/bootstrap", _bootstrap)
     app.router.add_get("/api/v1/health", _health)
     app.router.add_get("/api/v1/sources", _sources)
@@ -106,7 +109,12 @@ def _store(request: web.Request) -> SqliteReadStore:
 
 
 async def _health(request: web.Request) -> web.Response:
-    return _json_response(_store(request).health())
+    return _json_response(
+        build_health_payload(
+            _store(request),
+            request.app["runtime_status"](),
+        )
+    )
 
 
 async def _sources(request: web.Request) -> web.Response:
@@ -129,16 +137,83 @@ async def _incidents(request: web.Request) -> web.Response:
 
 async def _bootstrap(request: web.Request) -> web.Response:
     store = _store(request)
+    health = build_health_payload(
+        store,
+        request.app["runtime_status"](),
+    )
     return _json_response(
         {
             "current_market_identity": store.current_market_identity(),
-            "health": store.health(),
+            "health": health,
             "incidents": store.incidents(limit=REST_RESULT_LIMIT),
             "last_event_id": store.last_event_id(),
             "signals": store.signals(limit=REST_RESULT_LIMIT),
             "sources": store.sources(),
         }
     )
+
+
+def _starting_runtime_status() -> dict[str, Any]:
+    return {
+        "state": "BOOTING",
+        "live_ready": False,
+        "source_health": (
+            ("binance", "STARTING"),
+            ("polymarket", "STARTING"),
+        ),
+        "market_id": None,
+        "market_count": 0,
+        "asset_count": 0,
+        "last_event_id": 0,
+        "failure": None,
+    }
+
+
+def build_health_payload(
+    read_store: SqliteReadStore,
+    runtime_status: Any,
+) -> dict[str, Any]:
+    database_health = read_store.health()
+    if type(runtime_status) is dict:
+        runtime = dict(runtime_status)
+    else:
+        runtime = {
+            "state": runtime_status.state,
+            "live_ready": runtime_status.live_ready,
+            "source_health": runtime_status.source_health,
+            "market_id": runtime_status.market_id,
+            "market_count": runtime_status.market_count,
+            "asset_count": runtime_status.asset_count,
+            "last_event_id": runtime_status.last_event_id,
+            "failure": runtime_status.failure,
+        }
+    source_health = dict(runtime["source_health"])
+    required_sources_ready = (
+        source_health.get("binance") == "LIVE"
+        and source_health.get("polymarket") == "LIVE"
+    )
+    live_ready = runtime["live_ready"] is True
+    database_pass = database_health.get("status") == "PASS"
+    if database_pass and live_ready and required_sources_ready:
+        status = "PASS"
+    elif runtime.get("failure") is not None or not database_pass:
+        status = "DEGRADED"
+    else:
+        status = "STARTING"
+    return {
+        "database_health": database_health,
+        "runtime_readiness": {
+            "asset_count": runtime["asset_count"],
+            "failure": runtime["failure"],
+            "last_event_id": runtime["last_event_id"],
+            "live_ready": live_ready,
+            "market_count": runtime["market_count"],
+            "market_id": runtime["market_id"],
+            "state": runtime["state"],
+        },
+        "source_health": source_health,
+        "status": status,
+    }
 
 
 async def _send_available(

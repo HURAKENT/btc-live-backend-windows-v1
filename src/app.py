@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import signal
 from collections.abc import Callable
 from pathlib import Path
@@ -65,30 +66,56 @@ class RuntimeLifecycle(Protocol):
 
 
 class BackendRuntime:
-    def __init__(self) -> None:
+    def __init__(self, *, orchestrator_factory=None) -> None:
         self._store: SqliteStore | None = None
         self._read_store: SqliteReadStore | None = None
         self._broker: OutboxBroker | None = None
         self._api_runner: web.AppRunner | None = None
         self._provider_tasks: list[asyncio.Task[Any]] = []
         self._source_queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._config: RuntimeConfig | None = None
+        self._orchestrator_factory = orchestrator_factory
+        self._orchestrator = None
 
     def initialize(
         self,
         config: RuntimeConfig,
         store: SqliteStore,
     ) -> None:
+        self._config = config
         self._store = store
         self._read_store = store.open_read_store()
         self._broker = OutboxBroker()
 
     async def start_runtime_tasks(self) -> None:
-        return None
+        if self._store is None or self._broker is None:
+            raise RuntimeError("BACKEND_RUNTIME_NOT_INITIALIZED")
+        factory = self._orchestrator_factory
+        if factory is None:
+            from src.runtime_orchestrator import (
+                build_default_runtime_orchestrator,
+            )
+
+            factory = build_default_runtime_orchestrator
+        orchestrator = factory(store=self._store, broker=self._broker)
+        if inspect.isawaitable(orchestrator):
+            orchestrator = await orchestrator
+        self._orchestrator = orchestrator
+        await self._orchestrator.start()
 
     async def start_api(self, host: str, port: int) -> None:
         if self._read_store is None or self._broker is None:
             raise RuntimeError("BACKEND_RUNTIME_NOT_INITIALIZED")
-        app = create_api_app(self._read_store, self._broker)
+        runtime_status = (
+            None
+            if self._orchestrator is None
+            else self._orchestrator.status
+        )
+        app = create_api_app(
+            self._read_store,
+            self._broker,
+            runtime_status=runtime_status,
+        )
         runner = web.AppRunner(app)
         await runner.setup()
         try:
@@ -105,6 +132,9 @@ class BackendRuntime:
             self._api_runner = None
 
     async def stop_providers(self) -> None:
+        if self._orchestrator is not None:
+            await self._orchestrator.stop()
+            return
         for task in self._provider_tasks:
             task.cancel()
         if self._provider_tasks:
@@ -115,6 +145,9 @@ class BackendRuntime:
         self._provider_tasks.clear()
 
     async def drain_source_queue(self) -> None:
+        if self._orchestrator is not None:
+            await self._orchestrator.drain_source_queue()
+            return
         await self._source_queue.join()
 
     async def commit_pending_writer_commands(self) -> None:
