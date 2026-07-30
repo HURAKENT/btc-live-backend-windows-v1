@@ -322,3 +322,12 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Same-DB restart reached `PASS` without `SOURCE_EVENT_CONFLICT` or `RECOVERY_BLOCKED`; identical market/book identity replay remained idempotent and new live events continued to commit. The second `CTRL_BREAK_EVENT` also produced exit 0.
 - Fresh SQLite evidence remained migration version 2 with nine tables, `quick_check=ok`, `integrity_check=ok`, `journal_mode=wal`, `synchronous=2`, and `foreign_keys=1`.
 - Registry execution, real orders, paper fills, wallet/signing, credentials, and secrets remain absent. Wave 3 and Task 14 were not started in this integration cycle. Gate: `C1_PROCESS_INTEGRATION_PASS`.
+
+## Polymarket WS Initial Book Batch
+
+- Task 14 run `C1-ACCEPTANCE-20260729T162927Z-C63F88BF` stopped at `POLYMARKET_STREAM_FAILED: POLYMARKET_INVALID_TYPE: payload`; lifecycle moved from `LIVE_BUFFERING` through `RUNTIME_FATAL` to `RECOVERY_BLOCKED`.
+- One manual Windows probe, ID `POLYMARKET-WS-PROBE-20260730T112412Z-28728040`, ran from source commit `7ee89bd064588cf8dd9e67dd141be5e6a3246ada`. Its canonical report SHA-256 is `a76883c1ad9c564763d9873975f5aef6e5259a5ddedefe4288906ba22101b487`.
+- Sanitized evidence confirms discovery of 11 markets and 22 assets. The first subscribed Market WebSocket frame was a top-level array of length 2 for a two-asset YES/NO subscription, containing two homogeneous `book` objects.
+- The confirmed object field set is `asks`, `asset_id`, `bids`, `event_type`, `hash`, `last_trade_price`, `market`, `tick_size`, and `timestamp`. Raw frame and raw identifier persistence counters are zero.
+- Root cause: `POLYMARKET_WS_INITIAL_BOOK_BATCH_NOT_SUPPORTED`. The frame boundary now preserves the existing single-object parser and accepts only a non-empty, bounded, unique, subscribed-asset array of fully validated `book` objects.
+- Batch validation is atomic before enqueue, preserves wire order, and rejects empty, oversized, mixed, nested, service, price-change, duplicate-asset, unknown-asset, or structurally invalid arrays. Task 14 has not been rerun.

@@ -1,0 +1,154 @@
+{
+  "aiohttp_version": "3.14.3",
+  "bounds": {
+    "frames_received": 1,
+    "gamma_discovery_sequences": 1,
+    "inbound_bytes": 2657,
+    "max_frames": 10,
+    "reconnect_attempts": 0,
+    "subscriptions_sent": 1,
+    "timeout_seconds": 30,
+    "websocket_connections": 1
+  },
+  "conclusion": {
+    "exact_wire_container_established": true,
+    "likely_required_parser_change": "REVIEW_ARRAY_CONTAINER_SUPPORT",
+    "remaining_data_gaps": [],
+    "status": "POLYMARKET_WS_WIRE_SHAPE_ESTABLISHED"
+  },
+  "current_parser_contract": {
+    "accepted_top_level_json_types": [
+      "object"
+    ],
+    "mismatch_reason": "MARKET_DATA_TOP_LEVEL_CONTAINER_IS_NOT_OBJECT",
+    "observed_market_data_compatible": false
+  },
+  "discovery": {
+    "asset_count": 22,
+    "event_identity_sha256": "b514fbb48959db8e451f187b0b104c9bbbe6d49699a730c9ede88cbd8925c2d5",
+    "market_count": 11,
+    "selected": true,
+    "selected_market_identity_sha256": "bfbac06310b057c8971523c9e666d6486d61b09d7849f30c315935e128bcce5f",
+    "selected_market_order_index": 0,
+    "subscribed_asset_count": 2,
+    "subscribed_asset_set_sha256": "a2582f25a627d0d27d335600091d0cb471abd57b755ea3852cab67bbfd027551",
+    "token_role_count": {
+      "NO": 1,
+      "YES": 1
+    }
+  },
+  "endpoint_summary": {
+    "authenticated": false,
+    "gamma_host": "gamma-api.polymarket.com",
+    "gamma_path_class": "/events/keyset",
+    "tls": true,
+    "websocket_host": "ws-subscriptions-clob.polymarket.com",
+    "websocket_path_class": "/ws/market"
+  },
+  "first_json_frame_classification": "ARRAY_OF_MARKET_OBJECTS",
+  "first_market_data_candidate_classification": "ARRAY_OF_MARKET_OBJECTS",
+  "frames": [
+    {
+      "byte_length": 2657,
+      "classification": "ARRAY_OF_MARKET_OBJECTS",
+      "json_decode_status": "PASS",
+      "monotonic_offset_ms": 1030,
+      "raw_frame_sha256": "e3e48a68aa082e10e959a948e361d976fb2ed5460968d19747a4a23d42f12042",
+      "sequence": 1,
+      "structural_summary_sha256": "67f63eeabcc0451726ee3fdf9954eb45c3c466d2ec7d74b964fb8c0b01c4b2c0",
+      "structure": {
+        "array_length": 2,
+        "discriminators": {
+          "event_type": [
+            "book"
+          ]
+        },
+        "distinct_object_field_set_sha256": [
+          "407e9b7d019a41b6b5dea3626506491d632dfa71c4aa127ccd60341e728d03ce"
+        ],
+        "distinct_object_shape_count": 1,
+        "element_type_histogram": {
+          "object": 2
+        },
+        "empty": false,
+        "mixed_type": false,
+        "nested_array_element_count": 0,
+        "null_element_count": 0,
+        "object_element_count": 2,
+        "object_field_intersection": [
+          "asks",
+          "asset_id",
+          "bids",
+          "event_type",
+          "hash",
+          "last_trade_price",
+          "market",
+          "tick_size",
+          "timestamp"
+        ],
+        "object_field_union": [
+          "asks",
+          "asset_id",
+          "bids",
+          "event_type",
+          "hash",
+          "last_trade_price",
+          "market",
+          "tick_size",
+          "timestamp"
+        ]
+      },
+      "top_level_json_type": "array",
+      "transport_type": "TEXT"
+    }
+  ],
+  "generated_at_utc": "2026-07-30T11:24:12.127897Z",
+  "network_counters": {
+    "automatic_retries": 0,
+    "clob_book_requests": 0,
+    "frames_received": 1,
+    "gamma_discovery_sequences": 1,
+    "inbound_bytes": 2657,
+    "price_history_requests": 0,
+    "reconnect_attempts": 0,
+    "subscriptions_sent": 1,
+    "websocket_connections": 1
+  },
+  "observed_classifications": [
+    "ARRAY_OF_MARKET_OBJECTS"
+  ],
+  "observed_top_level_json_types": [
+    "array"
+  ],
+  "observed_transport_types": [
+    "TEXT"
+  ],
+  "probe_id": "POLYMARKET-WS-PROBE-20260730T112412Z-28728040",
+  "python_version": "3.12.4",
+  "report_sha256": "a76883c1ad9c564763d9873975f5aef6e5259a5ddedefe4288906ba22101b487",
+  "schema_version": "POLYMARKET_WS_WIRE_SHAPE_PROBE_V1",
+  "scope": {
+    "auth_used": false,
+    "backend_started": false,
+    "codex_network_run": false,
+    "manual_windows_run": true,
+    "order_surface_used": false,
+    "public_read_only": true,
+    "sqlite_used": false,
+    "task14_started": false,
+    "wallet_surface_used": false
+  },
+  "security_counters": {
+    "authentication_uses": 0,
+    "order_surface_uses": 0,
+    "raw_frames_persisted": 0,
+    "raw_identifiers_persisted": 0,
+    "wallet_surface_uses": 0
+  },
+  "source_commit": "7ee89bd064588cf8dd9e67dd141be5e6a3246ada",
+  "subscription": {
+    "asset_count": 2,
+    "payload_sha256": "334c578c5ae38821cd13b41e51dd09cf3fcd7abbc2eff7528cc4b396cb134f54",
+    "sent": true
+  }
+}
