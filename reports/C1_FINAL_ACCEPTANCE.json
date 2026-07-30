@@ -1,5 +1,5 @@
 {
-  "acceptance_harness_commit": "3f8be0d98bb3720ed0b32783a41f7ba8a0f90441",
+  "acceptance_harness_commit": "1811b587fba7c069a8aa29de17364128fc10f716",
   "acceptance_pack": {
     "crc_pass": true,
     "duplicate_entries": 0,
@@ -7,12 +7,12 @@
     "missing_sha_entries": 0,
     "path": "artifacts/C1_ACCEPTANCE_PACK.zip",
     "path_traversal_entries": 0,
-    "sha256": "c50a12300a3cca5b5f86fb04e107c2ba596ef361ef6d9453b653e5fcc8f07b0f",
+    "sha256": "9f6eaa9015f0698313c950571ae5f76be3f9c9d4327a461c4d504e8594b81a4f",
     "sha_mismatch": 0,
-    "size": 26036
+    "size": 26026
   },
-  "commit_sha": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
-  "commit_under_test": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
+  "commit_sha": "1811b587fba7c069a8aa29de17364128fc10f716",
+  "commit_under_test": "1811b587fba7c069a8aa29de17364128fc10f716",
   "gate": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS",
   "intentional_downtime_acceptance": {
     "completed": true,
@@ -44,7 +44,7 @@
     "C1_TRANSACTIONAL_OUTBOX_PASS": true,
     "C1_WINDOWS_LIFECYCLE_PASS": true
   },
-  "run_id": "C1-ACCEPTANCE-20260730T142620Z-AD3D3272",
+  "run_id": "C1-ACCEPTANCE-20260730T145425Z-F5722878",
   "runtime_baseline_commit": "eec05197f05c3d6887bbc49a5edd125ad784cd46",
   "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_FINAL_ACCEPTANCE_V1",
   "scope_assertions": {
@@ -62,7 +62,7 @@
     "trading_approval": false,
     "wallet_or_signing": false
   },
-  "source_commit": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
+  "source_commit": "1811b587fba7c069a8aa29de17364128fc10f716",
   "status": "PASS",
   "trading_approval": false
 }

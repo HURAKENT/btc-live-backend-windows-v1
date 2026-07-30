@@ -363,3 +363,43 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
   duplicate, missing-hash or mismatch entries.
 - Trading approval is false. Authentication, Registry execution, real orders,
   paper execution, wallet/signing and secrets remain absent.
+
+### Final verified launcher rerun
+
+- Source and acceptance harness commit:
+  `1811b587fba7c069a8aa29de17364128fc10f716`.
+  Run ID: `C1-ACCEPTANCE-20260730T145425Z-F5722878`.
+- The unchanged safe launcher passed process integration 11/11 and the
+  546-test full offline suite with one documented skip, completed Task 14,
+  reported `PASS`, and returned exit code 0.
+- Initial and post-restart states reached `LIVE_READY` with Binance and
+  Polymarket `LIVE`, one current market identity, 11 markets and 22 assets.
+- The second simultaneous instance exited 20. Initial and restart processes
+  exited 0; forced termination was false. Final backend, child process, port
+  and mutex checks all passed.
+- Monotonic measured downtime was 605,000 ms. The recorded process-stop
+  timestamp is `1785423301008`, the restart-request timestamp is
+  `1785423907042`, and restart used the same isolated SQLite database.
+- Binance continuity recovered 10/10 expected closed minutes with zero
+  missing minutes, duplicate natural keys, OHLCV conflicts, source-event
+  conflicts or cursor regressions. Polymarket reconciled 22/22 assets;
+  historical depth is explicitly `NOT_REQUIRED`.
+- Recovered and current evaluations each have count 2, use distinct
+  identities, are infrastructure-only, and have
+  `execution_eligible=false` and `trading_eligible=false`. Outbox replay
+  proved ordered, complete IDs `[1, 2]` and `[3, 4]`.
+- Final SQLite evidence: migration version 2, nine tables,
+  `quick_check=ok`, `integrity_check=ok`, `journal_mode=wal`,
+  `synchronous=2`, and `foreign_keys=1`.
+- Canonical report SHA-256 values are
+  `f3f331e23c6e011220bae0fcf70fc6ae0bb6322264065458ae6a08d27a8618cc`
+  and
+  `ddde9d856ae6a03d28be01a445ca69aadcdff0e1a9f8d0cb09102d59228d3eef`.
+  Acceptance pack SHA-256 is
+  `9f6eaa9015f0698313c950571ae5f76be3f9c9d4327a461c4d504e8594b81a4f`;
+  ZIP CRC and all 15 internal SHA-256 entries pass with zero traversal,
+  duplicate, missing or mismatched entries and no raw runtime database.
+- Protected source hashes are unchanged. Authentication, Registry execution,
+  real orders, paper execution, wallet/signing, credentials and secrets
+  remain absent. Trading approval remains false.
+- Final gate: `BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS`.
