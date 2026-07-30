@@ -21,6 +21,7 @@ CLOB_BASE_URL = "https://clob.polymarket.com"
 MARKET_WEBSOCKET_URL = (
     "wss://ws-subscriptions-clob.polymarket.com/ws/market"
 )
+MAX_HISTORY_REQUESTS_PER_ASSET = 64
 _SUPPORTED_PASSTHROUGH_EVENTS = frozenset(
     {
         "last_trade_price",
@@ -636,9 +637,15 @@ async def iter_price_history(
         raise ValueError("POLYMARKET_INVALID_HISTORY_RANGE")
 
     next_start = start_ts
-    seen: set[int] = set()
+    canonical_by_timestamp: dict[int, str] = {}
+    buffered_events: list[SourceEvent] = []
+    last_accepted_timestamp: int | None = None
     page_index = 0
+    request_count = 0
     while next_start <= end_ts:
+        if request_count >= MAX_HISTORY_REQUESTS_PER_ASSET:
+            raise ValueError("POLYMARKET_HISTORY_REQUEST_LIMIT")
+        request_count += 1
         request_start = next_start
         async with session.get(
             f"{clob_base_url}/prices-history",
@@ -657,11 +664,12 @@ async def iter_price_history(
         _require_type(payload, dict, "history.response")
         history = _require_type(payload.get("history"), list, "history")
         if not history:
-            return
+            break
 
-        last_timestamp: int | None = None
-        prior_seen = set(seen)
+        prior_seen = set(canonical_by_timestamp)
         page_seen: set[int] = set()
+        page_has_in_range_point = False
+        page_made_progress = False
         for index, point in enumerate(history):
             _require_type(point, dict, f"history[{index}]")
             timestamp = _require_type(
@@ -675,7 +683,18 @@ async def iter_price_history(
             )
             if timestamp > end_ts:
                 continue
+            page_has_in_range_point = True
+            normalized = {
+                "asset_id": asset_id,
+                "event_type": "price_history",
+                "price_micros": price,
+                "provider_point": {**point, "p": provider_price},
+                "timestamp_seconds": timestamp,
+            }
+            canonical = _canonical_json(normalized)
             if timestamp in page_seen:
+                if canonical_by_timestamp[timestamp] == canonical:
+                    continue
                 raise _history_sequence_error(
                     history=history,
                     page_index=page_index,
@@ -683,9 +702,14 @@ async def iter_price_history(
                     request_end=end_ts,
                     prior_seen=prior_seen,
                     first_rejected_position=index,
-                    rejection_category="DUPLICATE_WITHIN_PAGE",
+                    rejection_category=(
+                        "DUPLICATE_WITHIN_PAGE_CONFLICT"
+                    ),
                 )
             if timestamp in prior_seen:
+                page_seen.add(timestamp)
+                if canonical_by_timestamp[timestamp] == canonical:
+                    continue
                 raise _history_sequence_error(
                     history=history,
                     page_index=page_index,
@@ -693,9 +717,12 @@ async def iter_price_history(
                     request_end=end_ts,
                     prior_seen=prior_seen,
                     first_rejected_position=index,
-                    rejection_category="CROSS_PAGE_OVERLAP",
+                    rejection_category="CROSS_PAGE_OVERLAP_CONFLICT",
                 )
-            if last_timestamp is not None and timestamp <= last_timestamp:
+            if (
+                last_accepted_timestamp is not None
+                and timestamp <= last_accepted_timestamp
+            ):
                 raise _history_sequence_error(
                     history=history,
                     page_index=page_index,
@@ -705,35 +732,35 @@ async def iter_price_history(
                     first_rejected_position=index,
                     rejection_category="NON_INCREASING_WITHIN_PAGE",
                 )
-            seen.add(timestamp)
+            canonical_by_timestamp[timestamp] = canonical
             page_seen.add(timestamp)
-            last_timestamp = timestamp
-            normalized = {
-                "asset_id": asset_id,
-                "event_type": "price_history",
-                "price_micros": price,
-                "provider_point": {**point, "p": provider_price},
-                "timestamp_seconds": timestamp,
-            }
-            canonical = _canonical_json(normalized)
+            last_accepted_timestamp = timestamp
+            page_made_progress = True
             identity_hash = hashlib.sha256(
                 canonical.encode("utf-8")
             ).hexdigest()
-            yield _source_event(
-                event_type="POLYMARKET_PRICE_HISTORY",
-                natural_key=(
-                    f"polymarket:{asset_id}:price_history:"
-                    f"{timestamp}:{identity_hash}"
-                ),
-                timestamp_ms=timestamp * 1000,
-                payload=normalized,
-                recovery_origin="REST_BACKFILL",
+            buffered_events.append(
+                _source_event(
+                    event_type="POLYMARKET_PRICE_HISTORY",
+                    natural_key=(
+                        f"polymarket:{asset_id}:price_history:"
+                        f"{timestamp}:{identity_hash}"
+                    ),
+                    timestamp_ms=timestamp * 1000,
+                    payload=normalized,
+                    recovery_origin="REST_BACKFILL",
+                )
             )
 
-        if last_timestamp is None:
-            return
-        next_start = last_timestamp + 60
+        if not page_has_in_range_point:
+            break
+        if not page_made_progress or last_accepted_timestamp is None:
+            raise ValueError("POLYMARKET_HISTORY_NO_PROGRESS")
+        next_start = last_accepted_timestamp + 60
         page_index += 1
+
+    for event in buffered_events:
+        yield event
 
 
 class PolymarketStream:

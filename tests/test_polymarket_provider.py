@@ -883,7 +883,7 @@ class PolymarketHistorySequenceDiagnosticTests(
                 {
                     "history": [
                         {"t": 100, "p": "0.45"},
-                        {"t": 100, "p": "0.45"},
+                        {"t": 100, "p": "0.46"},
                     ]
                 }
             ]
@@ -901,7 +901,7 @@ class PolymarketHistorySequenceDiagnosticTests(
                 "first_rejected_position": 1,
                 "item_count": 2,
                 "page_index": 0,
-                "rejection_category": "DUPLICATE_WITHIN_PAGE",
+                "rejection_category": "DUPLICATE_WITHIN_PAGE_CONFLICT",
                 "request_range_sha256": unittest.mock.ANY,
                 "timestamp_type_histogram": {"int": 2},
             },
@@ -922,7 +922,7 @@ class PolymarketHistorySequenceDiagnosticTests(
                 },
                 {
                     "history": [
-                        {"t": 160, "p": "0.46"},
+                        {"t": 160, "p": "0.99"},
                         {"t": 220, "p": "0.47"},
                     ]
                 },
@@ -935,7 +935,7 @@ class PolymarketHistorySequenceDiagnosticTests(
         self.assertEqual(diagnostic["page_index"], 1)
         self.assertEqual(
             diagnostic["rejection_category"],
-            "CROSS_PAGE_OVERLAP",
+            "CROSS_PAGE_OVERLAP_CONFLICT",
         )
         self.assertEqual(diagnostic["cross_page_overlap_count"], 1)
         self.assertEqual(diagnostic["first_rejected_position"], 0)
@@ -967,12 +967,13 @@ class PolymarketHistorySequenceDiagnosticTests(
         raw_timestamp = 1785456789
         raw_asset = "synthetic-history-asset"
         raw_price = "0.123456"
+        conflicting_raw_price = "0.654321"
         error_text = await self._failure_text(
             [
                 {
                     "history": [
                         {"t": raw_timestamp, "p": raw_price},
-                        {"t": raw_timestamp, "p": raw_price},
+                        {"t": raw_timestamp, "p": conflicting_raw_price},
                     ]
                 }
             ],
@@ -983,6 +984,7 @@ class PolymarketHistorySequenceDiagnosticTests(
         self.assertNotIn(str(raw_timestamp), error_text)
         self.assertNotIn(raw_asset, error_text)
         self.assertNotIn(raw_price, error_text)
+        self.assertNotIn(conflicting_raw_price, error_text)
         self.assertLessEqual(len(error_text), 500)
 
     def test_diagnostic_remains_bounded_for_adversarial_page_shape(self):
@@ -1003,6 +1005,166 @@ class PolymarketHistorySequenceDiagnosticTests(
 
         self.assertIs(type(error), ValueError)
         self.assertLessEqual(len(str(error)), 500)
+
+
+class PolymarketHistoryDuplicateNormalizationTests(
+    unittest.IsolatedAsyncioTestCase
+):
+    @staticmethod
+    async def _events(responses, *, start_ts=100, end_ts=220):
+        session = FakeSession(responses)
+        events = [
+            event
+            async for event in iter_price_history(
+                session,
+                asset_id="synthetic-history-asset",
+                start_ts=start_ts,
+                end_ts=end_ts,
+            )
+        ]
+        return events, session
+
+    async def test_exact_duplicate_within_page_is_idempotent(self):
+        point = {"t": 100, "p": "0.45", "provider_flag": "same"}
+
+        events, _ = await self._events(
+            [{"history": [point, copy.deepcopy(point)]}],
+            end_ts=100,
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].source_timestamp_ms, 100_000)
+
+    async def test_conflicting_duplicate_within_page_is_atomic(self):
+        generator = iter_price_history(
+            FakeSession(
+                [
+                    {
+                        "history": [
+                            {
+                                "t": 100,
+                                "p": "0.45",
+                                "provider_flag": "first",
+                            },
+                            {
+                                "t": 100,
+                                "p": "0.45",
+                                "provider_flag": "conflict",
+                            },
+                        ]
+                    }
+                ]
+            ),
+            asset_id="synthetic-history-asset",
+            start_ts=100,
+            end_ts=100,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            '"rejection_category":"DUPLICATE_WITHIN_PAGE_CONFLICT"',
+        ):
+            await anext(generator)
+
+    async def test_exact_cross_page_overlap_is_idempotent(self):
+        events, session = await self._events(
+            [
+                {
+                    "history": [
+                        {"t": 100, "p": "0.45"},
+                        {"t": 160, "p": "0.99"},
+                    ]
+                },
+                {
+                    "history": [
+                        {"t": 160, "p": "0.99"},
+                        {"t": 220, "p": "0.47"},
+                    ]
+                },
+            ]
+        )
+
+        self.assertEqual(
+            [event.source_timestamp_ms for event in events],
+            [100_000, 160_000, 220_000],
+        )
+        self.assertEqual(len(session.calls), 2)
+
+    async def test_conflicting_cross_page_overlap_is_atomic(self):
+        generator = iter_price_history(
+            FakeSession(
+                [
+                    {
+                        "history": [
+                            {"t": 100, "p": "0.45"},
+                            {
+                                "t": 160,
+                                "p": "0.46",
+                                "provider_flag": "first",
+                            },
+                        ]
+                    },
+                    {
+                        "history": [
+                            {
+                                "t": 160,
+                                "p": "0.46",
+                                "provider_flag": "conflict",
+                            },
+                            {"t": 220, "p": "0.47"},
+                        ]
+                    },
+                ]
+            ),
+            asset_id="synthetic-history-asset",
+            start_ts=100,
+            end_ts=220,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            '"rejection_category":"CROSS_PAGE_OVERLAP_CONFLICT"',
+        ):
+            await anext(generator)
+
+    async def test_replay_only_page_fails_no_progress(self):
+        generator = iter_price_history(
+            FakeSession(
+                [
+                    {"history": [{"t": 100, "p": "0.45"}]},
+                    {"history": [{"t": 100, "p": "0.45"}]},
+                ]
+            ),
+            asset_id="synthetic-history-asset",
+            start_ts=100,
+            end_ts=160,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_HISTORY_NO_PROGRESS",
+        ):
+            await anext(generator)
+
+    async def test_history_requests_have_hard_per_asset_bound(self):
+        responses = [
+            {"history": [{"t": 100 + index * 60, "p": "0.45"}]}
+            for index in range(65)
+        ]
+        session = FakeSession(responses)
+        generator = iter_price_history(
+            session,
+            asset_id="synthetic-history-asset",
+            start_ts=100,
+            end_ts=100 + 64 * 60,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_HISTORY_REQUEST_LIMIT",
+        ):
+            await anext(generator)
+        self.assertEqual(len(session.calls), 64)
 
 
 class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
