@@ -36,7 +36,8 @@ ordering, deduplication or pagination semantics.
 
 ## Manual Action Required
 
-No.
+Yes. One manual Windows Task 14 run is required after the checkpoint
+containing instrumentation commit `12e522a`.
 
 ## Definition of Done Checklist
 
@@ -109,3 +110,35 @@ No.
 - Network: 0.
 - Task 14: not run.
 - Next gate: scope/security audit, commit/push, then one manual Task 14 run.
+
+### Checkpoint 2 — Manual Task 14 Evidence
+
+- Reason: the existing run proves a history sequence violation but not whether
+  it is a within-page duplicate, cross-page overlap, descending/non-monotonic
+  order or another sequence shape.
+- Instrumentation commit:
+  `12e522a`.
+- Allowed run count: 1.
+- Expected duration: 12–18 minutes, including the 605-second downtime only if
+  initial `LIVE_READY` is reached.
+- Command:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\gegos\Documents\Codex\btc_live_backend_windows_v1\scripts\RUN_TASK14_MANUAL.ps1'
+```
+
+- Canonical PASS outputs:
+  `C:\Users\gegos\Documents\Codex\btc_live_backend_windows_v1\reports\C1_DOWNTIME_ACCEPTANCE.json`,
+  `C:\Users\gegos\Documents\Codex\btc_live_backend_windows_v1\reports\C1_FINAL_ACCEPTANCE.json`
+  and
+  `C:\Users\gegos\Documents\Codex\btc_live_backend_windows_v1\artifacts\C1_ACCEPTANCE_PACK.zip`.
+- Blocked evidence base:
+  `C:\Users\gegos\Documents\Codex\btc_live_backend_windows_v1_runtime\acceptance`.
+- Acceptance data base:
+  `C:\Users\gegos\Documents\Codex\btc_live_backend_windows_v1_data\acceptance`.
+- Manual transcript base:
+  `C:\Users\gegos\Documents\Codex\task14_manual_logs`.
+- Do not rerun automatically or run a standalone history probe.
+- Resume with the launcher exit code, generated run ID, transcript path and
+  either the three canonical PASS outputs or the new run-specific
+  `evidence\task14_blocked.json`.
