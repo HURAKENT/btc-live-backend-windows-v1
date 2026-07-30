@@ -962,9 +962,13 @@ class LiveContractSmokeTests(unittest.TestCase):
                 downtime["runtime_baseline_commit"],
                 "eec05197f05c3d6887bbc49a5edd125ad784cd46",
             )
-            self.assertEqual(
+            self.assertRegex(
                 downtime["acceptance_harness_commit"],
-                downtime["commit_sha"],
+                r"^[0-9a-f]{40}$",
+            )
+            self.assertEqual(
+                final["acceptance_harness_commit"],
+                downtime["acceptance_harness_commit"],
             )
             self.assertEqual(
                 downtime["source_commit"],

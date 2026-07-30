@@ -1,5 +1,5 @@
 {
-  "acceptance_harness_commit": "3f8be0d",
+  "acceptance_harness_commit": "3f8be0d98bb3720ed0b32783a41f7ba8a0f90441",
   "binance_continuity": {
     "binance_ohlcv_conflicts": 0,
     "duplicate_binance_natural_keys": 0,
