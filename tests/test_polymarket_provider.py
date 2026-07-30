@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 
 from aiohttp import ClientSession, WSMsgType, web
 
+import src.polymarket_provider as polymarket_provider
 from src.market_discovery import (
     MarketIdentity,
     discover_active_btc_daily_range,
@@ -35,6 +36,42 @@ NOW = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
 
 def load_fixture(name):
     return json.loads(Path(FIXTURES, name).read_text(encoding="utf-8"))
+
+
+def synthetic_book(asset_id, book_hash):
+    return {
+        "asks": [{"price": "0.55", "size": "10"}],
+        "asset_id": asset_id,
+        "bids": [{"price": "0.45", "size": "10"}],
+        "event_type": "book",
+        "hash": book_hash,
+        "last_trade_price": "0.50",
+        "market": "synthetic-market",
+        "tick_size": "0.01",
+        "timestamp": "1785556800000",
+    }
+
+
+def parse_frame(
+    payload,
+    subscribed_asset_ids,
+    *,
+    allow_initial_book_batch=True,
+    incident_sink=None,
+):
+    parser = getattr(
+        polymarket_provider,
+        "parse_market_ws_frame",
+        parse_market_ws_message,
+    )
+    if parser is parse_market_ws_message:
+        return tuple(parser(payload, incident_sink=incident_sink))
+    return parser(
+        payload,
+        subscribed_asset_ids=subscribed_asset_ids,
+        allow_initial_book_batch=allow_initial_book_batch,
+        incident_sink=incident_sink,
+    )
 
 
 def discovery_event(
@@ -221,6 +258,311 @@ class PolymarketWireBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["provider_point"]["p"], "0.456")
         self.assertEqual(session.response.read_calls, 1)
         self.assertEqual(session.response.json_calls, 0)
+
+
+class PolymarketInitialBookBatchTests(unittest.IsolatedAsyncioTestCase):
+    def test_probe_like_two_book_batch_returns_two_events(self):
+        assets = ("synthetic-yes", "synthetic-no")
+        payload = [
+            synthetic_book(assets[0], "batch-hash-yes"),
+            synthetic_book(assets[1], "batch-hash-no"),
+        ]
+
+        events = parse_frame(payload, assets)
+
+        self.assertEqual(len(events), 2)
+        self.assertEqual(
+            [json.loads(event.payload_json)["asset_id"] for event in events],
+            list(assets),
+        )
+
+    def test_batch_preserves_wire_order(self):
+        assets = ("synthetic-yes", "synthetic-no")
+        payload = [
+            synthetic_book(assets[1], "batch-hash-no"),
+            synthetic_book(assets[0], "batch-hash-yes"),
+        ]
+
+        events = parse_frame(payload, assets)
+
+        self.assertEqual(
+            [json.loads(event.payload_json)["asset_id"] for event in events],
+            [assets[1], assets[0]],
+        )
+
+    def test_single_book_object_remains_accepted(self):
+        payload = synthetic_book("synthetic-yes", "single-book")
+
+        events = parse_frame(payload, ("synthetic-yes", "synthetic-no"))
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].event_type, "POLYMARKET_BOOK")
+
+    def test_single_price_change_object_remains_accepted(self):
+        payload = load_fixture("polymarket_price_change.json")
+
+        events = parse_frame(payload, ("token-00-yes", "token-00-no"))
+
+        self.assertTrue(events)
+        self.assertTrue(
+            all(
+                event.event_type == "POLYMARKET_PRICE_CHANGE"
+                for event in events
+            )
+        )
+
+    def test_twenty_two_unique_subscribed_books_are_accepted(self):
+        assets = tuple(f"synthetic-asset-{index:02d}" for index in range(22))
+        payload = [
+            synthetic_book(asset_id, f"batch-hash-{index:02d}")
+            for index, asset_id in enumerate(assets)
+        ]
+
+        events = parse_frame(payload, assets)
+
+        self.assertEqual(len(events), 22)
+        self.assertEqual(
+            [json.loads(event.payload_json)["asset_id"] for event in events],
+            list(assets),
+        )
+
+    def test_book_array_after_initial_frame_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_BOOK_BATCH_NOT_INITIAL",
+        ):
+            parse_frame(
+                [synthetic_book("synthetic-yes", "batch-hash-yes")],
+                ("synthetic-yes",),
+                allow_initial_book_batch=False,
+            )
+
+    def test_empty_array_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_EMPTY_INITIAL_BOOK_BATCH",
+        ):
+            parse_frame([], ("synthetic-yes", "synthetic-no"))
+
+    def test_mixed_object_and_primitive_array_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_INVALID_BOOK_BATCH_ELEMENT",
+        ):
+            parse_frame(
+                [synthetic_book("synthetic-yes", "hash-yes"), 1],
+                ("synthetic-yes", "synthetic-no"),
+            )
+
+    def test_nested_array_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_INVALID_BOOK_BATCH_ELEMENT",
+        ):
+            parse_frame(
+                [[synthetic_book("synthetic-yes", "hash-yes")]],
+                ("synthetic-yes",),
+            )
+
+    def test_price_change_array_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_UNSUPPORTED_BATCH_EVENT_TYPE",
+        ):
+            parse_frame(
+                [load_fixture("polymarket_price_change.json")],
+                ("token-00-yes", "token-00-no"),
+            )
+
+    def test_service_object_array_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_UNSUPPORTED_BATCH_EVENT_TYPE",
+        ):
+            parse_frame(
+                [{"type": "subscribed"}, {"type": "connected"}],
+                ("synthetic-yes", "synthetic-no"),
+            )
+
+    def test_duplicate_batch_asset_id_is_rejected(self):
+        payload = [
+            synthetic_book("synthetic-yes", "hash-one"),
+            synthetic_book("synthetic-yes", "hash-two"),
+        ]
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_DUPLICATE_BATCH_ASSET_ID",
+        ):
+            parse_frame(payload, ("synthetic-yes", "synthetic-no"))
+
+    def test_unsubscribed_batch_asset_id_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_UNSUBSCRIBED_BATCH_ASSET_ID",
+        ):
+            parse_frame(
+                [synthetic_book("synthetic-unknown", "hash-unknown")],
+                ("synthetic-yes", "synthetic-no"),
+            )
+
+    def test_batch_longer_than_subscription_is_rejected(self):
+        payload = [
+            synthetic_book(f"synthetic-{index}", f"hash-{index}")
+            for index in range(3)
+        ]
+        with self.assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_INITIAL_BOOK_BATCH_TOO_LARGE",
+        ):
+            parse_frame(payload, ("synthetic-0", "synthetic-1"))
+
+    def test_invalid_second_book_rejects_whole_batch(self):
+        invalid = synthetic_book("synthetic-no", "hash-no")
+        del invalid["hash"]
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_frame(
+                [
+                    synthetic_book("synthetic-yes", "hash-yes"),
+                    invalid,
+                ],
+                ("synthetic-yes", "synthetic-no"),
+            )
+
+    def test_invalid_first_book_is_rejected(self):
+        invalid = synthetic_book("synthetic-yes", "hash-yes")
+        del invalid["timestamp"]
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_frame(
+                [invalid],
+                ("synthetic-yes", "synthetic-no"),
+            )
+
+    def test_malformed_levels_block_whole_batch(self):
+        invalid = synthetic_book("synthetic-no", "hash-no")
+        invalid["asks"] = "not-a-list"
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_frame(
+                [
+                    synthetic_book("synthetic-yes", "hash-yes"),
+                    invalid,
+                ],
+                ("synthetic-yes", "synthetic-no"),
+            )
+
+    def test_primitive_top_level_remains_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "POLYMARKET_INVALID_TYPE"):
+            parse_frame("not-an-object", ("synthetic-yes",))
+
+    def test_unknown_single_object_behavior_does_not_regress(self):
+        incidents = []
+        payload = {
+            "asset_id": "synthetic-yes",
+            "event_type": "future_provider_event",
+            "timestamp": 1785556800000,
+        }
+
+        events = parse_frame(
+            payload,
+            ("synthetic-yes",),
+            incident_sink=incidents.append,
+        )
+
+        self.assertEqual(events[0].event_type, "UNHANDLED_PROVIDER_EVENT")
+        self.assertEqual(incidents[0]["code"], "UNHANDLED_PROVIDER_EVENT")
+
+    async def test_local_ws_batch_enqueues_two_events_in_wire_order(self):
+        assets = ("synthetic-yes", "synthetic-no")
+        connections = 0
+        incidents = []
+
+        async def handler(request):
+            nonlocal connections
+            connections += 1
+            websocket = web.WebSocketResponse()
+            await websocket.prepare(request)
+            subscription = await websocket.receive_json(timeout=1)
+            self.assertEqual(tuple(subscription["assets_ids"]), assets)
+            await websocket.send_json(
+                [
+                    synthetic_book(assets[1], "hash-no"),
+                    synthetic_book(assets[0], "hash-yes"),
+                ]
+            )
+            async for _message in websocket:
+                pass
+            return websocket
+
+        runner, websocket_url = await self._start_ws_server(handler)
+        try:
+            async with ClientSession() as session:
+                queue = asyncio.Queue()
+                stream = PolymarketStream(
+                    session,
+                    websocket_url=websocket_url,
+                    incident_sink=incidents.append,
+                )
+                task = asyncio.create_task(stream.run(assets, queue))
+                try:
+                    events = [
+                        await asyncio.wait_for(queue.get(), timeout=1)
+                        for _ in range(2)
+                    ]
+                finally:
+                    task.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await task
+        finally:
+            await runner.cleanup()
+
+        self.assertEqual(
+            [json.loads(event.payload_json)["asset_id"] for event in events],
+            [assets[1], assets[0]],
+        )
+        self.assertEqual(connections, 1)
+        self.assertEqual(incidents, [])
+
+    async def test_local_ws_invalid_second_element_enqueues_nothing(self):
+        assets = ("synthetic-yes", "synthetic-no")
+        invalid = synthetic_book(assets[1], "hash-no")
+        invalid["asks"] = "not-a-list"
+
+        async def handler(request):
+            websocket = web.WebSocketResponse()
+            await websocket.prepare(request)
+            await websocket.receive_json(timeout=1)
+            await websocket.send_json(
+                [synthetic_book(assets[0], "hash-yes"), invalid]
+            )
+            await websocket.close()
+            return websocket
+
+        runner, websocket_url = await self._start_ws_server(handler)
+        try:
+            async with ClientSession() as session:
+                queue = asyncio.Queue()
+                stream = PolymarketStream(
+                    session,
+                    websocket_url=websocket_url,
+                )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "POLYMARKET_INVALID_TYPE",
+                ):
+                    await stream.run(assets, queue)
+                self.assertTrue(queue.empty())
+        finally:
+            await runner.cleanup()
+
+    @staticmethod
+    async def _start_ws_server(handler):
+        app = web.Application()
+        app.router.add_get("/ws/market", handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "127.0.0.1", 0)
+        await site.start()
+        port = site._server.sockets[0].getsockname()[1]
+        return runner, f"http://127.0.0.1:{port}/ws/market"
 
 
 class _ReconnectWebSocket:

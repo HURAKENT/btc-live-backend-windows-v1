@@ -350,6 +350,58 @@ def parse_market_ws_message(
     ]
 
 
+def parse_market_ws_frame(
+    payload: Any,
+    *,
+    subscribed_asset_ids: Sequence[str],
+    allow_initial_book_batch: bool,
+    incident_sink: Callable[[dict[str, str]], None] | None = None,
+) -> tuple[SourceEvent, ...]:
+    if type(payload) is not list:
+        return tuple(
+            parse_market_ws_message(
+                payload,
+                incident_sink=incident_sink,
+            )
+        )
+    if not payload:
+        raise ValueError("POLYMARKET_EMPTY_INITIAL_BOOK_BATCH")
+    if not allow_initial_book_batch:
+        raise ValueError("POLYMARKET_BOOK_BATCH_NOT_INITIAL")
+
+    subscribed = tuple(subscribed_asset_ids)
+    if len(payload) > len(subscribed):
+        raise ValueError("POLYMARKET_INITIAL_BOOK_BATCH_TOO_LARGE")
+    subscribed_set = set(subscribed)
+    observed_assets: set[str] = set()
+    parsed_events: list[SourceEvent] = []
+    for index, item in enumerate(payload):
+        if type(item) is not dict:
+            raise ValueError(
+                f"POLYMARKET_INVALID_BOOK_BATCH_ELEMENT: {index}"
+            )
+        if item.get("event_type") != "book":
+            raise ValueError(
+                f"POLYMARKET_UNSUPPORTED_BATCH_EVENT_TYPE: {index}"
+            )
+        events = parse_market_ws_message(
+            item,
+            incident_sink=incident_sink,
+        )
+        asset_id = _require_type(
+            item.get("asset_id"),
+            str,
+            f"batch[{index}].asset_id",
+        )
+        if asset_id in observed_assets:
+            raise ValueError("POLYMARKET_DUPLICATE_BATCH_ASSET_ID")
+        if asset_id not in subscribed_set:
+            raise ValueError("POLYMARKET_UNSUBSCRIBED_BATCH_ASSET_ID")
+        observed_assets.add(asset_id)
+        parsed_events.extend(events)
+    return tuple(parsed_events)
+
+
 class MarketBook:
     def __init__(self, asset_id: str) -> None:
         _require_type(asset_id, str, "asset_id")
@@ -579,6 +631,7 @@ class PolymarketStream:
                     heartbeat = asyncio.create_task(
                         self._heartbeat(websocket)
                     )
+                    allow_initial_book_batch = True
                     try:
                         async for message in websocket:
                             if message.type != WSMsgType.TEXT:
@@ -591,10 +644,16 @@ class PolymarketStream:
                                 raise ValueError(
                                     "POLYMARKET_INVALID_WS_JSON"
                                 ) from None
-                            for event in parse_market_ws_message(
+                            parsed_events = parse_market_ws_frame(
                                 payload,
+                                subscribed_asset_ids=asset_ids,
+                                allow_initial_book_batch=(
+                                    allow_initial_book_batch
+                                ),
                                 incident_sink=self._incident_sink,
-                            ):
+                            )
+                            allow_initial_book_batch = False
+                            for event in parsed_events:
                                 await buffer.put(event)
                             self._policy.record_healthy_duration(
                                 self._monotonic() - connected_at

@@ -161,6 +161,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.startup_barrier = asyncio.Event()
         self.server = FakeProviderServer(
             startup_barrier=self.startup_barrier,
+            initial_book_batch=True,
         )
         await self.server.start()
         self.api_port = self._free_port()
@@ -352,6 +353,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
     def test_fake_provider_default_has_no_startup_barrier(self):
         server = FakeProviderServer()
         self.assertIsNone(server.startup_barrier)
+        self.assertFalse(server.initial_book_batch)
 
     async def _wait_for_polymarket_reconnect(self):
         deadline = time.monotonic() + 10

@@ -16,10 +16,12 @@ class FakeProviderServer:
         self,
         *,
         startup_barrier: asyncio.Event | None = None,
+        initial_book_batch: bool = False,
     ) -> None:
         self._runner: web.AppRunner | None = None
         self.port: int | None = None
         self.startup_barrier = startup_barrier
+        self.initial_book_batch = initial_book_batch
         self.startup_barrier_reached = asyncio.Event()
         self.polymarket_connections = 0
         self.binance_connections = 0
@@ -133,9 +135,18 @@ class FakeProviderServer:
         if tuple(subscription.get("assets_ids", ())) != self.asset_ids:
             await websocket.close(code=1008, message=b"invalid assets")
             return websocket
-        asset_id = self.asset_ids[0]
         suffix = str(self.polymarket_connections)
-        await websocket.send_json(_book_payload(asset_id, f"ws-book-{suffix}"))
+        if self.initial_book_batch:
+            initial_payload = [
+                _book_payload(asset_id, f"ws-book-{suffix}-{index:02d}")
+                for index, asset_id in enumerate(self.asset_ids)
+            ]
+        else:
+            initial_payload = _book_payload(
+                self.asset_ids[0],
+                f"ws-book-{suffix}",
+            )
+        await websocket.send_json(initial_payload)
         if self.polymarket_connections == 1:
             await asyncio.sleep(0.15)
             await websocket.close()
