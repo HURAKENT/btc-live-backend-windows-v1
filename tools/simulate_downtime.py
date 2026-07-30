@@ -1130,10 +1130,18 @@ def run_acceptance_cycle(
     initial_ready = dependencies.wait_live_ready(initial, "initial")
     evidence["initial_ready"] = initial_ready
     if not _ready_is_complete(initial_ready):
-        evidence["initial_stop"] = dependencies.stop_backend(
+        initial_stop = dependencies.stop_backend(
             initial,
             "initial",
         )
+        evidence["initial_stop"] = initial_stop
+        audit_blocked = getattr(dependencies, "audit_blocked", None)
+        if callable(audit_blocked):
+            evidence["blocked_evidence"] = audit_blocked(
+                database_path,
+                initial_ready,
+                initial_stop,
+            )
         evidence["status"] = "BLOCKED_INITIAL_LIVE_READY"
         return evidence
 
@@ -1394,6 +1402,73 @@ def _read_database(path: Path) -> dict[str, Any]:
         connection.close()
 
 
+def _blocked_database_evidence(path: Path) -> dict[str, Any]:
+    audit = _read_database(path)
+    diagnostics: list[dict[str, Any]] = []
+    diagnostic_keys: set[str] = set()
+    lifecycle_states: list[str] = []
+    prefix = "POLYMARKET_HISTORY_SEQUENCE_ERROR:"
+    allowed_diagnostic_fields = {
+        "adjacent_relations",
+        "cross_page_overlap_count",
+        "direction",
+        "duplicate_position_count",
+        "duplicate_positions",
+        "duplicate_positions_truncated",
+        "first_rejected_position",
+        "item_count",
+        "page_index",
+        "rejection_category",
+        "request_range_sha256",
+        "timestamp_type_histogram",
+    }
+    for incident in audit["incidents"]:
+        payload = incident["payload"]
+        if payload.get("record_type") == "LIFECYCLE_STATE":
+            state = payload.get("state")
+            if type(state) is str:
+                lifecycle_states.append(state)
+        detail = payload.get("detail")
+        if type(detail) is not str or not detail.startswith(prefix):
+            continue
+        try:
+            diagnostic = json.loads(detail.removeprefix(prefix))
+        except json.JSONDecodeError:
+            continue
+        if (
+            type(diagnostic) is dict
+            and set(diagnostic) == allowed_diagnostic_fields
+        ):
+            diagnostic_key = json.dumps(
+                diagnostic,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if diagnostic_key not in diagnostic_keys:
+                diagnostic_keys.add(diagnostic_key)
+                diagnostics.append(diagnostic)
+    return {
+        "database_integrity": {
+            key: audit[key]
+            for key in (
+                "status",
+                "quick_check",
+                "integrity_check",
+                "journal_mode",
+                "synchronous",
+                "foreign_keys",
+                "migration_version",
+                "table_count",
+            )
+        },
+        "history_sequence_diagnostics": diagnostics,
+        "latest_lifecycle_state": (
+            lifecycle_states[-1] if lifecycle_states else None
+        ),
+        "sanitized": True,
+    }
+
+
 def _protected_hashes() -> dict[str, str]:
     paths = _git_value(
         "ls-files",
@@ -1465,6 +1540,15 @@ class _ProductionDependencies:
         if phase == "restart" and evidence.get("live_ready") is True:
             self.restart_ready_at_ms = time.time_ns() // 1_000_000
         return evidence
+
+    @staticmethod
+    def audit_blocked(
+        database_path: Path,
+        ready: Mapping[str, Any],
+        stop: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        del ready, stop
+        return _blocked_database_evidence(database_path)
 
     def check_second_instance(self, database_path: Path) -> int:
         process, handle = _start_backend_process(

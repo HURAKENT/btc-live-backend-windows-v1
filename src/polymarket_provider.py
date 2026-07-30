@@ -132,6 +132,133 @@ def _normalize_history_price(value: Any, field: str) -> tuple[int, str]:
     return price_micros, format(decimal_value, "f")
 
 
+def _json_type_name(value: Any) -> str:
+    if value is None:
+        return "null"
+    if type(value) is bool:
+        return "bool"
+    if type(value) is int:
+        return "int"
+    if type(value) is Decimal:
+        return "decimal"
+    if type(value) is float:
+        return "float"
+    if type(value) is str:
+        return "str"
+    if type(value) is list:
+        return "array"
+    if type(value) is dict:
+        return "object"
+    return "other"
+
+
+def _history_sequence_diagnostic(
+    *,
+    history: list[Any],
+    page_index: int,
+    request_start: int,
+    request_end: int,
+    prior_seen: set[int],
+    first_rejected_position: int,
+    rejection_category: str,
+) -> dict[str, Any]:
+    timestamp_types: dict[str, int] = {}
+    timestamps: list[tuple[int, int]] = []
+    inspected = history[: first_rejected_position + 1]
+    for position, point in enumerate(inspected):
+        timestamp_value = (
+            point.get("t") if type(point) is dict else point
+        )
+        type_name = _json_type_name(timestamp_value)
+        timestamp_types[type_name] = timestamp_types.get(type_name, 0) + 1
+        if type(timestamp_value) is int and timestamp_value <= request_end:
+            timestamps.append((position, timestamp_value))
+
+    relations = {"EQ": 0, "GT": 0, "LT": 0}
+    for (_, previous), (_, current) in zip(timestamps, timestamps[1:]):
+        if previous < current:
+            relations["LT"] += 1
+        elif previous > current:
+            relations["GT"] += 1
+        else:
+            relations["EQ"] += 1
+
+    if len(timestamps) < 2:
+        direction = "INSUFFICIENT_ITEMS"
+    elif relations["LT"] and not relations["GT"] and not relations["EQ"]:
+        direction = "STRICT_ASCENDING"
+    elif relations["LT"] and not relations["GT"]:
+        direction = "NONDECREASING"
+    elif relations["GT"] and not relations["LT"] and not relations["EQ"]:
+        direction = "STRICT_DESCENDING"
+    elif relations["GT"] and not relations["LT"]:
+        direction = "NONINCREASING"
+    elif relations["EQ"] and not relations["LT"] and not relations["GT"]:
+        direction = "ALL_EQUAL"
+    else:
+        direction = "NON_MONOTONIC"
+
+    page_seen: set[int] = set()
+    duplicate_positions: list[int] = []
+    duplicate_position_count = 0
+    for position, timestamp in timestamps:
+        if timestamp in page_seen:
+            duplicate_position_count += 1
+            if len(duplicate_positions) < 8:
+                duplicate_positions.append(position)
+        page_seen.add(timestamp)
+
+    range_json = _canonical_json(
+        {"end": request_end, "start": request_start}
+    )
+    return {
+        "adjacent_relations": relations,
+        "cross_page_overlap_count": sum(
+            timestamp in prior_seen for _, timestamp in timestamps
+        ),
+        "direction": direction,
+        "duplicate_position_count": duplicate_position_count,
+        "duplicate_positions": duplicate_positions,
+        "duplicate_positions_truncated": duplicate_position_count > 8,
+        "first_rejected_position": first_rejected_position,
+        "item_count": len(history),
+        "page_index": page_index,
+        "rejection_category": rejection_category,
+        "request_range_sha256": hashlib.sha256(
+            range_json.encode("utf-8")
+        ).hexdigest(),
+        "timestamp_type_histogram": dict(sorted(timestamp_types.items())),
+    }
+
+
+def _history_sequence_error(
+    *,
+    history: list[Any],
+    page_index: int,
+    request_start: int,
+    request_end: int,
+    prior_seen: set[int],
+    first_rejected_position: int,
+    rejection_category: str,
+) -> ValueError:
+    diagnostic = _history_sequence_diagnostic(
+        history=history,
+        page_index=page_index,
+        request_start=request_start,
+        request_end=request_end,
+        prior_seen=prior_seen,
+        first_rejected_position=first_rejected_position,
+        rejection_category=rejection_category,
+    )
+    error = (
+        "POLYMARKET_HISTORY_SEQUENCE_ERROR:"
+        f"{_canonical_json(diagnostic)}"
+    )
+    if len(error) > 500:
+        raise RuntimeError("POLYMARKET_HISTORY_DIAGNOSTIC_TOO_LARGE")
+    return ValueError(error)
+
+
 def _source_event(
     *,
     event_type: str,
@@ -510,7 +637,9 @@ async def iter_price_history(
 
     next_start = start_ts
     seen: set[int] = set()
+    page_index = 0
     while next_start <= end_ts:
+        request_start = next_start
         async with session.get(
             f"{clob_base_url}/prices-history",
             params={
@@ -531,6 +660,8 @@ async def iter_price_history(
             return
 
         last_timestamp: int | None = None
+        prior_seen = set(seen)
+        page_seen: set[int] = set()
         for index, point in enumerate(history):
             _require_type(point, dict, f"history[{index}]")
             timestamp = _require_type(
@@ -544,11 +675,38 @@ async def iter_price_history(
             )
             if timestamp > end_ts:
                 continue
-            if timestamp in seen or (
-                last_timestamp is not None and timestamp <= last_timestamp
-            ):
-                raise ValueError("POLYMARKET_HISTORY_SEQUENCE_ERROR")
+            if timestamp in page_seen:
+                raise _history_sequence_error(
+                    history=history,
+                    page_index=page_index,
+                    request_start=request_start,
+                    request_end=end_ts,
+                    prior_seen=prior_seen,
+                    first_rejected_position=index,
+                    rejection_category="DUPLICATE_WITHIN_PAGE",
+                )
+            if timestamp in prior_seen:
+                raise _history_sequence_error(
+                    history=history,
+                    page_index=page_index,
+                    request_start=request_start,
+                    request_end=end_ts,
+                    prior_seen=prior_seen,
+                    first_rejected_position=index,
+                    rejection_category="CROSS_PAGE_OVERLAP",
+                )
+            if last_timestamp is not None and timestamp <= last_timestamp:
+                raise _history_sequence_error(
+                    history=history,
+                    page_index=page_index,
+                    request_start=request_start,
+                    request_end=end_ts,
+                    prior_seen=prior_seen,
+                    first_rejected_position=index,
+                    rejection_category="NON_INCREASING_WITHIN_PAGE",
+                )
             seen.add(timestamp)
+            page_seen.add(timestamp)
             last_timestamp = timestamp
             normalized = {
                 "asset_id": asset_id,
@@ -575,6 +733,7 @@ async def iter_price_history(
         if last_timestamp is None:
             return
         next_start = last_timestamp + 60
+        page_index += 1
 
 
 class PolymarketStream:

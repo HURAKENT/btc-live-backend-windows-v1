@@ -849,6 +849,162 @@ class PolymarketHistoryBoundaryTests(unittest.IsolatedAsyncioTestCase):
                     await self._history_events(session)
 
 
+class PolymarketHistorySequenceDiagnosticTests(
+    unittest.IsolatedAsyncioTestCase
+):
+    @staticmethod
+    async def _failure_text(responses, *, start_ts=0, end_ts=300):
+        session = FakeSession(responses)
+        with unittest.TestCase().assertRaisesRegex(
+            ValueError,
+            "POLYMARKET_HISTORY_SEQUENCE_ERROR",
+        ) as raised:
+            _ = [
+                event
+                async for event in iter_price_history(
+                    session,
+                    asset_id="synthetic-history-asset",
+                    start_ts=start_ts,
+                    end_ts=end_ts,
+                )
+            ]
+        return str(raised.exception)
+
+    @staticmethod
+    def _diagnostic(error_text):
+        prefix = "POLYMARKET_HISTORY_SEQUENCE_ERROR:"
+        if not error_text.startswith(prefix):
+            return {}
+        return json.loads(error_text.removeprefix(prefix))
+
+    async def test_duplicate_within_page_has_sanitized_diagnostic(self):
+        error_text = await self._failure_text(
+            [
+                {
+                    "history": [
+                        {"t": 100, "p": "0.45"},
+                        {"t": 100, "p": "0.45"},
+                    ]
+                }
+            ]
+        )
+
+        self.assertEqual(
+            self._diagnostic(error_text),
+            {
+                "adjacent_relations": {"EQ": 1, "GT": 0, "LT": 0},
+                "cross_page_overlap_count": 0,
+                "direction": "ALL_EQUAL",
+                "duplicate_position_count": 1,
+                "duplicate_positions": [1],
+                "duplicate_positions_truncated": False,
+                "first_rejected_position": 1,
+                "item_count": 2,
+                "page_index": 0,
+                "rejection_category": "DUPLICATE_WITHIN_PAGE",
+                "request_range_sha256": unittest.mock.ANY,
+                "timestamp_type_histogram": {"int": 2},
+            },
+        )
+        self.assertEqual(
+            len(self._diagnostic(error_text)["request_range_sha256"]),
+            64,
+        )
+
+    async def test_cross_page_overlap_is_distinguished(self):
+        error_text = await self._failure_text(
+            [
+                {
+                    "history": [
+                        {"t": 100, "p": "0.45"},
+                        {"t": 160, "p": "0.46"},
+                    ]
+                },
+                {
+                    "history": [
+                        {"t": 160, "p": "0.46"},
+                        {"t": 220, "p": "0.47"},
+                    ]
+                },
+            ],
+            start_ts=100,
+            end_ts=220,
+        )
+
+        diagnostic = self._diagnostic(error_text)
+        self.assertEqual(diagnostic["page_index"], 1)
+        self.assertEqual(
+            diagnostic["rejection_category"],
+            "CROSS_PAGE_OVERLAP",
+        )
+        self.assertEqual(diagnostic["cross_page_overlap_count"], 1)
+        self.assertEqual(diagnostic["first_rejected_position"], 0)
+
+    async def test_non_monotonic_page_is_distinguished(self):
+        error_text = await self._failure_text(
+            [
+                {
+                    "history": [
+                        {"t": 100, "p": "0.45"},
+                        {"t": 90, "p": "0.46"},
+                    ]
+                }
+            ]
+        )
+
+        diagnostic = self._diagnostic(error_text)
+        self.assertEqual(diagnostic["direction"], "STRICT_DESCENDING")
+        self.assertEqual(
+            diagnostic["rejection_category"],
+            "NON_INCREASING_WITHIN_PAGE",
+        )
+        self.assertEqual(
+            diagnostic["adjacent_relations"],
+            {"EQ": 0, "GT": 1, "LT": 0},
+        )
+
+    async def test_diagnostic_contains_no_raw_values_or_identifier(self):
+        raw_timestamp = 1785456789
+        raw_asset = "synthetic-history-asset"
+        raw_price = "0.123456"
+        error_text = await self._failure_text(
+            [
+                {
+                    "history": [
+                        {"t": raw_timestamp, "p": raw_price},
+                        {"t": raw_timestamp, "p": raw_price},
+                    ]
+                }
+            ],
+            start_ts=raw_timestamp,
+            end_ts=raw_timestamp,
+        )
+
+        self.assertNotIn(str(raw_timestamp), error_text)
+        self.assertNotIn(raw_asset, error_text)
+        self.assertNotIn(raw_price, error_text)
+        self.assertLessEqual(len(error_text), 500)
+
+    def test_diagnostic_remains_bounded_for_adversarial_page_shape(self):
+        timestamp_values = [1] * 64
+        history = [
+            {"t": value, "p": "0.1"} for value in timestamp_values
+        ]
+
+        error = polymarket_provider._history_sequence_error(
+            history=history,
+            page_index=999,
+            request_start=1,
+            request_end=9_999_999_999,
+            prior_seen={1},
+            first_rejected_position=len(history) - 1,
+            rejection_category="DUPLICATE_WITHIN_PAGE",
+        )
+
+        self.assertIs(type(error), ValueError)
+        self.assertLessEqual(len(str(error)), 500)
+
+
 class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
     def test_current_gamma_naming_is_accepted(self):
         event = discovery_event(

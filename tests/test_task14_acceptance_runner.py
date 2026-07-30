@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
+from src.storage import SqliteStore
 from tools import simulate_downtime
 
 
@@ -75,6 +77,20 @@ class _Dependencies:
             "initial graceful stop" if phase == "initial" else "final graceful stop"
         )
         return dict(self.initial_stop if phase == "initial" else self.final_stop)
+
+    def audit_blocked(self, database_path, ready, stop):
+        self.trace.append("blocked evidence audit")
+        return {
+            "database_integrity": self.integrity,
+            "history_sequence_diagnostics": [
+                {
+                    "page_index": 1,
+                    "rejection_category": "CROSS_PAGE_OVERLAP",
+                }
+            ],
+            "latest_lifecycle_state": "RECOVERY_BLOCKED",
+            "sanitized": True,
+        }
 
     def monotonic_ns(self):
         return self.now_ns
@@ -241,6 +257,90 @@ class Task14AcceptanceRunnerTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED_INITIAL_LIVE_READY")
         self.assertNotIn("sleep", self.dependencies.trace)
         self.assertEqual(self.dependencies.promotions, 0)
+
+    def test_initial_blocked_result_includes_sanitized_database_evidence(self):
+        self.dependencies.initial_ready = False
+
+        result = self.run_cycle()
+
+        self.assertEqual(
+            result["blocked_evidence"],
+            {
+                "database_integrity": self.dependencies.integrity,
+                "history_sequence_diagnostics": [
+                    {
+                        "page_index": 1,
+                        "rejection_category": "CROSS_PAGE_OVERLAP",
+                    }
+                ],
+                "latest_lifecycle_state": "RECOVERY_BLOCKED",
+                "sanitized": True,
+            },
+        )
+        self.assertIn("blocked evidence audit", self.dependencies.trace)
+
+    def test_blocked_database_evidence_is_sanitized_and_deduplicated(self):
+        diagnostic = {
+            "adjacent_relations": {"EQ": 1, "GT": 0, "LT": 0},
+            "cross_page_overlap_count": 0,
+            "direction": "ALL_EQUAL",
+            "duplicate_position_count": 1,
+            "duplicate_positions": [1],
+            "duplicate_positions_truncated": False,
+            "first_rejected_position": 1,
+            "item_count": 2,
+            "page_index": 0,
+            "rejection_category": "DUPLICATE_WITHIN_PAGE",
+            "request_range_sha256": "a" * 64,
+            "timestamp_type_histogram": {"int": 2},
+        }
+        detail = (
+            "POLYMARKET_HISTORY_SEQUENCE_ERROR:"
+            + json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+        )
+        store = SqliteStore.open(self.database)
+        try:
+            store.migrate()
+            store.append_incident(
+                incident_key="runtime:synthetic:failure",
+                severity="CRITICAL",
+                status="RECOVERY_BLOCKED",
+                payload_json=json.dumps(
+                    {
+                        "code": "RUNTIME_FATAL",
+                        "detail": detail,
+                        "source": None,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                created_at_ms=1,
+            )
+            store.append_lifecycle_state(
+                run_id="synthetic-run",
+                state="RECOVERY_BLOCKED",
+                sequence_index=0,
+                created_at_ms=2,
+                detail=detail,
+            )
+        finally:
+            store.close()
+
+        evidence = simulate_downtime._blocked_database_evidence(
+            self.database
+        )
+
+        self.assertEqual(
+            evidence["history_sequence_diagnostics"],
+            [diagnostic],
+        )
+        self.assertEqual(
+            evidence["latest_lifecycle_state"],
+            "RECOVERY_BLOCKED",
+        )
+        serialized = json.dumps(evidence, sort_keys=True)
+        self.assertNotIn("synthetic-run", serialized)
+        self.assertNotIn("synthetic:failure", serialized)
 
     def test_initial_graceful_stop_is_required(self):
         self.dependencies.initial_stop["exit_code"] = 1
