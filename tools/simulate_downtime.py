@@ -936,6 +936,13 @@ def _pack_entries(
     downtime_report: Mapping[str, Any],
     final_report: Mapping[str, Any],
 ) -> dict[str, bytes]:
+    initial_state = downtime_report["initial_state"]
+    backend_process_started = initial_state.get(
+        "backend_process_started",
+        initial_state.get("live_ready"),
+    )
+    if type(backend_process_started) is not bool:
+        raise ValueError("INVALID_BACKEND_PROCESS_STARTED_EVIDENCE")
     contract_paths = [
         PROJECT_ROOT / "contract" / "BTC_LIVE_BACKEND_WINDOWS_V1_CONTRACT.json",
         PROJECT_ROOT / "config" / "c0_c1_frozen_config.json",
@@ -993,9 +1000,7 @@ def _pack_entries(
                     f"ACCEPTANCE_STATUS_{downtime_report['status']}",
                     (
                         "BACKEND_STARTED"
-                        if downtime_report["initial_state"][
-                            "backend_process_started"
-                        ]
+                        if backend_process_started
                         else "BACKEND_NOT_STARTED"
                     ),
                 ]

@@ -200,6 +200,28 @@ class Task14AcceptanceRunnerTests(unittest.TestCase):
             downtime_target_ms=600_000,
         )
 
+    def test_pass_pack_derives_started_backend_from_live_ready_state(self):
+        downtime_report = {
+            "status": "PASS",
+            "initial_state": {"live_ready": True},
+            "database_integrity": {},
+            "binance_continuity": {},
+            "polymarket_reconciliation": {},
+            "canary_semantics": {},
+            "outbox_replay": {},
+            "blocking_failures": [],
+        }
+
+        entries = simulate_downtime._pack_entries(
+            downtime_report,
+            {"status": "PASS"},
+        )
+        bounded_log = json.loads(
+            entries["evidence/sanitized_bounded_log.json"]
+        )
+
+        self.assertIn("BACKEND_STARTED", bounded_log["events"])
+
     def test_complete_phase_order(self):
         result = self.run_cycle()
         self.assertEqual(result["status"], "PASS")
