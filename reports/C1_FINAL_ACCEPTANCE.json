@@ -1,4 +1,5 @@
 {
+  "acceptance_harness_commit": "3f8be0d",
   "acceptance_pack": {
     "crc_pass": true,
     "duplicate_entries": 0,
@@ -6,16 +7,16 @@
     "missing_sha_entries": 0,
     "path": "artifacts/C1_ACCEPTANCE_PACK.zip",
     "path_traversal_entries": 0,
-    "sha256": "f060e35394dd386a72399a79c4c9227a81ca642cb637315c6ee31b29ecdb98c2",
+    "sha256": "c50a12300a3cca5b5f86fb04e107c2ba596ef361ef6d9453b653e5fcc8f07b0f",
     "sha_mismatch": 0,
-    "size": 23258
+    "size": 26036
   },
-  "commit_sha": "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb",
-  "commit_under_test": "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb",
-  "gate": "NOT_REACHED",
+  "commit_sha": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
+  "commit_under_test": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
+  "gate": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS",
   "intentional_downtime_acceptance": {
     "completed": true,
-    "status": "BLOCKED_INITIAL_LIVE_READY"
+    "status": "PASS"
   },
   "limitations": [
     "C1 proves only walking-skeleton infrastructure.",
@@ -43,7 +44,8 @@
     "C1_TRANSACTIONAL_OUTBOX_PASS": true,
     "C1_WINDOWS_LIFECYCLE_PASS": true
   },
-  "run_id": "C1-ACCEPTANCE-20260728T215615Z-10F16FD7",
+  "run_id": "C1-ACCEPTANCE-20260730T142620Z-AD3D3272",
+  "runtime_baseline_commit": "eec05197f05c3d6887bbc49a5edd125ad784cd46",
   "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_FINAL_ACCEPTANCE_V1",
   "scope_assertions": {
     "c2_started": false,
@@ -60,6 +62,7 @@
     "trading_approval": false,
     "wallet_or_signing": false
   },
-  "status": "BLOCKED_INITIAL_LIVE_READY",
+  "source_commit": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
+  "status": "PASS",
   "trading_approval": false
 }

@@ -1,37 +1,78 @@
 {
+  "acceptance_harness_commit": "3f8be0d",
   "binance_continuity": {
-    "duplicate_natural_keys": null,
-    "expected_closed_minutes": null,
-    "missing_closed_minutes": null,
-    "recovered_closed_minutes": null,
-    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
-  },
-  "blocking_failures": [
-    {
-      "code": "BLOCKED_INITIAL_LIVE_READY",
-      "detail": "The backend exposed its loopback API but did not expose LIVE_READY, live Binance/Polymarket sources, or a current market identity. Source review shows BackendRuntime.start_runtime_tasks() returns without starting provider/recovery tasks."
+    "binance_ohlcv_conflicts": 0,
+    "duplicate_binance_natural_keys": 0,
+    "expected_binance_closed_minutes": 11,
+    "final_binance_cursor": {
+      "cursor": {
+        "natural_key": "binance:BTCUSDT:1m:1785422220000",
+        "source_timestamp_ms": 1785422220000
+      },
+      "updated_at_ms": 1785422220000
     },
-    {
-      "code": "BLOCKED_GRACEFUL_SHUTDOWN",
-      "detail": "The cleanup CTRL_BREAK_EVENT stopped the process without forced termination, but the observed Windows process exit code was 3221225786 rather than the required clean exit code 0."
-    }
-  ],
+    "initial_binance_cursor": {
+      "cursor": {
+        "natural_key": "binance:BTCUSDT:1m:1785421560000",
+        "source_timestamp_ms": 1785421560000
+      },
+      "updated_at_ms": 1785421560000
+    },
+    "last_event_id_regressions": 0,
+    "missing_binance_closed_minutes": 0,
+    "polymarket_asset_count": 22,
+    "recovered_binance_closed_minutes": 11,
+    "snapshot_input_bound": 23,
+    "snapshot_input_count": 23,
+    "snapshot_key": "canonical:2b523a3c4ace04096be4e5791acffcf3f6ad6ad62347ffe8f646de89e0e26f0e",
+    "snapshot_payload_sha256": "2b523a3c4ace04096be4e5791acffcf3f6ad6ad62347ffe8f646de89e0e26f0e",
+    "source_cursor_regressions": 0,
+    "source_event_conflicts": 0
+  },
+  "blocking_failures": [],
   "branch": "codex/c0-c1",
   "canary_semantics": {
-    "current_post_restart_count": null,
-    "recovered_execution_eligible": null,
-    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
+    "current_count": 2,
+    "current_evaluation_keys": [
+      "canary-evaluation:e76660b6897fd41e7ca9b7d0c8d8f3eddc29aeebe4f1cdce26b9e3df27371bc2",
+      "canary-evaluation:11e7b9887be9f109eb363540a222c53e7e57a41c04f294f2d9a0d28195a32cdc"
+    ],
+    "current_execution_eligible": false,
+    "current_infrastructure_only": true,
+    "current_trading_eligible": false,
+    "distinct_identities": true,
+    "duplicate_recovered_identities": 0,
+    "recovered_count": 2,
+    "recovered_evaluation_keys": [
+      "canary-evaluation:51f0429fd319d013b155df4143a96c3fa681e10d4d839e9403ab52e33a969ea1",
+      "canary-evaluation:2532299ae7df93eaf7de851b8d64e0d237a43f2bc9983040ba4e29d87631e14b"
+    ],
+    "recovered_execution_eligible": false,
+    "recovered_infrastructure_only": true,
+    "recovered_trading_eligible": false
   },
-  "commit_sha": "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb",
-  "commit_under_test": "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb",
-  "data_path_relative_label": "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
+  "commit_sha": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
+  "commit_under_test": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
   "database_integrity": {
+    "counts": {
+      "canonical_state": 4,
+      "incidents": 22,
+      "market_catalog": 1,
+      "outbox_events": 4,
+      "schema_migrations": 2,
+      "signals": 4,
+      "source_cursors": 23,
+      "source_events": 5011,
+      "strategy_evaluations": 4
+    },
     "foreign_keys": 1,
     "integrity_check": "ok",
     "journal_mode": "wal",
+    "migration_version": 2,
     "quick_check": "ok",
     "status": "PASS",
-    "synchronous": 2
+    "synchronous": 2,
+    "table_count": 9
   },
   "database_path_contract": {
     "backend_command": [
@@ -44,7 +85,7 @@
     "blocker": null,
     "configured_database_path": "data/runtime/btc_live_backend.sqlite3",
     "custom_database_path_used": true,
-    "database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
+    "database_path_sha256": "5ab5d1f2e6809286839ab9588cff231fc3892cf5da2d185855fb56b8f7f96745",
     "default_database_after": {
       "exists": false,
       "mtime_ns": null,
@@ -58,10 +99,8 @@
       "size": null
     },
     "default_database_unchanged": true,
-    "initial_database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
     "required_acceptance_database_label": "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
-    "restart_database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
-    "run_data_root_sha256": "40308b3499428ad811c0df0eb3a035d21adc3d06b7cba4072ec4eb8caedb0ed4",
+    "run_data_root_sha256": "44d6dd75cd6dfc642798791e7ce3ad8e978092c9cb09c4a2e313143a0709bff1",
     "same_path_for_initial_and_restart": true,
     "supported": true,
     "supported_cli_path_parameters": [
@@ -70,129 +109,231 @@
     "supported_environment_path_variables": []
   },
   "downtime": {
-    "downtime_duration_ms": null,
+    "downtime_duration_ms": 605016,
+    "final_backend_exit_code": 0,
     "forced_termination_used": false,
-    "initial_backend_exit_code": 3221225786,
-    "process_stopped_at_ms": 1785275786540,
-    "restart_requested_at_ms": null,
-    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY",
-    "stop_requested_at_ms": 1785275786535
+    "initial_backend_exit_code": 0,
+    "process_stopped_at_ms": 1785421621589,
+    "restart_requested_at_ms": 1785422227612,
+    "status": "PASS",
+    "stop_requested_at_ms": 1785421621199
   },
   "final_state": {
     "backend_absent": true,
+    "child_processes": 0,
     "mutex_free": true,
     "port_8767_free": true
   },
-  "gate": "NOT_REACHED",
+  "gate": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS",
   "initial_state": {
-    "backend_process_started": true,
-    "live_ready": false,
-    "observation": {
-      "binance_status": null,
-      "current_market_identity_present": false,
-      "health_status": "PASS",
-      "last_event_id": 0,
-      "live_ready": false,
-      "observations": [
-        {
-          "binance_status": null,
-          "current_market_identity_present": false,
-          "health_status": "PASS",
-          "last_event_id": 0,
-          "live_ready": false,
-          "polymarket_status": null,
-          "source_names": [],
-          "startup_state": null
-        },
-        {
-          "binance_status": null,
-          "current_market_identity_present": false,
-          "health_status": "PASS",
-          "last_event_id": 0,
-          "live_ready": false,
-          "polymarket_status": null,
-          "source_names": [],
-          "startup_state": null
-        },
-        {
-          "binance_status": null,
-          "current_market_identity_present": false,
-          "health_status": "PASS",
-          "last_event_id": 0,
-          "live_ready": false,
-          "polymarket_status": null,
-          "source_names": [],
-          "startup_state": null
-        }
-      ],
-      "polymarket_status": null,
-      "process_exit_code": null,
-      "source_names": [],
-      "startup_state": null,
-      "termination_reason": "INITIAL_LIVE_READY_NOT_OBSERVED"
-    },
-    "runtime_path_contract": {
-      "backend_command": [
-        "CURRENT_SYS_EXECUTABLE",
-        "run_backend.py",
-        "--database-path",
-        "data-root/acceptance/<run_id>/btc_live_backend.sqlite3"
-      ],
-      "backend_entrypoint": "run_backend.py",
-      "blocker": null,
-      "configured_database_path": "data/runtime/btc_live_backend.sqlite3",
-      "custom_database_path_used": true,
-      "database_path_sha256": "f96a3c42c5bec2adcedc4ca28375f52097f420068de2fdd1af5e3249e6e52fba",
-      "required_acceptance_database_label": "data-root/acceptance/<run_id>/btc_live_backend.sqlite3",
-      "run_data_root_sha256": "40308b3499428ad811c0df0eb3a035d21adc3d06b7cba4072ec4eb8caedb0ed4",
-      "supported": true,
-      "supported_cli_path_parameters": [
-        "--database-path"
-      ],
-      "supported_environment_path_variables": []
-    },
-    "sanitized_process_command": [
-      "CURRENT_SYS_EXECUTABLE",
-      "run_backend.py",
-      "--database-path",
-      "data-root/acceptance/<run_id>/btc_live_backend.sqlite3"
+    "asset_count": 22,
+    "binance_status": "LIVE",
+    "current_market_identity_present": true,
+    "health_status": "PASS",
+    "last_event_id": 2,
+    "live_ready": true,
+    "market_count": 11,
+    "market_id": "738509",
+    "observations": [
+      {
+        "asset_count": 22,
+        "binance_status": "STARTING",
+        "current_market_identity_present": true,
+        "health_status": "STARTING",
+        "last_event_id": 1,
+        "live_ready": false,
+        "market_count": 11,
+        "market_id": "738509",
+        "polymarket_status": "LIVE",
+        "source_names": [
+          "binance",
+          "polymarket"
+        ],
+        "startup_state": "STRATEGY_REPLAY"
+      },
+      {
+        "asset_count": 22,
+        "binance_status": "STARTING",
+        "current_market_identity_present": true,
+        "health_status": "STARTING",
+        "last_event_id": 1,
+        "live_ready": false,
+        "market_count": 11,
+        "market_id": "738509",
+        "polymarket_status": "LIVE",
+        "source_names": [
+          "binance",
+          "polymarket"
+        ],
+        "startup_state": "STRATEGY_REPLAY"
+      },
+      {
+        "asset_count": 22,
+        "binance_status": "LIVE",
+        "current_market_identity_present": true,
+        "health_status": "PASS",
+        "last_event_id": 2,
+        "live_ready": true,
+        "market_count": 11,
+        "market_id": "738509",
+        "polymarket_status": "LIVE",
+        "source_names": [
+          "binance",
+          "polymarket"
+        ],
+        "startup_state": "LIVE_READY"
+      }
     ],
-    "status": "BLOCKED_INITIAL_LIVE_READY"
+    "polymarket_status": "LIVE",
+    "process_exit_code": null,
+    "source_names": [
+      "binance",
+      "polymarket"
+    ],
+    "startup_state": "LIVE_READY",
+    "termination_reason": "LIVE_READY"
   },
   "outbox_replay": {
-    "proved": false,
-    "replayed_event_ids": [],
-    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
+    "database_event_ids": [
+      3,
+      4
+    ],
+    "initial": {
+      "database_event_ids": [
+        1,
+        2
+      ],
+      "missing_event_ids": [],
+      "proved": true,
+      "replayed_event_ids": [
+        1,
+        2
+      ]
+    },
+    "missing_event_ids": [],
+    "proved": true,
+    "replayed_event_ids": [
+      3,
+      4
+    ],
+    "status": "PASS"
   },
-  "platform": "win32",
   "polymarket_reconciliation": {
-    "historical_depth_classification": "NOT_RUN",
-    "reconciled": false,
-    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
+    "asset_count": 22,
+    "historical_depth_classification": "NOT_REQUIRED",
+    "reconciled": true,
+    "status": "PASS"
   },
-  "python_version": "3.12.4",
+  "protected_source": {
+    "after": {
+      "config/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_FROZEN_CONFIG.json": "e3c74f684c58c33dd9c790593789dc6cc274495dcf6918ab92ebb887e4bfad69",
+      "config/c0_c1_frozen_config.json": "37373f09f2abb6e00fe27301a0370b0035e339b32954ed55d8be106a29be851d",
+      "contract/BTC_LIVE_BACKEND_WINDOWS_V1_CONTRACT.json": "14704aac1ca269178ab26f4de55e58f52377f14ba4f4482dfaffbd5ad3f33007",
+      "contract/STRATEGY_REGISTRY_47_LIVE_BACKEND_LOCK.json": "5f4dbf5936c8b456dbe15aceeb4210342a452d6b379e0ee820d7b5de27b92957",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_ACCEPTANCE_MATRIX.csv": "a01605b19a09a77604df652169fab2fc053823e7bcb326529ff1b09f006d4f57",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_IMPLEMENTATION_PLAN.md": "32e2ad57dbe0dfc2b9954390595ee45757d486bf7ca807f8ae747156da171f61",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_PLAN.verification.json": "c6bb4dcbe8fe85f1630cbb2ebc55ce98a029f4f0d41bc2b2fde87fbe683f1be3",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_TASK_MATRIX.csv": "678b57cb2c7acda18ea1dd3a6bb974dc679d116bb4743c654d04fd358f2ed275",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_DESIGN.md": "2ddddae4fae7397f2c11f75fb654d66847d4a740f9466810a3d11cf10df3f607",
+      "migrations/0001_core.sql": "db1446b09adddb2498d8a31caf59d5480d678f485d9de6d88f1aadafef4fe29e",
+      "migrations/0002_indexes.sql": "48caaa3d1ed9129310c870ec0d3cdf2dc9c8d6240a7d5262c42042ed3104d35c",
+      "pyproject.toml": "d65f90028831d53e0fae2a2dd94b9d15494105cc1ac17e6230a21d3a26968b1c",
+      "registry/STRATEGY_REGISTRY_47.csv": "77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd",
+      "registry/STRATEGY_REGISTRY_47.json": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f",
+      "registry/STRATEGY_REGISTRY_47.xlsx": "ca665656879125b7e7c392edebb67406d1d53922d074f575d158807d851a5a6c",
+      "requirements.in": "f704e8c58f3af0d045bfd6c52956e94c09990e3684e3e66262b253cb3a8bfca6",
+      "requirements.lock": "7301c186c47bbd3a8a5295d9cc539c2a0bd1e0d5c6319a8518861253386f99af",
+      "run_backend.py": "e84d1532ffdb86212815df1792195bda44f2d59539982e030d84ccda812d2ce7",
+      "scripts/RUN_C1_ACCEPTANCE_SAFE.ps1": "d5cd3ccf23f8ab3c9d34d2130c6358ff00e708e3bf557870e96b6c65a784a35a",
+      "src/api.py": "be41c5caeca7584386c292826366abc6f79461775dd1da781b29033398971a11",
+      "src/app.py": "14cc7319900a44430cb45245e7b62dee9749de7c365722e81de6b0bd087eddfc",
+      "src/binance_provider.py": "494505293f81ea16b8418b4b110ebec87267f7a74acac9d6d5d3b9fb50a6456f",
+      "src/canary.py": "29ba1caad95d32f11f5b42919765817a4d46d0054bcb8a5bdb6ac7ca1302aacd",
+      "src/config.py": "fee3efc60e62b55b2603d3d2a70569a7ce89b68f5571d219f2963998a70f2332",
+      "src/fixed_point.py": "8365379d469eef18e3087e8b110f3717eceb934061f3a33db8fdd8993eafa72f",
+      "src/integration_endpoints.py": "2aba0e21cee5374a9ea54b2c5871f7eb83e03f09405d93fb32ab7a22098d0aba",
+      "src/lifecycle.py": "c1b549e0048fc6ab92592b00bea6d1121a1d0a5d67b35af0e04a4501408c60ec",
+      "src/market_discovery.py": "189e7bccc6f66b0dac0dd343937ec38e4f91e892bfba7029a26be00e53e9a903",
+      "src/models.py": "1cb5ba4bc71afcaf0bf3e373fd1ef13aa70b9974dfbd2f0cb67b5ffcc4ed64c5",
+      "src/outbox.py": "b16b75d1b229fbf9156304a78103a2baf5c2800d6aa16cd4a689a7b5c71caa45",
+      "src/polymarket_provider.py": "d9137e30cc5637078298584f7ef860514719fb673ba8fda8f44bb11b8095a7a7",
+      "src/recovery.py": "19706fb5ff03c5118ee3985ed7666e0465e8182c33ba3c77a8b1f950abe77d6c",
+      "src/registry_lock.py": "5566a40de51029465ee65402845786b77aab5b53952d19e3946903065739769e",
+      "src/runtime_adapters.py": "07771a3b65020271339eb78f107583243fd787ef2d8df56dd7770c405ea4d165",
+      "src/runtime_orchestrator.py": "85b264d6244e13879e4f8dd8643999592a0c057a53981efdd79b11972cb16548",
+      "src/runtime_projection.py": "acb547a83c19402271035082f4a5729786e9fe25420f2d08a3e64cbbe9e4580d",
+      "src/single_instance.py": "e3637d93053eaeb4635347e7fc87a9fe4bd38e604a81d5ac2020ec39afa1869b",
+      "src/storage.py": "bb7d06cc805f8d11f059b235109ba59615bb063dea2148171b00cb82f294bf56",
+      "tools/simulate_downtime.py": "0200ec870fb0b88c5270013173e31dab69a01a74c43c5a27d6fb6aa9537e59c6"
+    },
+    "before": {
+      "config/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_FROZEN_CONFIG.json": "e3c74f684c58c33dd9c790593789dc6cc274495dcf6918ab92ebb887e4bfad69",
+      "config/c0_c1_frozen_config.json": "37373f09f2abb6e00fe27301a0370b0035e339b32954ed55d8be106a29be851d",
+      "contract/BTC_LIVE_BACKEND_WINDOWS_V1_CONTRACT.json": "14704aac1ca269178ab26f4de55e58f52377f14ba4f4482dfaffbd5ad3f33007",
+      "contract/STRATEGY_REGISTRY_47_LIVE_BACKEND_LOCK.json": "5f4dbf5936c8b456dbe15aceeb4210342a452d6b379e0ee820d7b5de27b92957",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_ACCEPTANCE_MATRIX.csv": "a01605b19a09a77604df652169fab2fc053823e7bcb326529ff1b09f006d4f57",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_IMPLEMENTATION_PLAN.md": "32e2ad57dbe0dfc2b9954390595ee45757d486bf7ca807f8ae747156da171f61",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_PLAN.verification.json": "c6bb4dcbe8fe85f1630cbb2ebc55ce98a029f4f0d41bc2b2fde87fbe683f1be3",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_C0_C1_TASK_MATRIX.csv": "678b57cb2c7acda18ea1dd3a6bb974dc679d116bb4743c654d04fd358f2ed275",
+      "docs/frozen/BTC_LIVE_BACKEND_WINDOWS_V1_DESIGN.md": "2ddddae4fae7397f2c11f75fb654d66847d4a740f9466810a3d11cf10df3f607",
+      "migrations/0001_core.sql": "db1446b09adddb2498d8a31caf59d5480d678f485d9de6d88f1aadafef4fe29e",
+      "migrations/0002_indexes.sql": "48caaa3d1ed9129310c870ec0d3cdf2dc9c8d6240a7d5262c42042ed3104d35c",
+      "pyproject.toml": "d65f90028831d53e0fae2a2dd94b9d15494105cc1ac17e6230a21d3a26968b1c",
+      "registry/STRATEGY_REGISTRY_47.csv": "77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd",
+      "registry/STRATEGY_REGISTRY_47.json": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f",
+      "registry/STRATEGY_REGISTRY_47.xlsx": "ca665656879125b7e7c392edebb67406d1d53922d074f575d158807d851a5a6c",
+      "requirements.in": "f704e8c58f3af0d045bfd6c52956e94c09990e3684e3e66262b253cb3a8bfca6",
+      "requirements.lock": "7301c186c47bbd3a8a5295d9cc539c2a0bd1e0d5c6319a8518861253386f99af",
+      "run_backend.py": "e84d1532ffdb86212815df1792195bda44f2d59539982e030d84ccda812d2ce7",
+      "scripts/RUN_C1_ACCEPTANCE_SAFE.ps1": "d5cd3ccf23f8ab3c9d34d2130c6358ff00e708e3bf557870e96b6c65a784a35a",
+      "src/api.py": "be41c5caeca7584386c292826366abc6f79461775dd1da781b29033398971a11",
+      "src/app.py": "14cc7319900a44430cb45245e7b62dee9749de7c365722e81de6b0bd087eddfc",
+      "src/binance_provider.py": "494505293f81ea16b8418b4b110ebec87267f7a74acac9d6d5d3b9fb50a6456f",
+      "src/canary.py": "29ba1caad95d32f11f5b42919765817a4d46d0054bcb8a5bdb6ac7ca1302aacd",
+      "src/config.py": "fee3efc60e62b55b2603d3d2a70569a7ce89b68f5571d219f2963998a70f2332",
+      "src/fixed_point.py": "8365379d469eef18e3087e8b110f3717eceb934061f3a33db8fdd8993eafa72f",
+      "src/integration_endpoints.py": "2aba0e21cee5374a9ea54b2c5871f7eb83e03f09405d93fb32ab7a22098d0aba",
+      "src/lifecycle.py": "c1b549e0048fc6ab92592b00bea6d1121a1d0a5d67b35af0e04a4501408c60ec",
+      "src/market_discovery.py": "189e7bccc6f66b0dac0dd343937ec38e4f91e892bfba7029a26be00e53e9a903",
+      "src/models.py": "1cb5ba4bc71afcaf0bf3e373fd1ef13aa70b9974dfbd2f0cb67b5ffcc4ed64c5",
+      "src/outbox.py": "b16b75d1b229fbf9156304a78103a2baf5c2800d6aa16cd4a689a7b5c71caa45",
+      "src/polymarket_provider.py": "d9137e30cc5637078298584f7ef860514719fb673ba8fda8f44bb11b8095a7a7",
+      "src/recovery.py": "19706fb5ff03c5118ee3985ed7666e0465e8182c33ba3c77a8b1f950abe77d6c",
+      "src/registry_lock.py": "5566a40de51029465ee65402845786b77aab5b53952d19e3946903065739769e",
+      "src/runtime_adapters.py": "07771a3b65020271339eb78f107583243fd787ef2d8df56dd7770c405ea4d165",
+      "src/runtime_orchestrator.py": "85b264d6244e13879e4f8dd8643999592a0c057a53981efdd79b11972cb16548",
+      "src/runtime_projection.py": "acb547a83c19402271035082f4a5729786e9fe25420f2d08a3e64cbbe9e4580d",
+      "src/single_instance.py": "e3637d93053eaeb4635347e7fc87a9fe4bd38e604a81d5ac2020ec39afa1869b",
+      "src/storage.py": "bb7d06cc805f8d11f059b235109ba59615bb063dea2148171b00cb82f294bf56",
+      "tools/simulate_downtime.py": "0200ec870fb0b88c5270013173e31dab69a01a74c43c5a27d6fb6aa9537e59c6"
+    },
+    "unchanged": true
+  },
   "recovery": {
-    "post_restart_live_ready": false,
-    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
+    "blocking_incidents": [],
+    "historical_depth_classification": "NOT_REQUIRED",
+    "polymarket_reconciled": true,
+    "post_restart_live_ready": true
   },
-  "run_id": "C1-ACCEPTANCE-20260728T215615Z-10F16FD7",
-  "runtime_path_relative_label": "runtime-root/acceptance/<run_id>",
+  "run_id": "C1-ACCEPTANCE-20260730T142620Z-AD3D3272",
+  "runtime_baseline_commit": "eec05197f05c3d6887bbc49a5edd125ad784cd46",
   "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C1_DOWNTIME_ACCEPTANCE_V1",
   "security": {
-    "backend_process_started": true,
-    "forced_termination_used": false,
-    "network_used": false,
+    "authentication_used": false,
+    "network_scope": "PUBLIC_READ_ONLY",
     "paper_execution": false,
     "real_order_submission": false,
     "registry_47_execution": false,
-    "unknown_process_stopped": false,
+    "secrets_used": false,
     "wallet_or_signing": false
   },
   "single_instance": {
-    "status": "NOT_RUN_BLOCKED_INITIAL_LIVE_READY"
+    "second_instance_exit_code": 20,
+    "status": "PASS"
   },
-  "started_at_utc": "2026-07-28T21:56:15.151385Z",
-  "status": "BLOCKED_INITIAL_LIVE_READY",
+  "source_commit": "9e0f8193ed5b6204a9c02dab2ff18947b84d50f7",
+  "started_at_utc": "2026-07-30T14:26:20.394392Z",
+  "status": "PASS",
   "task_14_completed": true,
   "task_14_started": true
 }

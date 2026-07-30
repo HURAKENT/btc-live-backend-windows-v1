@@ -146,3 +146,27 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\gegos\Document
 - Resume with the launcher exit code, generated run ID, transcript path and
   either the three canonical PASS outputs or the new run-specific
   `evidence\task14_blocked.json`.
+
+### Checkpoint 3 — C1 Final Acceptance
+
+- Run evidence established the history failure as one exact within-page
+  duplicate: 61 integer timestamps, 59 `LT`, one `EQ`, duplicate position 60,
+  and no cross-page overlap.
+- Production commit `9e0f8193ed5b6204a9c02dab2ff18947b84d50f7`
+  coalesces only full-canonical-equal history rows, keeps conflicting
+  duplicates fatal, validates an asset atomically, fails on pagination
+  no-progress, and caps requests at 64 per asset.
+- TDD RED: six focused tests produced four failures and two errors on the old
+  semantics. GREEN: 84 provider tests, 38 adapter/real-provider/process tests,
+  and the 545-test offline suite passed with one documented skip.
+- Task 14 run `C1-ACCEPTANCE-20260730T142620Z-AD3D3272` completed initial
+  `LIVE_READY`, a 605,016 ms downtime, same-DB restart and final runtime audit.
+- Evidence finalization exposed `KeyError('backend_process_started')` after
+  runtime PASS. Commit `3f8be0d` fixes only that pack evidence mapping; its
+  RED reproduced the exact KeyError and its GREEN passed 19 focused and 546
+  full-suite tests with one documented skip.
+- Canonical reports and pack now verify with
+  `BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS`; pack SHA-256 is
+  `c50a12300a3cca5b5f86fb04e107c2ba596ef361ef6d9453b653e5fcc8f07b0f`.
+- Trading approval remains false. Registry execution, orders, paper
+  execution, wallet/signing and authentication remain disabled.

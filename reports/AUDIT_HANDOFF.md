@@ -331,3 +331,35 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - The confirmed object field set is `asks`, `asset_id`, `bids`, `event_type`, `hash`, `last_trade_price`, `market`, `tick_size`, and `timestamp`. Raw frame and raw identifier persistence counters are zero.
 - Root cause: `POLYMARKET_WS_INITIAL_BOOK_BATCH_NOT_SUPPORTED`. The frame boundary now preserves the existing single-object parser and accepts only a non-empty, bounded, unique, subscribed-asset array of fully validated `book` objects.
 - Batch validation is atomic before enqueue, preserves wire order, and rejects empty, oversized, mixed, nested, service, price-change, duplicate-asset, unknown-asset, or structurally invalid arrays. Task 14 has not been rerun.
+
+## C1 Final Acceptance — Task 14
+
+- Source under test: `9e0f8193ed5b6204a9c02dab2ff18947b84d50f7`.
+  Acceptance run: `C1-ACCEPTANCE-20260730T142620Z-AD3D3272`.
+- Initial and post-restart states reached `LIVE_READY` with Binance and
+  Polymarket `LIVE`, 11 markets, 22 assets and current market identity.
+- The initial backend and final restart exited 0. The second instance exited
+  20. Forced termination was false; final backend, child process, port and
+  mutex checks passed.
+- Intentional downtime was 605,016 ms. Restart reused the same isolated
+  SQLite database. Binance continuity recovered 11/11 expected closed
+  minutes with zero missing minutes, duplicate natural keys, OHLCV conflicts
+  or cursor regressions.
+- Polymarket reconciliation passed for 22 assets; historical depth remained
+  explicitly `NOT_REQUIRED`. Source-event conflicts were zero.
+- Recovered and current evaluations are distinct, infrastructure-only and
+  execution/trading ineligible. Outbox replay IDs are complete, unique and
+  ordered.
+- Final SQLite evidence: migration version 2, nine tables,
+  `quick_check=ok`, `integrity_check=ok`, WAL, synchronous 2 and foreign keys
+  enabled.
+- A post-runtime pack-finalization defect,
+  `KeyError('backend_process_started')`, was reproduced by RED and corrected
+  in harness commit `3f8be0d`; no runtime acceptance condition was weakened.
+- Canonical downtime/final reports are `PASS` with gate
+  `BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS`. Acceptance pack SHA-256 is
+  `c50a12300a3cca5b5f86fb04e107c2ba596ef361ef6d9453b653e5fcc8f07b0f`;
+  CRC and internal SHA-256 verification pass, with zero traversal,
+  duplicate, missing-hash or mismatch entries.
+- Trading approval is false. Authentication, Registry execution, real orders,
+  paper execution, wallet/signing and secrets remain absent.
