@@ -4,6 +4,9 @@ import hashlib
 import importlib.util
 import json
 import math
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -92,6 +95,78 @@ class ProbeExistenceTests(unittest.TestCase):
     def test_tool_exists_and_imports(self):
         self.assertTrue(TOOL_PATH.is_file())
         self.assertIsNotNone(PROBE)
+
+
+class DirectExecutionTests(unittest.TestCase):
+    def test_real_direct_help_succeeds(self):
+        result = subprocess.run(
+            [sys.executable, str(TOOL_PATH), "--help"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
+        self.assertIn("usage:", result.stdout.lower())
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_real_direct_invalid_config_exits_thirty_without_report(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "probe.json"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL_PATH),
+                    "--output",
+                    str(output.resolve()),
+                    "--max-frames",
+                    "11",
+                ],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+
+            self.assertEqual(
+                result.returncode,
+                30,
+                result.stdout + result.stderr,
+            )
+            self.assertIn("INVALID_MAX_FRAMES", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_module_import_does_not_change_sys_path(self):
+        program = (
+            "import json, sys\n"
+            "before = list(sys.path)\n"
+            "import tools.polymarket_ws_wire_shape_probe\n"
+            "print(json.dumps({'same': before == sys.path}))\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", program],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
+        self.assertEqual(json.loads(result.stdout), {"same": True})
+        self.assertNotIn("Traceback", result.stderr)
 
 
 @unittest.skipUnless(PROBE_AVAILABLE, "probe implementation is not present")

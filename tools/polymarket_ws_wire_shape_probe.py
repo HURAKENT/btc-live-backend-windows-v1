@@ -14,6 +14,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Sequence
 
+if __package__ in (None, ""):
+    project_root = Path(__file__).resolve().parents[1]
+    project_root_text = str(project_root)
+    if project_root_text not in sys.path:
+        sys.path.insert(0, project_root_text)
+
 import aiohttp
 from aiohttp import WSMsgType
 
