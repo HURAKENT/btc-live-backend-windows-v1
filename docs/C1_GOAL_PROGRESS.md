@@ -101,8 +101,12 @@ containing instrumentation commit `12e522a`.
   3 errors, while the no-raw-value assertion already passed.
 - Deduplication RED: 1 focused test failed because fatal and lifecycle
   incidents exposed the same diagnostic twice.
+- Diagnostic-bound RED: 1 adversarial test errored with
+  `POLYMARKET_HISTORY_DIAGNOSTIC_TOO_LARGE`; the narrow correction limits
+  analysis to the validated prefix through the first rejected position.
 - Focused GREEN: 95 provider/Task 14 runner tests passed; the subsequent
-  adversarial diagnostic-bound test also passed.
+  adversarial diagnostic-bound test passed, and the fresh post-commit focused
+  total was 96 tests.
 - Full offline GREEN: process integration 11/11; full suite 539 tests with
   one documented conditional skip; compileall and pip check passed through
   `RUN_C1_ACCEPTANCE_SAFE.ps1 -Mode Offline`.
