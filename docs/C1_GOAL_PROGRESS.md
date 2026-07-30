@@ -2,7 +2,7 @@
 
 ## Goal Status
 
-`ACTIVE_PENDING_GOAL_START`
+`ACTIVE`
 
 ## Repository
 
@@ -27,10 +27,12 @@
 Separate history-order probe cancelled:
 `SEPARATE_HISTORY_ORDER_PROBE_CANCELLED`.
 
-Next autonomous action: review history semantic contract and choose:
+History semantics review selected option B: current persisted evidence does
+not prove provider ordering, so normalization would be speculative.
 
-- A: safe bounded production normalization; or
-- B: minimal sanitized runtime instrumentation.
+Current cycle adds minimal sanitized sequence diagnostics to the existing
+provider failure and Task 14 blocked evidence. It does not change acceptance,
+ordering, deduplication or pagination semantics.
 
 ## Manual Action Required
 
@@ -87,3 +89,23 @@ No.
 - Current blocker: `POLYMARKET_HISTORY_SEQUENCE_ERROR`.
 - Next autonomous step: activate Goal, review history semantics and choose
   bounded normalization or sanitized instrumentation.
+
+### Checkpoint 1 — History Boundary Instrumentation
+
+- Goal API status: active.
+- Decision: option B, minimal sanitized existing-runtime instrumentation.
+- Rejected option A: provider ordering is not established by current
+  persisted evidence.
+- TDD RED: 5 focused tests ran; missing diagnostics/hook caused 1 failure and
+  3 errors, while the no-raw-value assertion already passed.
+- Deduplication RED: 1 focused test failed because fatal and lifecycle
+  incidents exposed the same diagnostic twice.
+- Focused GREEN: 95 provider/Task 14 runner tests passed; the subsequent
+  adversarial diagnostic-bound test also passed.
+- Full offline GREEN: process integration 11/11; full suite 539 tests with
+  one documented conditional skip; compileall and pip check passed through
+  `RUN_C1_ACCEPTANCE_SAFE.ps1 -Mode Offline`.
+- Production semantics: unchanged; sequence violations remain fatal.
+- Network: 0.
+- Task 14: not run.
+- Next gate: scope/security audit, commit/push, then one manual Task 14 run.
