@@ -1,105 +1,83 @@
-# C1 Autonomous Operating Contract
+# C2-C3 Autonomous Operating Contract
 
-## Роль
+## Role and terminal objective
 
-Codex является автономным engineering manager и implementer проекта C1. Он
-самостоятельно:
+Codex is the autonomous engineering manager and implementer for C2 Recovery
+Hardening and C3 Market Rollover on branch `codex/c2-c3`. Work continues
+without a new prompt until all three gates are established:
 
-- определяет earliest load-bearing blocker;
-- проводит read-only postmortem;
-- выбирает минимальный исправляющий шаг;
-- пишет RED→GREEN tests;
-- меняет production code в пределах C1;
-- выполняет offline и loopback gates;
-- создаёт узкие commits;
-- поддерживает канонические handoff и progress documents;
-- продолжает работу после промежуточного blocker.
+- `C2_RECOVERY_HARDENING_PASS`;
+- `C3_MARKET_ROLLOVER_PASS`;
+- `BTC_LIVE_BACKEND_WINDOWS_V1_C2_C3_PASS`.
 
-Новый пользовательский prompt после каждого исправления не требуется.
+The final Goal state is `C2_C3_AUTONOMOUS_GOAL_COMPLETE`.
 
-## Конечная цель
+## Historical C1 boundary
 
-Достичь `BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS`.
+C1 remains accepted and immutable. Canonical history is recorded in:
 
-Работа не заканчивается на исправленном unit bug, зелёных offline tests,
-initial `LIVE_READY`, начале downtime, статусе `BLOCKED` или созданном
-acceptance artifact без полного PASS.
+- `docs/C1_AUTONOMOUS_GOAL.md`;
+- `docs/C1_GOAL_PROGRESS.md`;
+- `reports/C1_DOWNTIME_ACCEPTANCE.json`;
+- `reports/C1_FINAL_ACCEPTANCE.json`;
+- `artifacts/C1_ACCEPTANCE_PACK.zip`.
 
-## Безопасность
+C2-C3 work must not rewrite those acceptance artifacts or reinterpret C1 as
+trading approval.
 
-Запрещено добавлять или включать:
+## Engineering method
 
-- real orders и live-money;
-- wallet, private keys или signing;
-- authentication/private provider surfaces;
-- paper execution;
+- Identify the earliest load-bearing boundary before changing production.
+- Use strict RED -> minimal GREEN -> regression verification.
+- Preserve one SQLite writer and append-only/idempotent evidence semantics.
+- Prefer deterministic synthetic and loopback acceptance over wall-clock waits.
+- Record decisions and checkpoints in the canonical C2-C3 documents.
+- Keep production fixes and acceptance/evidence commits narrow.
+- A third production correction at the same release boundary requires
+  `ARCHITECTURE_REVIEW_REQUIRED`.
+
+## Scope and safety
+
+Allowed scope is persistent recovery completeness, cutover buffering,
+reconciliation, incident evidence, recovered evaluations, active/next market
+lifecycle, subscription migration, and deterministic daily-market rollover.
+
+Forbidden scope:
+
+- C4 or later milestones;
 - Registry 47 execution;
-- dashboard scope;
-- Wave 2/3 scope, не требуемый для C1.
+- paper execution;
+- real orders or live-money;
+- wallet, private keys, signing, authentication, or private provider APIs;
+- dashboard expansion;
+- migration without a proven schema necessity, RED restart/backup evidence,
+  and an explicit decision-log entry.
 
-C1 PASS не является разрешением торговли.
+`trading_approval` remains `false` for every C2-C3 report and result.
 
-## Среда
+## Environment and manual boundary
 
-- Codex работает через WSL2 с repository под `/mnt/c`.
-- Direct `powershell.exe` interop ненадёжен.
-- `System.Diagnostics.Process` wrapper допустим для bounded offline Windows
-  commands.
-- Computer Use не применяется для PowerShell или terminal automation.
-- Public provider run и Task 14 `Mode=Run` выполняются пользователем вручную
-  из обычного Windows PowerShell.
+- Codex runs through WSL2 with the repository under `/mnt/c`.
+- Windows offline commands may use the established bounded process wrapper.
+- Computer Use is not used for terminal automation.
+- A public-provider run is allowed only when deterministic/loopback evidence
+  cannot establish a required provider boundary. At most one bounded public
+  read-only recovery acceptance may be requested.
+- Real daily rollover waiting is forbidden; C3 uses deterministic replay.
 
-## Manual checkpoint
+Before any manual Windows checkpoint, Codex must finish code/tests/commit/push,
+prove `HEAD==origin/codex/c2-c3` and a clean tree, update
+`docs/C2_C3_GOAL_PROGRESS.md`, provide one command and one allowed run count,
+and stop without asking the user to choose the next engineering step.
 
-Перед реальным Windows-run Codex обязан:
+## Git and completion
 
-1. завершить code, tests, commit и push;
-2. подтвердить `HEAD==origin` и clean tracked/index/untracked state;
-3. обновить `docs/C1_GOAL_PROGRESS.md`;
-4. поставить Goal на паузу доступным Goal-механизмом; если API не поддерживает
-   pause, остановить execution на manual checkpoint;
-5. вывести ровно один блок `MANUAL_ACTION_REQUIRED`;
-6. выдать одну готовую команду;
-7. указать один разрешённый run count;
-8. указать ожидаемую длительность;
-9. указать exact artifact paths;
-10. не просить пользователя выбирать следующий технический шаг.
+- Never change `main`, force-push, or alter Git configuration.
+- Completion claims require fresh focused, full offline, compile, dependency,
+  scope, security, report, and pack verification.
+- Final state requires `HEAD==origin/codex/c2-c3`, clean tracked/index/untracked
+  state, C1 artifacts unchanged, C2 and C3 reports PASS, and C4 not started.
 
-## Anti-loop
-
-Запрещено:
-
-- создавать новый standalone probe/runner, если evidence можно получить
-  существующим runtime;
-- повторять Task 14 без production change или нового material evidence;
-- создавать несколько preparation tasks для одного run;
-- исправлять доказанный harness вместо production boundary;
-- делать speculative permissive parsing;
-- выполнять бесконечный recovery на одной границе.
-
-Для одной earliest boundary разрешены один read-only postmortem, один
-implementation/instrumentation cycle и один manual acceptance run. Если это не
-даёт новой информации, terminal state — `ARCHITECTURE_REVIEW_REQUIRED`.
-
-## Git и verification
-
-- Рабочая ветка: `codex/c0-c1`.
-- `main` не менять.
-- Force push и изменение Git config запрещены.
-- Commits должны быть узкими.
-- Production fix и evidence/docs по возможности разделяются.
-- Completion claims допустимы только после свежей verification.
-- `HEAD==origin` и clean worktree обязательны перед manual run и Goal
-  completion.
-
-## Stop conditions
-
-Codex останавливается только если:
-
-- требуется manual Windows-run;
-- требуется wallet/order/signing/live-money;
-- требуется destructive operation;
-- отсутствуют необходимые credentials или administrator permissions;
-- frozen contract противоречит Definition of Done;
-- два bounded цикла на одной границе не дали прогресса;
-- Goal полностью выполнена.
+Codex stops only for a true manual/credential/destructive boundary, a frozen
+contract conflict, two bounded non-progress cycles at one boundary, or complete
+achievement of the C2-C3 Goal.
