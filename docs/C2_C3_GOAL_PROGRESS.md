@@ -6,15 +6,15 @@
 
 ## CURRENT STAGE
 
-`BOOTSTRAP_DESIGN_AND_PLAN`
+`C2_RECOVERY_HARDENING_TDD`
 
 ## Repository
 
 - Branch: `codex/c2-c3`.
 - Branch base: `f167847c0da271592043db750b11249aac294bc9`.
-- LAST VERIFIED COMMIT: `f167847c0da271592043db750b11249aac294bc9`.
-- HEAD/ORIGIN STATUS: local branch created from verified
-  `origin/codex/c0-c1`; upstream for `codex/c2-c3` pending first push.
+- LAST VERIFIED COMMIT: `6281e7a6f2f715ae44e67522a868fd3d444bb7d4`.
+- HEAD/ORIGIN STATUS: `HEAD==origin/codex/c2-c3` at
+  `6281e7a6f2f715ae44e67522a868fd3d444bb7d4`; tree clean after bootstrap push.
 
 ## Verification
 
@@ -28,15 +28,15 @@
 
 - BLOCKER: `NONE`.
 - EARLIEST FAILED BOUNDARY: `NONE — implementation has not started`.
-- LOCKED NEXT STEP: commit/push durable Goal/design/plan, then C2 milestone 1
-  RED tests for persistent recovery planning and completeness evidence.
+- LOCKED NEXT STEP: C2 milestone 1 RED tests for persistent recovery planning
+  and completeness evidence.
 
 ## Milestones
 
 - [x] Verify C1 baseline, clean tree and historical artifact hashes.
 - [x] Create `codex/c2-c3` from the exact accepted baseline.
 - [x] Review frozen design/plan, contract, matrix, C1 handoff and relevant code.
-- [ ] Commit and push durable Goal/design/plan bootstrap.
+- [x] Commit and push durable Goal/design/plan bootstrap.
 - [ ] C2 persistent recovery plan and cursor contract.
 - [ ] C2 cutover/reconciliation/incident/evaluation acceptance.
 - [ ] C2 report and `C2_RECOVERY_HARDENING_PASS`.
