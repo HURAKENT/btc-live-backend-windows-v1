@@ -1,16 +1,26 @@
 # BTC Live Backend Windows V1
 
-Frozen repository baseline for a Windows-first modular monolith.
+Windows-first public read-only modular monolith.
 
-- The registry contains 47 frozen strategy identities.
-- Registry 47 is not yet an executable rule pack.
-- Stage C0–C1 is active.
-- Real orders are absent.
-- Paper execution is outside C0–C1.
-- The dashboard is outside C0–C1.
-- Persistence uses SQLite WAL.
-- Client updates use REST/WebSocket push.
-- Restart recovery is mandatory.
+## Project status
+
+- C0–C1: `COMPLETE`.
+- Historical C1 accepted runtime baseline:
+  `1811b587fba7c069a8aa29de17364128fc10f716`.
+- Historical C1 evidence commit:
+  `b7ced2649781d4af033d92e3e0de36932eb409b6`.
+- Historical C1 run:
+  `C1-ACCEPTANCE-20260730T145425Z-F5722878`.
+- C1.1 hardening: `READY_TO_COMMIT`.
+- C1.1 is offline-only closure hardening and is not a new live-accepted
+  baseline.
+- C2: `NOT_STARTED`.
+- Trading approval: `false`.
+
+The registry contains 47 frozen strategy identities, but Registry 47 remains
+non-executable. Real orders, paper execution, wallet/private-key support,
+signing and authentication are absent. Persistence uses SQLite WAL; client
+updates use loopback REST/WebSocket push; restart recovery is mandatory.
 
 ## Safe Windows commands
 
@@ -33,8 +43,5 @@ Exit codes are `0` for a clean stop, `20` when another instance owns the
 Windows mutex, `30` for frozen contract/configuration failure, and `40` for
 database integrity failure.
 
-Real orders remain disabled. Wallet/private-key and paper execution are
-absent. Registry 47 remains non-executable. Launching the backend does not
-establish strategy parity or authorize trading.
-
-Tasks 13–14 remain mandatory before C1 acceptance can be declared.
+Tasks 13–14 are complete for the historical C1 baseline. Starting this
+backend does not establish strategy parity and does not authorize trading.

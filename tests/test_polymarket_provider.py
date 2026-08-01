@@ -1024,6 +1024,29 @@ class PolymarketHistoryDuplicateNormalizationTests(
         ]
         return events, session
 
+    async def test_new_point_before_initial_request_start_is_atomic(self):
+        generator = iter_price_history(
+            FakeSession(
+                [
+                    {
+                        "history": [
+                            {"t": 40, "p": "0.44"},
+                            {"t": 100, "p": "0.45"},
+                        ]
+                    }
+                ]
+            ),
+            asset_id="synthetic-history-asset",
+            start_ts=100,
+            end_ts=100,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            '"rejection_category":"BEFORE_REQUEST_START"',
+        ):
+            await anext(generator)
+
     async def test_exact_duplicate_within_page_is_idempotent(self):
         point = {"t": 100, "p": "0.45", "provider_flag": "same"}
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -23,6 +24,70 @@ POWERSHELL = (
 class ManualRunnerExistenceTests(unittest.TestCase):
     def test_manual_runner_exists(self):
         self.assertTrue(MANUAL_RUNNER.is_file())
+
+
+class ManualRunnerSourceContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = MANUAL_RUNNER.read_text(encoding="utf-8-sig")
+
+    def test_run_does_not_use_stale_last_exit_code(self):
+        self.assertNotIn(
+            "$LauncherExitCode = $LASTEXITCODE",
+            self.source,
+        )
+        self.assertIn(
+            "$LauncherExitCode = $LauncherResult.ExitCode",
+            self.source,
+        )
+
+    def test_run_uses_native_process_and_monotonic_stopwatch(self):
+        self.assertIn(
+            "$LauncherResult = Invoke-NativeProcess",
+            self.source,
+        )
+        self.assertIn(
+            "[System.Diagnostics.Stopwatch]::StartNew()",
+            self.source,
+        )
+        self.assertIn("$Stopwatch.Elapsed.TotalSeconds", self.source)
+
+    def test_observer_failure_categories_are_explicit(self):
+        for category in (
+            "IMPOSSIBLE_PASS_DURATION",
+            "TERMINAL_JSON_MISSING",
+            "TERMINAL_JSON_INVALID",
+            "RUN_ID_MISMATCH",
+            "COMMIT_PROVENANCE_MISMATCH",
+            "ARTIFACT_MISSING",
+            "ARTIFACT_INVALID",
+            "PACK_HASH_MISMATCH",
+            "STALE_ARTIFACTS",
+            "TRANSCRIPT_FINALIZATION_FAILED",
+            "RECEIPT_WRITE_FAILED",
+        ):
+            with self.subTest(category=category):
+                self.assertIn(category, self.source)
+
+    def test_receipt_is_external_and_never_written_to_reports(self):
+        self.assertIn("task14_launcher_receipt.json", self.source)
+        self.assertIn("LATEST_TASK14_LAUNCHER_RECEIPT.json", self.source)
+        self.assertNotIn(r"reports\C1_LAUNCHER_RECEIPT.json", self.source)
+        self.assertIn("transcript_relative_path", self.source)
+        self.assertIn("trading_approval", self.source)
+
+    def test_native_process_failure_message_is_generic(self):
+        self.assertIn("Native process did not start.", self.source)
+        self.assertNotIn("Git process did not start.", self.source)
+
+    def test_pass_requires_all_three_canonical_artifacts_to_be_fresh(self):
+        for artifact in ("Downtime", "Final", "Pack"):
+            with self.subTest(artifact=artifact):
+                self.assertIn(
+                    f"$Before.{artifact}.Sha256 -eq $After.{artifact}.Sha256",
+                    self.source,
+                )
+
 
 
 @unittest.skipUnless(
@@ -82,6 +147,38 @@ class Task14ManualRunnerTests(unittest.TestCase):
         )
         cls.after_files = cls._relative_files()
         cls.after_hashes = cls._canonical_hashes()
+        cls.run_result = subprocess.run(
+            [
+                str(POWERSHELL),
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(cls.scripts / MANUAL_RUNNER.name),
+                "-Mode",
+                "Run",
+                "-NoPause",
+            ],
+            cwd=cls.root,
+            env=preflight_env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        cls.run_after_files = cls._relative_files()
+        cls.run_after_hashes = cls._canonical_hashes()
+        receipt_paths = sorted(
+            (cls.root.parent / "task14_manual_logs").glob(
+                "manual_task14_*/task14_launcher_receipt.json"
+            )
+        )
+        cls.receipt_paths = receipt_paths
+        cls.receipt = (
+            json.loads(receipt_paths[-1].read_text(encoding="utf-8"))
+            if receipt_paths
+            else None
+        )
         cls.source = MANUAL_RUNNER.read_text(encoding="utf-8-sig")
 
     @classmethod
@@ -193,12 +290,41 @@ class Task14ManualRunnerTests(unittest.TestCase):
         )
 
     def test_launcher_exit_code_is_propagated(self):
-        self.assertIn("$LauncherExitCode = $LASTEXITCODE", self.source)
-        self.assertIn("exit $LauncherExitCode", self.source)
+        self.assertIn(
+            "$LauncherExitCode = $LauncherResult.ExitCode",
+            self.source,
+        )
+        self.assertIn("exit $RunnerExitCode", self.source)
 
     def test_tests_never_invoke_default_run(self):
         output = self.preflight.stdout + self.preflight.stderr
         self.assertNotIn("LAUNCHER_MODE=Run", output)
+
+    def test_run_waits_for_child_and_propagates_nonzero_exit(self):
+        output = self.run_result.stdout + self.run_result.stderr
+        self.assertEqual(self.run_result.returncode, 91, output)
+        self.assertIn("LAUNCHER_MODE=Run", output)
+        self.assertIn("TASK14_LAUNCHER_EXIT=91", output)
+        self.assertIn("TASK14_RUNNER_EXIT=91", output)
+        self.assertIn("TASK14_OBSERVER_STATUS=CHILD_EXIT_91", output)
+        self.assertIn("TASK14_RESULT=BLOCKED", output)
+
+    def test_blocked_run_writes_external_receipt_only(self):
+        self.assertEqual(len(self.receipt_paths), 1)
+        self.assertIsNotNone(self.receipt)
+        self.assertEqual(self.receipt["schema_version"], 1)
+        self.assertIsNone(self.receipt["run_id"])
+        self.assertEqual(self.receipt["launcher_exit_code"], 91)
+        self.assertEqual(self.receipt["runner_exit_code"], 91)
+        self.assertEqual(self.receipt["result"], "BLOCKED")
+        self.assertEqual(
+            self.receipt["observer_status"],
+            "CHILD_EXIT_91",
+        )
+        self.assertFalse(self.receipt["trading_approval"])
+        self.assertNotIn(str(self.root), json.dumps(self.receipt))
+        self.assertEqual(self.after_files, self.run_after_files)
+        self.assertEqual(self.after_hashes, self.run_after_hashes)
 
     @classmethod
     def _compile_python_stub(cls) -> Path:

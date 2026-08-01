@@ -692,6 +692,16 @@ async def iter_price_history(
                 "timestamp_seconds": timestamp,
             }
             canonical = _canonical_json(normalized)
+            if timestamp < request_start and timestamp not in prior_seen:
+                raise _history_sequence_error(
+                    history=history,
+                    page_index=page_index,
+                    request_start=request_start,
+                    request_end=end_ts,
+                    prior_seen=prior_seen,
+                    first_rejected_position=index,
+                    rejection_category="BEFORE_REQUEST_START",
+                )
             if timestamp in page_seen:
                 if canonical_by_timestamp[timestamp] == canonical:
                     continue

@@ -403,3 +403,41 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
   real orders, paper execution, wallet/signing, credentials and secrets
   remain absent. Trading approval remains false.
 - Final gate: `BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS`.
+
+
+## C1.1 Closure Hardening — verified and ready to commit
+
+- Historical C1 remains accepted at runtime baseline
+  `1811b587fba7c069a8aa29de17364128fc10f716` and evidence commit
+  `b7ced2649781d4af033d92e3e0de36932eb409b6`.
+- This stage adds only offline hardening: a Polymarket history lower-bound,
+  an acceptance-phase mutex, a deterministic manual runner observer and an
+  external launcher receipt.
+- C1.1 hardening status:
+  `READY_TO_COMMIT`.
+- The packaged implementation patch was confirmed byte-for-byte at the
+  patch level before review: both the worktree diff and
+  `C1_1_IMPLEMENTATION.patch` produced patch-id
+  `e99f39fda6c9f2180baa2a242a9da1958c4ec3dc`.
+- The packaged verifier's reported scope drift was a verifier-only parsing
+  defect. In Windows PowerShell 5.1, the unparenthesized expression applying
+  `-split` to `Get-GitValue` produced one multiline `Object[]` element rather
+  than 11 path elements. Parenthesized output, CR/LF splitting, trimming and
+  slash normalization produced 11 expected paths and zero unexpected paths.
+  The external package script was not added to this repository.
+- Independent review found one test-harness defect: `setUpClass` assigned a
+  `CompletedProcess` to `cls.run`, shadowing `unittest.TestCase.run`. The RED
+  failure was `TypeError: 'CompletedProcess' object is not callable`; the
+  narrow GREEN correction renamed the fixture result to `run_result`.
+- Fresh verification passed 219 focused tests with one documented skip. The
+  Windows safe launcher `-Mode Offline` returned 0, including 11/11 process
+  integration tests and a 561-test full suite with one documented skip.
+  `compileall`, `pip check`, diff/scope and forbidden-surface audits passed.
+- Historical C1 report and pack SHA-256 values remain
+  `f3f331e23c6e011220bae0fcf70fc6ae0bb6322264065458ae6a08d27a8618cc`,
+  `ddde9d856ae6a03d28be01a445ca69aadcdff0e1a9f8d0cb09102d59228d3eef`
+  and `9f6eaa9015f0698313c950571ae5f76be3f9c9d4327a461c4d504e8594b81a4f`.
+- Provider requests: `0`.
+- Task 14 runs: `0`.
+- C2: `NOT_STARTED`.
+- Trading approval: `false`.

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from src.single_instance import AlreadyRunningError, WindowsMutex
 from src.storage import SqliteStore
 from tools import simulate_downtime
 
@@ -182,6 +187,151 @@ class _Dependencies:
             "snapshot_input_count": 23,
             "snapshot_input_bound": 23,
         }
+
+
+class _AcceptanceLock:
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class Task14AcceptanceLockTests(unittest.TestCase):
+    def test_collision_exits_20_without_creating_run_roots(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data_base = root / "data"
+            runtime_base = root / "runtime"
+            reports = root / "reports"
+            artifacts = root / "artifacts"
+            reports.mkdir()
+            artifacts.mkdir()
+            downtime = reports / "C1_DOWNTIME_ACCEPTANCE.json"
+            final = reports / "C1_FINAL_ACCEPTANCE.json"
+            pack = artifacts / "C1_ACCEPTANCE_PACK.zip"
+            downtime.write_bytes(b"historical-downtime")
+            final.write_bytes(b"historical-final")
+            pack.write_bytes(b"historical-pack")
+            canonical_before = {
+                path: path.read_bytes()
+                for path in (downtime, final, pack)
+            }
+
+            def collision(_name):
+                raise AlreadyRunningError("BACKEND_ALREADY_RUNNING")
+
+            output = io.StringIO()
+            with (
+                mock.patch.object(simulate_downtime, "require_windows"),
+                mock.patch.object(
+                    simulate_downtime,
+                    "ACCEPTANCE_DATA_BASE",
+                    data_base,
+                ),
+                mock.patch.object(
+                    simulate_downtime,
+                    "ACCEPTANCE_RUNTIME_BASE",
+                    runtime_base,
+                ),
+                mock.patch.object(
+                    simulate_downtime,
+                    "DOWNTIME_REPORT_PATH",
+                    downtime,
+                ),
+                mock.patch.object(
+                    simulate_downtime,
+                    "FINAL_REPORT_PATH",
+                    final,
+                ),
+                mock.patch.object(
+                    simulate_downtime,
+                    "PACK_PATH",
+                    pack,
+                ),
+                contextlib.redirect_stdout(output),
+            ):
+                exit_code = simulate_downtime.main(
+                    mutex_factory=collision
+                )
+
+            self.assertEqual(exit_code, 20)
+            terminal = json.loads(output.getvalue().strip())
+            self.assertEqual(
+                terminal["status"],
+                "BLOCKED_ACCEPTANCE_ALREADY_RUNNING",
+            )
+            self.assertIsNone(terminal["run_id"])
+            self.assertFalse(data_base.exists())
+            self.assertFalse(runtime_base.exists())
+            self.assertEqual(
+                canonical_before,
+                {path: path.read_bytes() for path in canonical_before},
+            )
+
+    def test_lock_is_held_during_core_and_released_after_return(self):
+        lock = _AcceptanceLock()
+        observed = []
+
+        def factory(name):
+            observed.append(("acquire", name, lock.closed))
+            return lock
+
+        def core():
+            observed.append(("core", lock.closed))
+            return 7
+
+        with (
+            mock.patch.object(simulate_downtime, "require_windows"),
+            mock.patch.object(
+                simulate_downtime, "_run_acceptance_main", core
+            ),
+        ):
+            exit_code = simulate_downtime.main(mutex_factory=factory)
+
+        self.assertEqual(exit_code, 7)
+        self.assertEqual(
+            observed,
+            [
+                (
+                    "acquire",
+                    "BTC_LIVE_BACKEND_WINDOWS_V1_C1_ACCEPTANCE",
+                    False,
+                ),
+                ("core", False),
+            ],
+        )
+        self.assertTrue(lock.closed)
+
+    def test_lock_is_released_after_unexpected_exception(self):
+        lock = _AcceptanceLock()
+
+        def core():
+            raise RuntimeError("synthetic failure")
+
+        with (
+            mock.patch.object(simulate_downtime, "require_windows"),
+            mock.patch.object(
+                simulate_downtime, "_run_acceptance_main", core
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "synthetic failure"):
+                simulate_downtime.main(mutex_factory=lambda _name: lock)
+
+        self.assertTrue(lock.closed)
+
+    @unittest.skipUnless(os.name == "nt", "Windows named mutex contract")
+    def test_real_windows_acceptance_mutex_collision_and_release(self):
+        name = simulate_downtime.ACCEPTANCE_MUTEX_NAME
+        first = WindowsMutex.acquire(name)
+        try:
+            with self.assertRaises(AlreadyRunningError):
+                WindowsMutex.acquire(name)
+        finally:
+            first.close()
+
+        replacement = WindowsMutex.acquire(name)
+        replacement.close()
 
 
 class Task14AcceptanceRunnerTests(unittest.TestCase):

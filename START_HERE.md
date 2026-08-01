@@ -2,6 +2,16 @@
 
 Run commands from the project root in Windows PowerShell 5.1.
 
+## Current state
+
+- C0–C1: `COMPLETE`.
+- Historical C1 run:
+  `C1-ACCEPTANCE-20260730T145425Z-F5722878`.
+- C1.1 hardening: `READY_TO_COMMIT`.
+- C1.1 is offline-only hardening; not a new live-accepted baseline.
+- C2: `NOT_STARTED`.
+- Trading approval: `false`.
+
 ## Verify offline
 
 ```powershell
@@ -28,8 +38,6 @@ Process exit codes:
 - `30`: frozen contract or configuration failure;
 - `40`: database integrity failure.
 
-Real orders are disabled. Wallet/private-key support and paper execution are
-absent. Registry 47 remains non-executable.
-
-Tasks 13–14 are still mandatory for C1 acceptance. Starting this backend does
-not establish strategy parity and does not approve trading.
+Tasks 13–14 are complete for historical C1. Registry 47 remains
+non-executable. Real orders, paper execution, wallet/private-key support and
+signing remain absent. Running the backend does not approve trading.

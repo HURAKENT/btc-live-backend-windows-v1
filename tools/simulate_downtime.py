@@ -21,10 +21,23 @@ from typing import Any, Mapping
 import aiohttp
 
 
+_SINGLE_INSTANCE_IMPORT_ROOT = Path(__file__).resolve().parent.parent
+_single_instance_path_inserted = (
+    str(_SINGLE_INSTANCE_IMPORT_ROOT) not in sys.path
+)
+if _single_instance_path_inserted:
+    sys.path.insert(0, str(_SINGLE_INSTANCE_IMPORT_ROOT))
+try:
+    from src.single_instance import AlreadyRunningError, WindowsMutex
+finally:
+    if _single_instance_path_inserted:
+        sys.path.remove(str(_SINGLE_INSTANCE_IMPORT_ROOT))
+
+
 IMPORT_PERFORMED_NETWORK_IO = False
 MIN_DOWNTIME_MS = 600_000
 MAX_DOWNTIME_MS = 630_000
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = _SINGLE_INSTANCE_IMPORT_ROOT
 REPORTS_DIR = PROJECT_ROOT / "reports"
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 DOWNTIME_REPORT_PATH = REPORTS_DIR / "C1_DOWNTIME_ACCEPTANCE.json"
@@ -48,6 +61,7 @@ API_PORT = 8767
 INITIAL_READY_OBSERVATION_SECONDS = 180
 RUNTIME_BASELINE_COMMIT = "eec05197f05c3d6887bbc49a5edd125ad784cd46"
 REAL_DOWNTIME_TARGET_MS = 605_000
+ACCEPTANCE_MUTEX_NAME = "BTC_LIVE_BACKEND_WINDOWS_V1_C1_ACCEPTANCE"
 
 
 class AcceptanceBlocked(RuntimeError):
@@ -2055,8 +2069,7 @@ def _validate_prerequisites(run_id: str) -> dict[str, Any]:
     return path_contract
 
 
-def main() -> int:
-    require_windows()
+def _run_acceptance_main() -> int:
     now = datetime.now(UTC)
     run_id = (
         f"C1-ACCEPTANCE-{now.strftime('%Y%m%dT%H%M%SZ')}-"
@@ -2149,6 +2162,28 @@ def main() -> int:
     finally:
         if dependencies is not None:
             dependencies.cleanup()
+
+
+def main(*, mutex_factory=WindowsMutex.acquire) -> int:
+    require_windows()
+    try:
+        acceptance_mutex = mutex_factory(ACCEPTANCE_MUTEX_NAME)
+    except AlreadyRunningError:
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCKED_ACCEPTANCE_ALREADY_RUNNING",
+                    "run_id": None,
+                },
+                sort_keys=True,
+            )
+        )
+        return 20
+
+    try:
+        return _run_acceptance_main()
+    finally:
+        acceptance_mutex.close()
 
 
 if __name__ == "__main__":

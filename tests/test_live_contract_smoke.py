@@ -243,6 +243,49 @@ class LiveContractSmokeTests(unittest.TestCase):
                 self.assertIn(expected, text)
         self.assertNotIn("C1 PASS", text)
 
+    def test_c1_closure_state_is_consistent(self):
+        progress = (
+            PROJECT_ROOT / "docs" / "C1_GOAL_PROGRESS.md"
+        ).read_text(encoding="utf-8")
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        start_here = (
+            PROJECT_ROOT / "START_HERE.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("C1_AUTONOMOUS_GOAL_COMPLETE", progress)
+        self.assertIn("BTC_LIVE_BACKEND_WINDOWS_V1_C1_PASS", progress)
+        self.assertIn("Current Blocker", progress)
+        self.assertIn("`NONE`", progress)
+        self.assertIn(
+            "C1-ACCEPTANCE-20260730T145425Z-F5722878",
+            progress,
+        )
+        self.assertIn("Manual Action Required", progress)
+        self.assertIn("No.", progress)
+        markers = (
+            "C1.1 hardening: PENDING_WINDOWS_OFFLINE_VERIFICATION",
+            "C1.1 hardening: READY_TO_COMMIT",
+        )
+        self.assertEqual(sum(marker in progress for marker in markers), 1)
+        self.assertNotIn("C1_1_CLOSURE_HARDENING_COMPLETE", progress)
+
+        for document in (readme, start_here):
+            self.assertIn("C0–C1", document)
+            self.assertIn("COMPLETE", document)
+            self.assertIn("C2", document)
+            self.assertIn("NOT_STARTED", document)
+            self.assertIn("trading approval", document.lower())
+            self.assertNotIn("remain mandatory", document)
+            self.assertNotIn("still mandatory", document)
+
+    def test_manual_task14_receipt_remains_outside_repository(self):
+        text = (
+            PROJECT_ROOT / "scripts" / "RUN_TASK14_MANUAL.ps1"
+        ).read_text(encoding="utf-8-sig")
+        self.assertIn("LATEST_TASK14_LAUNCHER_RECEIPT.json", text)
+        self.assertIn("task14_manual_logs", text)
+        self.assertNotIn("C1_LAUNCHER_RECEIPT.json", text)
+
     def test_launchers_parse_with_windows_powershell_51_when_available(self):
         executable = shutil.which("powershell.exe")
         if executable is None:
