@@ -26,9 +26,13 @@ def event(
     *,
     event_type: str,
     timestamp: int = 60_000,
+    asset_id: str | None = None,
 ) -> SourceEvent:
+    payload_value = {"event_type": event_type, "source": source}
+    if asset_id is not None:
+        payload_value["asset_id"] = asset_id
     payload = json.dumps(
-        {"event_type": event_type, "source": source},
+        payload_value,
         sort_keys=True,
         separators=(",", ":"),
     )
@@ -204,6 +208,7 @@ class RuntimeAdapterTests(unittest.IsolatedAsyncioTestCase):
             "polymarket",
             "history:1",
             event_type="POLYMARKET_PRICE_HISTORY",
+            asset_id=reconciliation.asset_ids[0],
         )
 
         async def history(_session, *, asset_id, start_ts, end_ts):

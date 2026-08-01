@@ -442,6 +442,7 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
         owners: list[str | None] = []
         methods = (
             "append_lifecycle_state",
+            "append_incident",
             "persist_market_identity",
             "append_source_event",
             "upsert_source_cursor",

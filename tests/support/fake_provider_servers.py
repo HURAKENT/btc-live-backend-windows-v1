@@ -26,6 +26,7 @@ class FakeProviderServer:
         self.polymarket_connections = 0
         self.binance_connections = 0
         self.observed_subscriptions: list[dict] = []
+        self.history_requests: list[dict[str, str]] = []
         self.external_requests = 0
         fixture = json.loads(
             Path("tests/fixtures/gamma_btc_daily_range.json").read_text(
@@ -114,6 +115,7 @@ class FakeProviderServer:
         return web.json_response(_book_payload(asset_id, "rest-book"))
 
     async def _history(self, request: web.Request) -> web.Response:
+        self.history_requests.append(dict(request.query))
         end_ts = int(request.query["endTs"])
         return web.Response(
             text=json.dumps(

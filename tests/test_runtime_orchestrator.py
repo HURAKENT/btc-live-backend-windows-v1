@@ -215,7 +215,15 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_each_transition_is_persisted(self):
         await self.runtime.start()
-        self.assertEqual(self.store.count("incidents"), len(STARTUP_SEQUENCE))
+        self.assertEqual(
+            self.store.scalar(
+                """
+                SELECT COUNT(*) FROM incidents
+                WHERE incident_key LIKE 'lifecycle:%'
+                """
+            ),
+            len(STARTUP_SEQUENCE),
+        )
 
     async def test_discovery_identity_is_persisted(self):
         await self.runtime.start()

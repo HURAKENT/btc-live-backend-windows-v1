@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import time
 from collections.abc import Callable
@@ -12,12 +13,20 @@ from typing import Any
 import aiohttp
 
 from src.binance_provider import BinanceStream, MINUTE_MS
-from src.canary import commit_canary_if_new
+from src.canary import commit_canary_if_new, evaluate_canary
 from src.lifecycle import STARTUP_SEQUENCE, LifecycleStateMachine
 from src.models import CanonicalSnapshot, SourceEvent
 from src.outbox import OutboxBroker
 from src.polymarket_provider import PolymarketStream
-from src.recovery import reconcile_binance_minutes, reconcile_polymarket_state
+from src.recovery import (
+    C2RecoverySummary,
+    assess_c2_recovery,
+    build_binance_recovery_plan,
+    polymarket_history_cursor_source,
+    reconcile_binance_minutes,
+    reconcile_polymarket_state,
+    resolve_polymarket_history_starts,
+)
 from src.runtime_adapters import (
     BinanceRuntimeAdapter,
     MarketDiscovery,
@@ -115,6 +124,7 @@ class C1RuntimeOrchestrator:
         history_end_ts: int,
         clock_ms: Any = lambda: time.time_ns() // 1_000_000,
         binance_end_resolver: Callable[[], int] | None = None,
+        binance_last_committed_open_ms: int | None = None,
         write_queue_maxsize: int = DEFAULT_WRITE_QUEUE_MAXSIZE,
         live_buffer_max_events: int = DEFAULT_LIVE_BUFFER_MAX_EVENTS,
         stream_ready_timeout_seconds: float = (
@@ -145,6 +155,15 @@ class C1RuntimeOrchestrator:
             or binance_end_ms % MINUTE_MS != 0
         ):
             raise ValueError("INVALID_RUNTIME_RECOVERY_BOUNDARY")
+        if binance_last_committed_open_ms is None:
+            binance_last_committed_open_ms = binance_start_ms - MINUTE_MS
+        if (
+            type(binance_last_committed_open_ms) is not int
+            or binance_last_committed_open_ms < 0
+            or binance_last_committed_open_ms > binance_end_ms
+            or binance_last_committed_open_ms % MINUTE_MS != 0
+        ):
+            raise ValueError("INVALID_RUNTIME_RECOVERY_CURSOR")
         self._run_id = run_id
         self._store = store
         self._broker = broker
@@ -152,6 +171,9 @@ class C1RuntimeOrchestrator:
         self._polymarket = polymarket_adapter
         self._binance_start_ms = binance_start_ms
         self._binance_end_ms = binance_end_ms
+        self._binance_last_committed_open_ms = (
+            binance_last_committed_open_ms
+        )
         self._history_start_ts = history_start_ts
         if type(write_queue_maxsize) is not int or write_queue_maxsize <= 0:
             raise ValueError("INVALID_RUNTIME_WRITE_QUEUE_MAXSIZE")
@@ -209,6 +231,7 @@ class C1RuntimeOrchestrator:
         }
         self._last_event_id = 0
         self._providers_stopped = False
+        self._recovery_summary: C2RecoverySummary | None = None
 
     @property
     def lifecycle_states(self) -> tuple[str, ...]:
@@ -239,6 +262,12 @@ class C1RuntimeOrchestrator:
     @property
     def registry_execution_count(self) -> int:
         return 0
+
+    @property
+    def recovery_summary(self) -> C2RecoverySummary:
+        if self._recovery_summary is None:
+            raise RuntimeError("C2_RECOVERY_SUMMARY_NOT_AVAILABLE")
+        return self._recovery_summary
 
     def status(self) -> RuntimeStatus:
         market = self._market
@@ -361,7 +390,7 @@ class C1RuntimeOrchestrator:
                 self._ensure_running()
             continuity = reconcile_binance_minutes(
                 last_committed_open_ms=(
-                    self._binance_start_ms - MINUTE_MS
+                    self._binance_last_committed_open_ms
                 ),
                 current_open_ms=effective_end_ms + MINUTE_MS,
                 recovered_events=recovered,
@@ -374,11 +403,26 @@ class C1RuntimeOrchestrator:
             self._ensure_running()
 
             await self._transition("POLYMARKET_BACKFILL")
+            history_parameters = inspect.signature(
+                self._polymarket.recover
+            ).parameters
+            history_kwargs: dict[str, Any] = {
+                "start_ts": self._history_start_ts,
+                "end_ts": self._history_end_ts,
+            }
+            if "start_ts_by_asset" in history_parameters:
+                history_kwargs["start_ts_by_asset"] = (
+                    resolve_polymarket_history_starts(
+                        asset_ids=self._market.asset_ids,
+                        read_cursor=self._store.read_source_cursor,
+                        floor_start_ts=self._history_start_ts,
+                        end_ts=self._history_end_ts,
+                    )
+                )
             history = tuple(
                 await self._polymarket.recover(
                     self._market,
-                    start_ts=self._history_start_ts,
-                    end_ts=self._history_end_ts,
+                    **history_kwargs,
                 )
             )
             for event in history:
@@ -403,7 +447,7 @@ class C1RuntimeOrchestrator:
             if not reconciliation.live_ready_allowed:
                 raise RuntimeError(reconciliation.status)
             await self._transition("RECONCILIATION")
-            await self._submit_write(
+            recovered_snapshot = await self._submit_write(
                 "BUILD_SNAPSHOT",
                 {
                     "evaluation_origin": RECOVERED_EVALUATION_ORIGIN,
@@ -413,7 +457,10 @@ class C1RuntimeOrchestrator:
             self._ensure_running()
 
             await self._transition("STRATEGY_REPLAY")
-            await self._drain_live_buffer()
+            buffered_event_count = len(self._live_buffer)
+            drained_event_count, _ = (
+                await self._drain_live_buffer()
+            )
             try:
                 await asyncio.wait_for(
                     self._wait_for_live_evidence(),
@@ -422,7 +469,7 @@ class C1RuntimeOrchestrator:
             except TimeoutError:
                 raise RuntimeError("LIVE_EVIDENCE_TIMEOUT") from None
             await self._submit_write("SET_LIVE_READY", None)
-            await self._submit_write(
+            current_snapshot = await self._submit_write(
                 "BUILD_SNAPSHOT",
                 {
                     "evaluation_origin": CURRENT_EVALUATION_ORIGIN,
@@ -431,6 +478,98 @@ class C1RuntimeOrchestrator:
             )
             self._ensure_running()
             self._ensure_streams_alive()
+
+            adapter_history_summary = getattr(
+                self._polymarket,
+                "last_recovery_summary",
+                None,
+            )
+            history_completed_asset_count = (
+                len(self._market.asset_ids)
+                if adapter_history_summary is None
+                else len(adapter_history_summary.completed_asset_ids)
+            )
+            history_event_count = (
+                len(history)
+                if adapter_history_summary is None
+                else adapter_history_summary.event_count
+            )
+            source_duplicate_count = self._store.scalar(
+                """
+                SELECT COALESCE(SUM(duplicate_count - 1), 0)
+                    AS C2_SOURCE_DUPLICATE_COUNT
+                FROM (
+                    SELECT COUNT(*) AS duplicate_count
+                    FROM source_events
+                    GROUP BY natural_key
+                    HAVING COUNT(*) > 1
+                )
+                """
+            )
+            if type(source_duplicate_count) is not int:
+                raise RuntimeError("INVALID_C2_SOURCE_DUPLICATE_EVIDENCE")
+            recovered_evaluation = (
+                self._evaluation_persistence_evidence(recovered_snapshot)
+            )
+            current_evaluation = (
+                self._evaluation_persistence_evidence(current_snapshot)
+            )
+            self._recovery_summary = assess_c2_recovery(
+                binance_expected_closed_minutes=(
+                    continuity.expected_closed_minutes
+                ),
+                binance_recovered_closed_minutes=(
+                    continuity.recovered_closed_minutes
+                ),
+                binance_missing_closed_minutes=(
+                    continuity.missing_closed_minutes
+                ),
+                binance_duplicate_count_after_dedup=(
+                    continuity.duplicate_count_after_dedup
+                ),
+                market_count=len(self._market.market_ids),
+                asset_count=len(self._market.asset_ids),
+                current_book_count=len(self._market.current_events),
+                history_completed_asset_count=(
+                    history_completed_asset_count
+                ),
+                history_event_count=history_event_count,
+                buffered_event_count=buffered_event_count,
+                drained_event_count=drained_event_count,
+                source_duplicate_count_after_dedup=(
+                    source_duplicate_count
+                ),
+                writer_consumer_count=self.writer_consumer_count,
+                recovered_evaluation_committed=(
+                    recovered_evaluation[0]
+                ),
+                current_evaluation_committed=(
+                    current_evaluation[0]
+                ),
+                recovered_execution_eligible=recovered_evaluation[1],
+                current_execution_eligible=current_evaluation[1],
+            )
+            if not self._recovery_summary.live_ready_allowed:
+                raise RuntimeError(
+                    "C2_RECOVERY_BLOCKED:"
+                    + ",".join(self._recovery_summary.blockers)
+                )
+            await self._submit_write(
+                "INCIDENT",
+                {
+                    "incident_key": f"c2-recovery:{self._run_id}",
+                    "severity": "INFO",
+                    "status": self._recovery_summary.status,
+                    "payload_json": json.dumps(
+                        self._recovery_summary.as_dict(),
+                        ensure_ascii=False,
+                        allow_nan=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    "created_at_ms": self._clock_ms(),
+                },
+            )
 
             await self._transition("BUFFER_DRAIN")
             self._ensure_running()
@@ -536,7 +675,9 @@ class C1RuntimeOrchestrator:
         result = await self._submit_source(event)
         self._mark_live_evidence(source, result)
 
-    async def _drain_live_buffer(self) -> None:
+    async def _drain_live_buffer(self) -> tuple[int, int]:
+        drained_event_count = 0
+        replay_count = 0
         while self._live_buffer:
             buffered = sorted(
                 self._live_buffer,
@@ -551,9 +692,13 @@ class C1RuntimeOrchestrator:
                 result = await self._submit_source(
                     event,
                 )
+                drained_event_count += 1
+                if not result.inserted:
+                    replay_count += 1
                 self._mark_live_evidence(source, result)
                 self._ensure_running()
         self._buffering_live = False
+        return drained_event_count, replay_count
 
     def _mark_live_evidence(
         self,
@@ -722,7 +867,11 @@ class C1RuntimeOrchestrator:
             except json.JSONDecodeError:
                 asset_id = None
             if type(asset_id) is str and asset_id:
-                source = f"polymarket:{asset_id}"
+                source = (
+                    polymarket_history_cursor_source(asset_id)
+                    if event.event_type == "POLYMARKET_PRICE_HISTORY"
+                    else f"polymarket:{asset_id}"
+                )
         return source
 
     def _persist_market_identity(
@@ -765,6 +914,25 @@ class C1RuntimeOrchestrator:
             snapshot,
             broker=self._broker,
         )
+
+    def _evaluation_persistence_evidence(
+        self,
+        snapshot: CanonicalSnapshot,
+    ) -> tuple[bool, bool]:
+        evaluation = evaluate_canary(snapshot)
+        rows = self._store.rows(
+            """
+            SELECT execution_eligible
+            FROM strategy_evaluations
+            WHERE evaluation_key = ?
+            """,
+            (evaluation.evaluation_key,),
+        )
+        if not rows:
+            return False, False
+        if len(rows) != 1 or rows[0][0] not in (0, 1):
+            raise RuntimeError("INVALID_C2_EVALUATION_EVIDENCE")
+        return True, bool(rows[0][0])
 
     async def _transition(self, state: str) -> None:
         sequence_index = len(self._lifecycle.states)
@@ -975,15 +1143,11 @@ async def build_default_runtime_orchestrator(
         return current_open_ms - MINUTE_MS
 
     end_ms = resolve_closed_minute_end_ms()
-    cursor = store.read_source_cursor("binance")
-    start_ms = (
-        end_ms
-        if cursor is None
-        else min(
-            end_ms,
-            cursor["cursor"]["source_timestamp_ms"] + MINUTE_MS,
-        )
+    plan = build_binance_recovery_plan(
+        cursor=store.read_source_cursor("binance"),
+        latest_closed_open_ms=end_ms,
     )
+    start_ms = plan.request_start_ms
 
     async def load_events() -> list[dict[str, Any]]:
         params = {
@@ -1061,6 +1225,7 @@ async def build_default_runtime_orchestrator(
         polymarket_adapter=polymarket,
         binance_start_ms=start_ms,
         binance_end_ms=end_ms,
+        binance_last_committed_open_ms=plan.last_committed_open_ms,
         history_start_ts=max(0, now_seconds - 3600),
         history_end_ts=now_seconds,
         binance_end_resolver=resolve_closed_minute_end_ms,

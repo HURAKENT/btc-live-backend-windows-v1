@@ -226,6 +226,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(counts_before["signals"], 0)
         self.assertGreater(counts_before["outbox_events"], 0)
         self.assertEqual(counts_before["duplicate_natural_keys"], 0)
+        self.assertEqual(len(self.server.history_requests), 22)
 
         second = self._spawn()
         second_exit = await asyncio.to_thread(second.wait, 10)
@@ -264,6 +265,11 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(restart_observed_starting)
         self.assertEqual(restarted_health["status"], "PASS")
         self.assertEqual(
+            len(self.server.history_requests),
+            22,
+            "same-DB restart must use persisted per-asset history cursors",
+        )
+        self.assertEqual(
             [
                 entry["status"]
                 for entry in self.status_timeline
@@ -282,6 +288,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         restarted_counts = self._database_counts()
         self.assertEqual(restarted_counts["market_catalog"], 1)
         self.assertEqual(restarted_counts["duplicate_natural_keys"], 0)
+        self.assertEqual(restarted_counts["c2_recovery_pass"], 2)
         self.assertGreaterEqual(
             restarted_counts["strategy_evaluations"],
             first_counts["strategy_evaluations"],
@@ -421,6 +428,13 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 "SELECT COUNT(*) FROM ("
                 "SELECT natural_key FROM source_events "
                 "GROUP BY natural_key HAVING COUNT(*) > 1)"
+            ).fetchone()[0]
+            result["c2_recovery_pass"] = connection.execute(
+                """
+                SELECT COUNT(*) FROM incidents
+                WHERE incident_key LIKE 'c2-recovery:%'
+                  AND status = 'C2_RECOVERY_HARDENING_PASS'
+                """
             ).fetchone()[0]
             return result
         finally:

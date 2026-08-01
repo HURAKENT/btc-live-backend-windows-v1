@@ -40,6 +40,14 @@ class MarketReconciliation:
     historical_depth: str
 
 
+@dataclass(frozen=True, slots=True)
+class PolymarketHistoryRecoverySummary:
+    completed_asset_ids: tuple[str, ...]
+    empty_asset_ids: tuple[str, ...]
+    skipped_asset_ids: tuple[str, ...]
+    event_count: int
+
+
 class BinanceRuntimeAdapter:
     __slots__ = (
         "_backfill",
@@ -137,6 +145,7 @@ class PolymarketRuntimeAdapter:
         "_event_loader",
         "_fetch_books",
         "_history",
+        "_last_recovery_summary",
         "_now_utc",
         "_session",
         "_stream",
@@ -170,6 +179,9 @@ class PolymarketRuntimeAdapter:
         self._discover = discover
         self._fetch_books = fetch_books
         self._history = history
+        self._last_recovery_summary: (
+            PolymarketHistoryRecoverySummary | None
+        ) = None
         self._close_session = close_session
         self._closed = False
         self._stream_ready = asyncio.Event()
@@ -281,25 +293,90 @@ class PolymarketRuntimeAdapter:
         *,
         start_ts: int,
         end_ts: int,
+        start_ts_by_asset: dict[str, int | None] | None = None,
     ) -> list[SourceEvent]:
         if type(reconciliation) is not MarketReconciliation:
             raise ValueError("INVALID_MARKET_RECONCILIATION")
+        if type(start_ts) is not int or type(end_ts) is not int:
+            raise ValueError("INVALID_POLYMARKET_HISTORY_BOUNDARY")
+        if start_ts < 0 or end_ts < start_ts:
+            raise ValueError("INVALID_POLYMARKET_HISTORY_BOUNDARY")
+        if start_ts_by_asset is None:
+            starts = {
+                asset_id: start_ts for asset_id in reconciliation.asset_ids
+            }
+        else:
+            if (
+                type(start_ts_by_asset) is not dict
+                or set(start_ts_by_asset) != set(reconciliation.asset_ids)
+            ):
+                raise ValueError("INVALID_POLYMARKET_HISTORY_STARTS")
+            starts = dict(start_ts_by_asset)
+        for value in starts.values():
+            if value is not None and (
+                type(value) is not int
+                or value < start_ts
+                or value > end_ts
+            ):
+                raise ValueError("INVALID_POLYMARKET_HISTORY_STARTS")
+
+        self._last_recovery_summary = None
         recovered: list[SourceEvent] = []
+        completed: list[str] = []
+        empty: list[str] = []
+        skipped: list[str] = []
         for asset_id in reconciliation.asset_ids:
+            asset_start_ts = starts[asset_id]
+            if asset_start_ts is None:
+                completed.append(asset_id)
+                skipped.append(asset_id)
+                continue
+            event_count_before = len(recovered)
             kwargs = {}
             if self._clob_base_url is not None:
                 kwargs["clob_base_url"] = self._clob_base_url
             async for item in self._history(
                 self._session,
                 asset_id=asset_id,
-                start_ts=start_ts,
+                start_ts=asset_start_ts,
                 end_ts=end_ts,
                 **kwargs,
             ):
-                if type(item) is not SourceEvent:
+                if (
+                    type(item) is not SourceEvent
+                    or item.source != "polymarket"
+                    or item.event_type != "POLYMARKET_PRICE_HISTORY"
+                ):
                     raise ValueError("INVALID_POLYMARKET_HISTORY_EVENT")
+                try:
+                    observed_asset_id = json.loads(
+                        item.payload_json
+                    ).get("asset_id")
+                except json.JSONDecodeError:
+                    raise ValueError(
+                        "INVALID_POLYMARKET_HISTORY_EVENT"
+                    ) from None
+                if observed_asset_id != asset_id:
+                    raise ValueError(
+                        "RUNTIME_POLYMARKET_HISTORY_ASSET_MISMATCH"
+                    )
                 recovered.append(item)
+            completed.append(asset_id)
+            if len(recovered) == event_count_before:
+                empty.append(asset_id)
+        self._last_recovery_summary = PolymarketHistoryRecoverySummary(
+            completed_asset_ids=tuple(completed),
+            empty_asset_ids=tuple(empty),
+            skipped_asset_ids=tuple(skipped),
+            event_count=len(recovered),
+        )
         return recovered
+
+    @property
+    def last_recovery_summary(
+        self,
+    ) -> PolymarketHistoryRecoverySummary | None:
+        return self._last_recovery_summary
 
     async def stream(
         self,
