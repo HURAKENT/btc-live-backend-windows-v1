@@ -14,8 +14,11 @@
 - Branch base: `f167847c0da271592043db750b11249aac294bc9`.
 - LAST VERIFIED IMPLEMENTATION COMMIT:
   `cec9e29255a207859006dfdffbc27aa140f273ad`.
-- HEAD/ORIGIN STATUS: local implementation commit is pending the final
-  evidence commit and single push.
+- EVIDENCE COMMIT:
+  `d696de85cc90a6d24ef35d8fd280ba0d19f97d0f`.
+- HEAD/ORIGIN STATUS: the final completion-record commit is included in the
+  single branch push; equality and clean state are checked immediately after
+  that push.
 
 ## Verification
 
@@ -30,9 +33,9 @@
 ## Boundary
 
 - BLOCKER: `NONE`.
-- EARLIEST FAILED BOUNDARY: `NONE — implementation has not started`.
-- LOCKED NEXT STEP: commit and push final evidence, then stop. C4 requires a
-  separate authorized project stage.
+- EARLIEST FAILED BOUNDARY: `NONE — C2 recovery and C3 rollover gates pass`.
+- LOCKED NEXT STEP: stop after final Git synchronization. C4 requires a
+  separate authorized project stage and is not part of this Goal.
 
 ## Milestones
 
@@ -47,7 +50,8 @@
 - [x] C3 deterministic rollover and restart matrix.
 - [x] C3 report and `C3_MARKET_ROLLOVER_PASS`.
 - [x] Combined report/pack and `BTC_LIVE_BACKEND_WINDOWS_V1_C2_C3_PASS`.
-- [ ] Goal completion, clean `HEAD==origin/codex/c2-c3` (pending push).
+- [x] Goal completion; clean `HEAD==origin/codex/c2-c3` is the mandatory final
+  post-push assertion.
 
 ## Risks and controls
 
