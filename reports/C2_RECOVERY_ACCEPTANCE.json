@@ -1,0 +1,78 @@
+{
+  "evidence_basis": "DETERMINISTIC_OFFLINE_AND_LOOPBACK",
+  "gate": "C2_RECOVERY_HARDENING_PASS",
+  "generated_at_utc": "2026-08-01T13:15:32Z",
+  "limitations": [
+    "C2 hardens recovery and restart behavior; it does not authorize trading.",
+    "The C2 gate used deterministic fixtures and loopback provider processes; no public provider request was required.",
+    "C3 market rollover has not started in this report."
+  ],
+  "persistence": {
+    "evaluations": {
+      "current_committed": true,
+      "current_execution_eligible": false,
+      "current_origin": "CURRENT_LIVE_REEVALUATION",
+      "recovered_committed": true,
+      "recovered_execution_eligible": false,
+      "recovered_origin": "RECOVERED_AFTER_DOWNTIME"
+    },
+    "outbox_ids_unique_and_increasing": true,
+    "restart_history_requests_added": 0,
+    "same_database_restart": true,
+    "writer_consumer_count": 1
+  },
+  "protected_c1_artifacts": {
+    "sha256": {
+      "artifacts/C1_ACCEPTANCE_PACK.zip": "9f6eaa9015f0698313c950571ae5f76be3f9c9d4327a461c4d504e8594b81a4f",
+      "reports/C1_DOWNTIME_ACCEPTANCE.json": "f3f331e23c6e011220bae0fcf70fc6ae0bb6322264065458ae6a08d27a8618cc",
+      "reports/C1_FINAL_ACCEPTANCE.json": "ddde9d856ae6a03d28be01a445ca69aadcdff0e1a9f8d0cb09102d59228d3eef"
+    },
+    "unchanged": true
+  },
+  "recovery": {
+    "binance_duplicates_after_dedup": 0,
+    "binance_missing_closed_minutes": 0,
+    "buffer_drained_after_authoritative_replay": true,
+    "current_book_count": 22,
+    "history_completed_asset_count": 22,
+    "history_cursor_namespace_separate_from_books": true,
+    "persistent_cursor_bounds": true,
+    "polymarket_asset_count": 22,
+    "polymarket_market_count": 11,
+    "source_duplicates_after_dedup": 0,
+    "stream_first_buffering": true
+  },
+  "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C2_RECOVERY_ACCEPTANCE_V1",
+  "scope": {
+    "authentication": false,
+    "c3_started": false,
+    "c4_started": false,
+    "external_provider_requests": 0,
+    "orders": 0,
+    "paper_fills": 0,
+    "registry_executions": 0,
+    "task14_runs": 0,
+    "wallet_or_signing": false
+  },
+  "source_commit": "d772428844dc65ca47f5a147bfc75a2e51c2b706",
+  "sqlite": {
+    "foreign_keys": 1,
+    "integrity_check": "ok",
+    "journal_mode": "wal",
+    "migration_version": 2,
+    "quick_check": "ok",
+    "synchronous": 2,
+    "table_count": 9
+  },
+  "status": "PASS",
+  "trading_approval": false,
+  "verification": {
+    "compileall_pass": true,
+    "documented_skips": 1,
+    "focused_tests": 129,
+    "full_suite_tests": 591,
+    "offline_launcher_exit": 0,
+    "pip_check_pass": true,
+    "process_integration_tests": 11
+  }
+}

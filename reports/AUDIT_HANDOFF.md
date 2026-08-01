@@ -441,3 +441,35 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - Task 14 runs: `0`.
 - C2: `NOT_STARTED`.
 - Trading approval: `false`.
+
+## C2 Recovery Hardening
+
+- Implementation commit:
+  `d772428844dc65ca47f5a147bfc75a2e51c2b706`; gate:
+  `C2_RECOVERY_HARDENING_PASS`.
+- Persistent Binance recovery plans validate aligned cursor evidence, derive
+  exact closed-minute bounds and replay one authoritative anchor when a fresh
+  projector restarts at the current cursor. Missing and duplicate counts are
+  fail-closed.
+- Polymarket price-history cursors use a separate per-asset namespace and
+  validate source, decoded timestamp, natural-key identity and future bounds.
+  Already-complete assets issue no repeat history request; all asset results
+  validate before the orchestrator enqueues them.
+- The runtime persists a deterministic C2 summary incident through the
+  existing writer. Duplicate-source and recovered/current evaluation facts
+  are read from SQLite rather than asserted as constants. Both evaluation
+  origins are committed and execution-ineligible.
+- Final focused verification passed 129 tests. The canonical Windows Offline
+  launcher passed 11 process-integration tests and the 591-test full suite
+  with one documented skip, then `compileall` and `pip check`; exit code 0.
+- Fresh SQLite evidence is migration version 2, nine tables,
+  `quick_check=ok`, `integrity_check=ok`, WAL, synchronous 2 and foreign keys
+  enabled. The one-writer topology and strictly increasing unique outbox
+  replay remain intact across the same-database process restart.
+- Historical C1 reports and pack retain SHA-256 values
+  `f3f331e23c6e011220bae0fcf70fc6ae0bb6322264065458ae6a08d27a8618cc`,
+  `ddde9d856ae6a03d28be01a445ca69aadcdff0e1a9f8d0cb09102d59228d3eef`
+  and `9f6eaa9015f0698313c950571ae5f76be3f9c9d4327a461c4d504e8594b81a4f`.
+- No public provider request or Task 14 run occurred. C3 and C4 were not
+  started in this report. Registry execution, authentication, orders, paper
+  fills, wallet/signing and trading approval remain zero/false.
