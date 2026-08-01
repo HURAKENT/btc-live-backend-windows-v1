@@ -14,6 +14,7 @@ from src.market_discovery import (
     discover_active_btc_daily_range,
 )
 from src.models import SourceEvent
+from src.market_rollover import MarketPair, build_market_pair
 from src.polymarket_provider import (
     PolymarketStream,
     fetch_current_books,
@@ -38,6 +39,12 @@ class MarketReconciliation:
     asset_ids: tuple[str, ...]
     current_events: tuple[SourceEvent, ...]
     historical_depth: str
+
+
+@dataclass(frozen=True, slots=True)
+class MarketDiscoveryPair:
+    current: MarketDiscovery
+    next: MarketDiscovery
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +149,7 @@ class PolymarketRuntimeAdapter:
         "_close_session",
         "_closed",
         "_discover",
+        "_discover_pair",
         "_event_loader",
         "_fetch_books",
         "_history",
@@ -149,6 +157,7 @@ class PolymarketRuntimeAdapter:
         "_now_utc",
         "_session",
         "_stream",
+        "_stream_factory",
         "_stream_ready",
         "_clob_base_url",
     )
@@ -163,6 +172,7 @@ class PolymarketRuntimeAdapter:
         discover: Callable[..., MarketIdentity] = (
             discover_active_btc_daily_range
         ),
+        discover_pair: Callable[..., MarketPair] = build_market_pair,
         fetch_books: Callable[..., Awaitable[list[SourceEvent]]] = (
             fetch_current_books
         ),
@@ -171,12 +181,15 @@ class PolymarketRuntimeAdapter:
         ),
         close_session: Callable[[], Awaitable[None] | None] | None = None,
         clob_base_url: str | None = None,
+        stream_factory: Callable[[], PolymarketStream] | None = None,
     ) -> None:
         self._session = session
         self._stream = stream
+        self._stream_factory = stream_factory
         self._event_loader = event_loader
         self._now_utc = now_utc
         self._discover = discover
+        self._discover_pair = discover_pair
         self._fetch_books = fetch_books
         self._history = history
         self._last_recovery_summary: (
@@ -191,35 +204,7 @@ class PolymarketRuntimeAdapter:
         try:
             payload = await self._event_loader()
             identity = self._discover(payload, now_utc=self._now_utc())
-            if (
-                len(identity.market_ids) != 11
-                or len(identity.asset_ids) != 22
-                or len(set(identity.asset_ids)) != 22
-            ):
-                raise ValueError(
-                    "RUNTIME_POLYMARKET_INCOMPLETE_MARKET_IDENTITY"
-                )
-            identity_json = json.dumps(
-                {
-                    "asset_ids": list(identity.asset_ids),
-                    "event_id": identity.event_id,
-                    "event_slug": identity.event_slug,
-                    "market_ids": list(identity.market_ids),
-                    "outcomes": list(identity.outcomes),
-                    "resolution_utc": identity.resolution_utc.isoformat(),
-                },
-                ensure_ascii=False,
-                allow_nan=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-            return MarketDiscovery(
-                market_identity_json=identity_json,
-                market_id=identity.event_id,
-                market_ids=identity.market_ids,
-                asset_ids=identity.asset_ids,
-                historical_depth="NOT_AVAILABLE_NOT_REQUIRED",
-            )
+            return self._market_discovery(identity)
         except asyncio.CancelledError:
             raise
         except ValueError:
@@ -228,6 +213,59 @@ class PolymarketRuntimeAdapter:
             raise RuntimeError(
                 "RUNTIME_POLYMARKET_DISCOVERY_FAILED"
             ) from error
+
+    async def discover_market_pair(self) -> MarketDiscoveryPair:
+        try:
+            payload = await self._event_loader()
+            pair = self._discover_pair(payload, now_utc=self._now_utc())
+            if type(pair) is not MarketPair:
+                raise ValueError("INVALID_RUNTIME_MARKET_PAIR")
+            return MarketDiscoveryPair(
+                current=self._market_discovery(pair.current),
+                next=self._market_discovery(pair.next),
+            )
+        except asyncio.CancelledError:
+            raise
+        except ValueError:
+            raise
+        except Exception as error:
+            raise RuntimeError(
+                "RUNTIME_POLYMARKET_PAIR_DISCOVERY_FAILED"
+            ) from error
+
+    @staticmethod
+    def _market_discovery(identity: MarketIdentity) -> MarketDiscovery:
+        if (
+            type(identity) is not MarketIdentity
+            or len(identity.market_ids) != 11
+            or len(set(identity.market_ids)) != 11
+            or len(identity.asset_ids) != 22
+            or len(set(identity.asset_ids)) != 22
+        ):
+            raise ValueError(
+                "RUNTIME_POLYMARKET_INCOMPLETE_MARKET_IDENTITY"
+            )
+        identity_json = json.dumps(
+            {
+                "asset_ids": list(identity.asset_ids),
+                "event_id": identity.event_id,
+                "event_slug": identity.event_slug,
+                "market_ids": list(identity.market_ids),
+                "outcomes": list(identity.outcomes),
+                "resolution_utc": identity.resolution_utc.isoformat(),
+            },
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return MarketDiscovery(
+            market_identity_json=identity_json,
+            market_id=identity.event_id,
+            market_ids=identity.market_ids,
+            asset_ids=identity.asset_ids,
+            historical_depth="NOT_AVAILABLE_NOT_REQUIRED",
+        )
 
     async def reconcile_current_books(
         self,
@@ -394,6 +432,23 @@ class PolymarketRuntimeAdapter:
         else:
             self._stream_ready.set()
             await self._stream.run(asset_ids, queue)
+
+    async def stream_next(
+        self,
+        *,
+        asset_ids: tuple[str, ...],
+        queue: asyncio.Queue[SourceEvent],
+        ready_event: asyncio.Event,
+    ) -> None:
+        if self._stream_factory is None:
+            raise RuntimeError("RUNTIME_POLYMARKET_NEXT_STREAM_UNAVAILABLE")
+        stream = self._stream_factory()
+        parameters = inspect.signature(stream.run).parameters
+        if "ready_event" in parameters:
+            await stream.run(asset_ids, queue, ready_event=ready_event)
+        else:
+            ready_event.set()
+            await stream.run(asset_ids, queue)
 
     async def wait_stream_ready(self) -> None:
         await self._stream_ready.wait()

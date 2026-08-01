@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from aiohttp import WSMsgType, web
@@ -17,28 +19,82 @@ class FakeProviderServer:
         *,
         startup_barrier: asyncio.Event | None = None,
         initial_book_batch: bool = False,
+        enable_rollover: bool = False,
     ) -> None:
         self._runner: web.AppRunner | None = None
         self.port: int | None = None
         self.startup_barrier = startup_barrier
         self.initial_book_batch = initial_book_batch
+        self.enable_rollover = enable_rollover
         self.startup_barrier_reached = asyncio.Event()
         self.polymarket_connections = 0
         self.binance_connections = 0
         self.observed_subscriptions: list[dict] = []
         self.history_requests: list[dict[str, str]] = []
         self.external_requests = 0
+        self.gamma_requests = 0
         fixture = json.loads(
             Path("tests/fixtures/gamma_btc_daily_range.json").read_text(
                 encoding="utf-8"
             )
         )[0]
-        self.event = copy.deepcopy(fixture)
-        self.asset_ids = tuple(
+        current_resolution = (
+            datetime.now(timezone.utc) + timedelta(seconds=2)
+            if enable_rollover
+            else datetime.fromisoformat(
+                fixture["endDate"].replace("Z", "+00:00")
+            )
+        )
+        self.event = self._event_variant(
+            fixture,
+            suffix="current",
+            resolution=current_resolution,
+        )
+        self.next_event = self._event_variant(
+            fixture,
+            suffix="next",
+            resolution=current_resolution + timedelta(days=1),
+        )
+        self.later_event = self._event_variant(
+            fixture,
+            suffix="later",
+            resolution=current_resolution + timedelta(days=2),
+        )
+        self.asset_ids = self._asset_ids(self.event)
+        self.next_asset_ids = self._asset_ids(self.next_event)
+        self.later_asset_ids = self._asset_ids(self.later_event)
+        self.all_asset_ids = frozenset(
+            (*self.asset_ids, *self.next_asset_ids, *self.later_asset_ids)
+        )
+
+    @staticmethod
+    def _asset_ids(event: dict) -> tuple[str, ...]:
+        return tuple(
             asset_id
-            for market in self.event["markets"]
+            for market in event["markets"]
             for asset_id in json.loads(market["clobTokenIds"])
         )
+
+    @staticmethod
+    def _event_variant(
+        fixture: dict,
+        *,
+        suffix: str,
+        resolution: datetime,
+    ) -> dict:
+        event = copy.deepcopy(fixture)
+        event["id"] = f"btc-daily-range-{suffix}"
+        event["endDate"] = resolution.isoformat().replace("+00:00", "Z")
+        for index, market in enumerate(event["markets"]):
+            market["id"] = f"{suffix}-bucket-{index:02d}"
+            market["clobTokenIds"] = json.dumps(
+                [
+                    f"{suffix}-token-{index:02d}-yes",
+                    f"{suffix}-token-{index:02d}-no",
+                ],
+                separators=(",", ":"),
+            )
+        return event
 
     async def start(self) -> None:
         app = web.Application()
@@ -82,7 +138,13 @@ class FakeProviderServer:
         ):
             self.startup_barrier_reached.set()
             await self.startup_barrier.wait()
-        return web.json_response({"events": [self.event], "next_cursor": ""})
+        self.gamma_requests += 1
+        return web.json_response(
+            {
+                "events": [self.event, self.next_event, self.later_event],
+                "next_cursor": "",
+            }
+        )
 
     async def _binance_rest(self, request: web.Request) -> web.Response:
         start = int(request.query["startTime"])
@@ -110,7 +172,7 @@ class FakeProviderServer:
 
     async def _book(self, request: web.Request) -> web.Response:
         asset_id = request.query["token_id"]
-        if asset_id not in self.asset_ids:
+        if asset_id not in self.all_asset_ids:
             return web.json_response({"error": "unknown"}, status=404)
         return web.json_response(_book_payload(asset_id, "rest-book"))
 
@@ -134,18 +196,23 @@ class FakeProviderServer:
         self.polymarket_connections += 1
         subscription = await websocket.receive_json(timeout=5)
         self.observed_subscriptions.append(subscription)
-        if tuple(subscription.get("assets_ids", ())) != self.asset_ids:
+        subscribed_assets = tuple(subscription.get("assets_ids", ()))
+        if subscribed_assets not in (
+            self.asset_ids,
+            self.next_asset_ids,
+            self.later_asset_ids,
+        ):
             await websocket.close(code=1008, message=b"invalid assets")
             return websocket
         suffix = str(self.polymarket_connections)
         if self.initial_book_batch:
             initial_payload = [
                 _book_payload(asset_id, f"ws-book-{suffix}-{index:02d}")
-                for index, asset_id in enumerate(self.asset_ids)
+                for index, asset_id in enumerate(subscribed_assets)
             ]
         else:
             initial_payload = _book_payload(
-                self.asset_ids[0],
+                subscribed_assets[0],
                 f"ws-book-{suffix}",
             )
         await websocket.send_json(initial_payload)

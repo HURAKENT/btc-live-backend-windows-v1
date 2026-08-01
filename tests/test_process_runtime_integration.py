@@ -162,6 +162,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.server = FakeProviderServer(
             startup_barrier=self.startup_barrier,
             initial_book_batch=True,
+            enable_rollover=True,
         )
         await self.server.start()
         self.api_port = self._free_port()
@@ -217,16 +218,18 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         })
         self.assertIsNone(first.poll())
         await self._wait_for_polymarket_reconnect()
+        await self._wait_for_rollover()
 
         counts_before = self._database_counts()
-        self.assertEqual(counts_before["market_catalog"], 1)
+        self.assertEqual(counts_before["market_catalog"], 2)
         self.assertGreater(counts_before["source_events"], 0)
         self.assertGreater(counts_before["canonical_state"], 0)
         self.assertGreater(counts_before["strategy_evaluations"], 0)
         self.assertGreater(counts_before["signals"], 0)
         self.assertGreater(counts_before["outbox_events"], 0)
         self.assertEqual(counts_before["duplicate_natural_keys"], 0)
-        self.assertEqual(len(self.server.history_requests), 22)
+        self.assertEqual(len(self.server.history_requests), 44)
+        self.assertEqual(counts_before["c3_rollover_pass"], 1)
 
         second = self._spawn()
         second_exit = await asyncio.to_thread(second.wait, 10)
@@ -266,7 +269,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(restarted_health["status"], "PASS")
         self.assertEqual(
             len(self.server.history_requests),
-            22,
+            44,
             "same-DB restart must use persisted per-asset history cursors",
         )
         self.assertEqual(
@@ -286,9 +289,10 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
             all(process.poll() is not None for process in self.processes)
         )
         restarted_counts = self._database_counts()
-        self.assertEqual(restarted_counts["market_catalog"], 1)
+        self.assertEqual(restarted_counts["market_catalog"], 2)
         self.assertEqual(restarted_counts["duplicate_natural_keys"], 0)
         self.assertEqual(restarted_counts["c2_recovery_pass"], 2)
+        self.assertEqual(restarted_counts["c3_rollover_pass"], 1)
         self.assertGreaterEqual(
             restarted_counts["strategy_evaluations"],
             first_counts["strategy_evaluations"],
@@ -361,6 +365,7 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
         server = FakeProviderServer()
         self.assertIsNone(server.startup_barrier)
         self.assertFalse(server.initial_book_batch)
+        self.assertFalse(server.enable_rollover)
 
     async def _wait_for_polymarket_reconnect(self):
         deadline = time.monotonic() + 10
@@ -369,6 +374,14 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 return
             await asyncio.sleep(0.05)
         self.fail("Polymarket stream did not reconnect")
+
+    async def _wait_for_rollover(self):
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if self._database_counts()["c3_rollover_pass"] == 1:
+                return
+            await asyncio.sleep(0.05)
+        self.fail("C3 market rollover did not complete")
 
     async def _read_outbox_replay(self):
         url = f"http://127.0.0.1:{self.api_port}/ws/v1/events?after_event_id=0"
@@ -435,6 +448,10 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 WHERE incident_key LIKE 'c2-recovery:%'
                   AND status = 'C2_RECOVERY_HARDENING_PASS'
                 """
+            ).fetchone()[0]
+            result["c3_rollover_pass"] = connection.execute(
+                "SELECT COUNT(*) FROM incidents "
+                "WHERE status = 'C3_MARKET_ROLLOVER_PASS'"
             ).fetchone()[0]
             return result
         finally:

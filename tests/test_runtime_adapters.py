@@ -226,6 +226,51 @@ class RuntimeAdapterTests(unittest.IsolatedAsyncioTestCase):
             [recovered],
         )
 
+    async def test_discover_market_pair_preserves_current_next_order(self):
+        from src.market_rollover import MarketPair
+        from src.runtime_adapters import MarketDiscoveryPair
+
+        current = self._identity()
+        next_identity = self._identity(
+            event_id="event-2",
+            day=31,
+            prefix="next",
+        )
+
+        def discover_pair(_payload, *, now_utc):
+            return MarketPair(current=current, next=next_identity)
+
+        adapter = self._polymarket(discover_pair=discover_pair)
+        pair = await adapter.discover_market_pair()
+
+        self.assertIs(type(pair), MarketDiscoveryPair)
+        self.assertEqual(pair.current.market_id, "event-1")
+        self.assertEqual(pair.next.market_id, "event-2")
+        self.assertEqual(len(pair.current.asset_ids), 22)
+        self.assertEqual(len(pair.next.asset_ids), 22)
+
+    async def test_discover_market_pair_rejects_incomplete_next(self):
+        from src.market_rollover import MarketPair
+
+        current = self._identity()
+        next_identity = self._identity(
+            event_id="event-2",
+            day=31,
+            prefix="next",
+        )
+
+        def discover_pair(_payload, *, now_utc):
+            pair = MarketPair(current=current, next=next_identity)
+            object.__setattr__(pair.next, "asset_ids", pair.next.asset_ids[:-1])
+            return pair
+
+        adapter = self._polymarket(discover_pair=discover_pair)
+        with self.assertRaisesRegex(
+            ValueError,
+            "RUNTIME_POLYMARKET_INCOMPLETE_MARKET_IDENTITY",
+        ):
+            await adapter.discover_market_pair()
+
     def test_runtime_adapter_module_has_no_auth_order_or_wallet_surface(self):
         import inspect
         import src.runtime_adapters as module
@@ -234,15 +279,26 @@ class RuntimeAdapterTests(unittest.IsolatedAsyncioTestCase):
         for token in ("authorization", "private_key", "place_order", "wallet"):
             self.assertNotIn(token, source)
 
-    def _identity(self):
+    def _identity(
+        self,
+        *,
+        event_id="event-1",
+        day=30,
+        prefix="",
+    ):
+        value_prefix = f"{prefix}-" if prefix else ""
         return MarketIdentity(
-            event_id="event-1",
-            event_slug="bitcoin-price-on-2026-07-30",
+            event_id=event_id,
+            event_slug=f"bitcoin-price-on-2026-07-{day:02d}",
             active=True,
-            resolution_utc=datetime(2026, 7, 30, tzinfo=timezone.utc),
-            market_ids=tuple(f"market-{index}" for index in range(11)),
+            resolution_utc=datetime(2026, 7, day, tzinfo=timezone.utc),
+            market_ids=tuple(
+                f"{value_prefix}market-{index}" for index in range(11)
+            ),
             outcomes=tuple(f"range-{index}" for index in range(11)),
-            asset_ids=tuple(f"asset-{index}" for index in range(22)),
+            asset_ids=tuple(
+                f"{value_prefix}asset-{index}" for index in range(22)
+            ),
         )
 
     def _books(self, asset_ids):
@@ -276,6 +332,7 @@ class RuntimeAdapterTests(unittest.IsolatedAsyncioTestCase):
         fetch=None,
         history=None,
         close=None,
+        discover_pair=None,
     ):
         identity = identity or self._identity()
         books = self._books(identity.asset_ids) if books is None else books
@@ -302,6 +359,11 @@ class RuntimeAdapterTests(unittest.IsolatedAsyncioTestCase):
             fetch_books=fetch or fetch_default,
             history=history or history_default,
             close_session=close,
+            **(
+                {}
+                if discover_pair is None
+                else {"discover_pair": discover_pair}
+            ),
         )
 
 

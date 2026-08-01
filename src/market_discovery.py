@@ -200,3 +200,40 @@ def discover_active_btc_daily_range(
     ) != 1:
         raise ValueError("AMBIGUOUS_BTC_DAILY_RANGE")
     return candidates[0]
+
+
+def discover_btc_daily_range_candidates(
+    payload: list[dict[str, Any]],
+    *,
+    now_utc: datetime,
+) -> tuple[MarketIdentity, ...]:
+    _require_type(payload, list, "payload")
+    if not isinstance(now_utc, datetime) or now_utc.tzinfo is None:
+        raise ValueError("INVALID_DISCOVERY_CLOCK")
+    now_utc = now_utc.astimezone(timezone.utc)
+
+    by_event_id: dict[str, MarketIdentity | None] = {}
+    for index, event in enumerate(payload):
+        _require_type(event, dict, f"payload[{index}]")
+        event_id = _require_type(event.get("id"), str, f"payload[{index}].id")
+        candidate = _candidate_identity(event, now_utc=now_utc)
+        if event_id in by_event_id:
+            if by_event_id[event_id] != candidate:
+                raise ValueError("MARKET_ROLLOVER_IDENTITY_CONFLICT")
+            continue
+        by_event_id[event_id] = candidate
+
+    candidates = sorted(
+        (
+            candidate
+            for candidate in by_event_id.values()
+            if candidate is not None
+        ),
+        key=lambda candidate: (
+            candidate.resolution_utc,
+            candidate.event_id,
+        ),
+    )
+    if not candidates:
+        raise ValueError("BTC_DAILY_RANGE_DATA_GAP")
+    return tuple(candidates)
