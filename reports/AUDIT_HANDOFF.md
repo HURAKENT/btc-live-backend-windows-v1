@@ -473,3 +473,44 @@ The exact next permissible step is an independent audit of Task 1 in ChatGPT Pro
 - No public provider request or Task 14 run occurred. C3 and C4 were not
   started in this report. Registry execution, authentication, orders, paper
   fills, wallet/signing and trading approval remain zero/false.
+
+## C3 Deterministic Market Rollover
+
+- Implementation commit:
+  `cec9e29255a207859006dfdffbc27aa140f273ad`; gate:
+  `C3_MARKET_ROLLOVER_PASS`.
+- Strict current/next discovery validates each complete 11-market/22-asset
+  identity, accepts only exact duplicate replay, rejects conflicting identity
+  and equal-resolution ambiguity, and preserves deterministic resolution
+  order.
+- The next subscription buffers independently while the current market remains
+  live. All next books and per-asset history validate before any next-market
+  write. An incomplete next market records `ROLLOVER_BLOCKED`, commits zero next
+  source rows and leaves current `LIVE_READY`.
+- Successful cutover persists
+  `NEXT_DISCOVERED → NEXT_BUFFERING → NEXT_RECONCILED → CUTOVER_COMMITTED → CURRENT_LIVE`,
+  switches the projector only after complete reconciliation, cancels the old
+  subscription, promotes the next stream and retains exactly one active
+  subscription and one SQLite writer consumer.
+- Independent review found and corrected two load-bearing defects with RED
+  tests: production expiry waiting initially targeted the next resolution
+  instead of current resolution; promoted live events initially remained in
+  the retired buffer instead of reaching the writer/projection path.
+- Loopback Windows process integration proves 11/22 initial readiness, a
+  22-asset rollover, 44 total initial/history requests, two immutable market
+  identities, post-cutover live ingress, unique increasing outbox IDs, second
+  instance exit 20, graceful stops, and same-database restart with zero added
+  history requests and zero duplicate natural keys.
+- Final pre-evidence verification passed 63 focused tests and the 615-test full
+  suite with one documented conditional skip. The canonical Windows Offline
+  launcher returned 0; `compileall` and `pip check` passed.
+- Historical C1 artifact SHA-256 values remain
+  `f3f331e23c6e011220bae0fcf70fc6ae0bb6322264065458ae6a08d27a8618cc`,
+  `ddde9d856ae6a03d28be01a445ca69aadcdff0e1a9f8d0cb09102d59228d3eef`
+  and `9f6eaa9015f0698313c950571ae5f76be3f9c9d4327a461c4d504e8594b81a4f`.
+- Public provider requests and Task 14 runs remain zero. C4, Registry execution,
+  authentication, orders, paper fills, wallet/signing and trading approval
+  remain zero/false.
+- The final report/pack verification adds ten offline contract tests; the final
+  suite therefore contains 625 passing tests with one documented skip. Combined
+  gate: `BTC_LIVE_BACKEND_WINDOWS_V1_C2_C3_PASS`.

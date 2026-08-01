@@ -1,0 +1,80 @@
+{
+  "evidence_basis": "DETERMINISTIC_OFFLINE_AND_LOOPBACK",
+  "gate": "C3_MARKET_ROLLOVER_PASS",
+  "generated_at_utc": "2026-08-01T13:46:10Z",
+  "limitations": [
+    "C3 proves deterministic market rollover infrastructure; it does not authorize trading.",
+    "The gate used synthetic fixtures and loopback provider processes; no public provider request was required.",
+    "C4 and Registry execution were not started."
+  ],
+  "protected_c1_artifacts": {
+    "sha256": {
+      "artifacts/C1_ACCEPTANCE_PACK.zip": "9f6eaa9015f0698313c950571ae5f76be3f9c9d4327a461c4d504e8594b81a4f",
+      "reports/C1_DOWNTIME_ACCEPTANCE.json": "f3f331e23c6e011220bae0fcf70fc6ae0bb6322264065458ae6a08d27a8618cc",
+      "reports/C1_FINAL_ACCEPTANCE.json": "ddde9d856ae6a03d28be01a445ca69aadcdff0e1a9f8d0cb09102d59228d3eef"
+    },
+    "unchanged": true
+  },
+  "restart": {
+    "c3_pass_incidents": 1,
+    "duplicate_natural_keys": 0,
+    "initial_history_requests": 44,
+    "outbox_ids_unique_and_increasing": true,
+    "restart_history_requests_added": 0,
+    "same_database": true
+  },
+  "rollover": {
+    "active_subscription_count_after_cutover": 1,
+    "current_asset_count": 22,
+    "current_market_count": 11,
+    "identity_switched_after_reconciliation": true,
+    "invalid_next_keeps_current_live": true,
+    "invalid_next_rows_committed": 0,
+    "lifecycle": [
+      "NEXT_DISCOVERED",
+      "NEXT_BUFFERING",
+      "NEXT_RECONCILED",
+      "CUTOVER_COMMITTED",
+      "CURRENT_LIVE"
+    ],
+    "market_catalog_count": 2,
+    "next_asset_count": 22,
+    "next_current_book_count": 22,
+    "next_history_completed_assets": 22,
+    "next_market_count": 11,
+    "post_cutover_live_event_committed": true,
+    "writer_consumer_count": 1
+  },
+  "schema_version": "BTC_LIVE_BACKEND_WINDOWS_V1_C3_MARKET_ROLLOVER_ACCEPTANCE_V1",
+  "scope": {
+    "authentication": false,
+    "c4_started": false,
+    "external_provider_requests": 0,
+    "orders": 0,
+    "paper_fills": 0,
+    "registry_executions": 0,
+    "task14_runs": 0,
+    "wallet_or_signing": false
+  },
+  "source_commit": "cec9e29255a207859006dfdffbc27aa140f273ad",
+  "sqlite": {
+    "foreign_keys": 1,
+    "integrity_check": "ok",
+    "journal_mode": "wal",
+    "migration_version": 2,
+    "quick_check": "ok",
+    "synchronous": 2,
+    "table_count": 9
+  },
+  "status": "PASS",
+  "trading_approval": false,
+  "verification": {
+    "compileall_pass": true,
+    "documented_skips": 1,
+    "focused_tests": 63,
+    "full_suite_tests": 625,
+    "offline_launcher_exit": 0,
+    "pip_check_pass": true,
+    "process_integration_tests": 11
+  }
+}
