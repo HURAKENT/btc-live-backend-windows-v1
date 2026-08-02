@@ -221,8 +221,13 @@ class FakeRolloverPolymarketAdapter:
         self.next_assets = tuple(
             f"next-asset-{index}" for index in range(22)
         )
+        self.later_assets = tuple(
+            f"later-asset-{index}" for index in range(22)
+        )
         self.current = self._discovery("current-event", self.current_assets)
         self.next = self._discovery("next-event", self.next_assets)
+        self.later = self._discovery("later-event", self.later_assets)
+        self.pair_calls = 0
         self.incomplete_next = incomplete_next
         self.current_ready = __import__("asyncio").Event()
         self.current_cancelled = False
@@ -262,7 +267,10 @@ class FakeRolloverPolymarketAdapter:
         )
 
     async def discover_market_pair(self):
-        return MarketDiscoveryPair(current=self.current, next=self.next)
+        self.pair_calls += 1
+        if self.pair_calls == 1:
+            return MarketDiscoveryPair(current=self.current, next=self.next)
+        return MarketDiscoveryPair(current=self.next, next=self.later)
 
     async def reconcile_current_books(self, discovery):
         count = (
@@ -311,7 +319,7 @@ class FakeRolloverPolymarketAdapter:
                 "next-event:live",
                 "POLYMARKET_BOOK",
                 180_001,
-                asset_id=self.next_assets[0],
+                asset_id=asset_ids[0],
             )
         )
         try:
@@ -342,8 +350,14 @@ class RuntimeRolloverTests(unittest.IsolatedAsyncioTestCase):
         self.temp.cleanup()
 
     def _runtime(self, polymarket):
+        rollover_count = 0
+        later_cycle = __import__("asyncio").Event()
+
         async def immediate_rollover(_discovery):
-            return None
+            nonlocal rollover_count
+            rollover_count += 1
+            if rollover_count > 1:
+                await later_cycle.wait()
 
         return C1RuntimeOrchestrator(
             run_id="c3-rollover-run",

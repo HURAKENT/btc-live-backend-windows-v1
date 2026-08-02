@@ -637,6 +637,57 @@ class SqliteStore:
                 self._connection.rollback()
             raise
 
+    def latest_committed_rollover_identity(self) -> dict[str, str] | None:
+        row = self._connection.execute(
+            """
+            SELECT payload_json
+            FROM incidents
+            WHERE status = 'CUTOVER_COMMITTED'
+            ORDER BY incident_id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return None
+        payload = _decode_stored_json(row[0])
+        if (
+            type(payload) is not dict
+            or payload.get("record_type") != "MARKET_ROLLOVER_STATE"
+            or payload.get("state") != "CUTOVER_COMMITTED"
+            or type(payload.get("market_id")) is not str
+            or not payload["market_id"]
+            or type(payload.get("market_identity_sha256")) is not str
+            or len(payload["market_identity_sha256"]) != 64
+        ):
+            raise ValueError("INVALID_DURABLE_ROLLOVER_COMMIT")
+        market = self._connection.execute(
+            """
+            SELECT payload_json, payload_sha256
+            FROM market_catalog
+            WHERE market_id = ?
+            """,
+            (payload["market_id"],),
+        ).fetchone()
+        if market is None:
+            raise ValueError("DURABLE_ROLLOVER_MARKET_MISSING")
+        identity_json = _canonical_json(
+            market[0], "INVALID_MARKET_IDENTITY_JSON"
+        )
+        identity_sha256 = hashlib.sha256(
+            identity_json.encode("utf-8")
+        ).hexdigest()
+        if (
+            market[0] != identity_json
+            or market[1] != identity_sha256
+            or payload["market_identity_sha256"] != identity_sha256
+        ):
+            raise ValueError("DURABLE_ROLLOVER_IDENTITY_CONFLICT")
+        return {
+            "market_id": payload["market_id"],
+            "market_identity_json": identity_json,
+            "market_identity_sha256": identity_sha256,
+        }
+
     def append_lifecycle_state(
         self,
         *,

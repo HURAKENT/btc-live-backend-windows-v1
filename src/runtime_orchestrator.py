@@ -112,13 +112,40 @@ class _LiveIngress:
 
 
 class _NextPolymarketIngress:
-    __slots__ = ("_owner",)
+    __slots__ = ("_discovery", "_owner", "_state")
 
-    def __init__(self, owner: C1RuntimeOrchestrator) -> None:
+    def __init__(
+        self,
+        owner: C1RuntimeOrchestrator,
+        discovery: MarketDiscovery,
+    ) -> None:
         self._owner = owner
+        self._discovery = discovery
+        self._state = "BUFFERING"
+
+    @property
+    def promoted(self) -> bool:
+        return self._state == "PROMOTED"
+
+    def promote(self) -> None:
+        if self._state != "BUFFERING":
+            raise RuntimeError("INVALID_NEXT_INGRESS_PROMOTION")
+        self._state = "PROMOTED"
+
+    def retire(self) -> None:
+        if self._state == "PROMOTED":
+            self._state = "RETIRED"
 
     async def put(self, event: SourceEvent) -> None:
-        await self._owner._ingest_next_polymarket(event)
+        if self._state == "PROMOTED":
+            await self._owner._ingest_live("polymarket", event)
+            return
+        if self._state == "RETIRED":
+            raise RuntimeError("RETIRED_POLYMARKET_INGRESS")
+        await self._owner._ingest_next_polymarket(
+            event,
+            self._discovery,
+        )
 
 
 class C1RuntimeOrchestrator:
@@ -255,10 +282,13 @@ class C1RuntimeOrchestrator:
         self._rollover_lifecycle = MarketRolloverLifecycle()
         self._rollover_summary: C3RolloverSummary | None = None
         self._rollover_blocker: str | None = None
-        self._rollover_committed = False
+        self._first_rollover_done = asyncio.Event()
+        self._first_rollover_error: str | None = None
+        self._rollover_cycle_count = 0
         self._current_discovery: MarketDiscovery | None = None
         self._next_discovery: MarketDiscovery | None = None
         self._next_market: MarketReconciliation | None = None
+        self._current_rollover_ingress: _NextPolymarketIngress | None = None
         self._next_live_buffer: list[SourceEvent] = []
         self._next_progress = asyncio.Event()
         self._next_stream_error: BaseException | None = None
@@ -369,6 +399,7 @@ class C1RuntimeOrchestrator:
                 pair = await discover_pair()
                 if type(pair) is not MarketDiscoveryPair:
                     raise ValueError("INVALID_RUNTIME_MARKET_PAIR")
+                pair = await self._restore_committed_rollover_pair(pair)
                 discovery = pair.current
                 self._current_discovery = pair.current
                 self._next_discovery = pair.next
@@ -679,9 +710,11 @@ class C1RuntimeOrchestrator:
         task = self._tasks.get("market_rollover")
         if task is None:
             raise RuntimeError("C3_ROLLOVER_NOT_ENABLED")
-        await asyncio.shield(task)
-        if self._rollover_blocker is not None:
-            raise RuntimeError(f"ROLLOVER_BLOCKED:{self._rollover_blocker}")
+        await self._first_rollover_done.wait()
+        if self._first_rollover_error is not None:
+            raise RuntimeError(
+                f"ROLLOVER_BLOCKED:{self._first_rollover_error}"
+            )
 
     async def wait_for_source_idle(self) -> None:
         await asyncio.sleep(0)
@@ -762,15 +795,14 @@ class C1RuntimeOrchestrator:
         result = await self._submit_source(event)
         self._mark_live_evidence(source, result)
 
-    async def _ingest_next_polymarket(self, event: SourceEvent) -> None:
-        if self._rollover_committed:
-            await self._ingest_live("polymarket", event)
-            return
-        discovery = self._next_discovery
+    async def _ingest_next_polymarket(
+        self,
+        event: SourceEvent,
+        discovery: MarketDiscovery,
+    ) -> None:
         if type(event) is not SourceEvent or event.source != "polymarket":
             raise ValueError("INVALID_NEXT_POLYMARKET_LIVE_EVENT")
-        if discovery is None:
-            raise RuntimeError("NEXT_MARKET_DISCOVERY_REQUIRED")
+        self._validate_market_discovery(discovery)
         try:
             asset_id = json.loads(event.payload_json).get("asset_id")
         except (json.JSONDecodeError, AttributeError):
@@ -783,140 +815,183 @@ class C1RuntimeOrchestrator:
         self._next_progress.set()
 
     async def _run_market_rollover(self) -> None:
-        try:
-            discovery = self._next_discovery
-            current_discovery = self._current_discovery
-            if discovery is None or current_discovery is None:
-                raise RuntimeError("NEXT_MARKET_DISCOVERY_REQUIRED")
-            await self._rollover_wait(current_discovery)
-            await self._rollover_transition("NEXT_DISCOVERED")
+        while not self._stopping:
+            try:
+                cycle = await self._run_market_rollover_cycle()
+                self._rollover_summary = C3RolloverSummary(
+                    status="C3_MARKET_ROLLOVER_PASS",
+                    old_market_identity_sha256=cycle["old_market_hash"],
+                    new_market_identity_sha256=cycle["new_market_hash"],
+                    market_count=len(cycle["market"].market_ids),
+                    asset_count=len(cycle["market"].asset_ids),
+                    current_book_count=len(cycle["market"].current_events),
+                    history_completed_asset_count=cycle["completed"],
+                    buffered_event_count=cycle["buffered_count"],
+                    drained_event_count=cycle["buffered_count"],
+                    active_subscription_count=1,
+                    writer_consumer_count=self.writer_consumer_count,
+                )
+                await self._append_rollover_incident(
+                    "C3_MARKET_ROLLOVER_PASS",
+                    self._rollover_summary.as_dict(),
+                )
+                self._rollover_cycle_count += 1
+                await self._refresh_market_pair(cycle["market"])
+                if self._rollover_cycle_count == 1:
+                    self._first_rollover_done.set()
+            except asyncio.CancelledError:
+                raise
+            except BaseException as error:
+                await self._block_rollover(str(error))
+                if not self._first_rollover_done.is_set():
+                    self._first_rollover_error = str(error)[:500]
+                    self._first_rollover_done.set()
+                return
 
-            ready = asyncio.Event()
-            stream_next = getattr(self._polymarket, "stream_next", None)
-            if not callable(stream_next):
-                raise RuntimeError("RUNTIME_POLYMARKET_NEXT_STREAM_UNAVAILABLE")
-            next_task = asyncio.create_task(
-                self._next_provider_stream(
-                    stream_next(
-                        asset_ids=discovery.asset_ids,
-                        queue=_NextPolymarketIngress(self),
-                        ready_event=ready,
-                    )
+    async def _run_market_rollover_cycle(self) -> dict[str, Any]:
+        discovery = self._next_discovery
+        current_discovery = self._current_discovery
+        if discovery is None or current_discovery is None:
+            raise RuntimeError("NEXT_MARKET_DISCOVERY_REQUIRED")
+        await self._rollover_wait(current_discovery)
+        await self._rollover_transition("NEXT_DISCOVERED")
+
+        self._next_live_buffer.clear()
+        self._next_progress.clear()
+        self._next_stream_error = None
+        ready = asyncio.Event()
+        stream_next = getattr(self._polymarket, "stream_next", None)
+        if not callable(stream_next):
+            raise RuntimeError("RUNTIME_POLYMARKET_NEXT_STREAM_UNAVAILABLE")
+        ingress = _NextPolymarketIngress(self, discovery)
+        next_task = asyncio.create_task(
+            self._next_provider_stream(
+                stream_next(
+                    asset_ids=discovery.asset_ids,
+                    queue=ingress,
+                    ready_event=ready,
                 ),
-                name=f"{self._run_id}:polymarket-next",
+                ingress,
+            ),
+            name=f"{self._run_id}:polymarket-next",
+        )
+        self._tasks["next_polymarket_stream"] = next_task
+        await asyncio.wait_for(
+            ready.wait(), timeout=self._stream_ready_timeout_seconds
+        )
+        if next_task.done():
+            raise RuntimeError("UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT")
+        await self._rollover_transition("NEXT_BUFFERING")
+
+        market = await self._polymarket.reconcile_current_books(discovery)
+        self._validate_market(market)
+        history_kwargs: dict[str, Any] = {
+            "start_ts": self._history_start_ts,
+            "end_ts": self._history_end_ts,
+        }
+        if "start_ts_by_asset" in inspect.signature(
+            self._polymarket.recover
+        ).parameters:
+            history_kwargs["start_ts_by_asset"] = (
+                resolve_polymarket_history_starts(
+                    asset_ids=market.asset_ids,
+                    read_cursor=self._store.read_source_cursor,
+                    floor_start_ts=self._history_start_ts,
+                    end_ts=self._history_end_ts,
+                )
             )
-            self._tasks["next_polymarket_stream"] = next_task
-            await asyncio.wait_for(
-                ready.wait(), timeout=self._stream_ready_timeout_seconds
-            )
+        history = tuple(
+            await self._polymarket.recover(market, **history_kwargs)
+        )
+        self._validate_rollover_events(market, history)
+        while not self._next_live_buffer:
             if next_task.done():
                 raise RuntimeError("UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT")
-            await self._rollover_transition("NEXT_BUFFERING")
-
-            market = await self._polymarket.reconcile_current_books(discovery)
-            self._validate_market(market)
-            history_kwargs: dict[str, Any] = {
-                "start_ts": self._history_start_ts,
-                "end_ts": self._history_end_ts,
-            }
-            if "start_ts_by_asset" in inspect.signature(
-                self._polymarket.recover
-            ).parameters:
-                history_kwargs["start_ts_by_asset"] = (
-                    resolve_polymarket_history_starts(
-                        asset_ids=market.asset_ids,
-                        read_cursor=self._store.read_source_cursor,
-                        floor_start_ts=self._history_start_ts,
-                        end_ts=self._history_end_ts,
-                    )
-                )
-            history = tuple(
-                await self._polymarket.recover(market, **history_kwargs)
+            self._next_progress.clear()
+            if self._next_live_buffer:
+                break
+            await asyncio.wait_for(
+                self._next_progress.wait(),
+                timeout=self._stream_ready_timeout_seconds,
             )
-            self._validate_rollover_events(market, history)
-            while not self._next_live_buffer:
-                if next_task.done():
-                    raise RuntimeError("UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT")
-                self._next_progress.clear()
-                if self._next_live_buffer:
-                    break
-                await asyncio.wait_for(
-                    self._next_progress.wait(),
-                    timeout=self._stream_ready_timeout_seconds,
-                )
-            buffered = tuple(self._next_live_buffer)
-            self._validate_rollover_events(market, buffered)
-            if next_task.done() or self._next_stream_error is not None:
-                raise RuntimeError("UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT")
-            await self._rollover_transition("NEXT_RECONCILED")
+        buffered = tuple(self._next_live_buffer)
+        self._validate_rollover_events(market, buffered)
+        if next_task.done() or self._next_stream_error is not None:
+            raise RuntimeError("UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT")
+        await self._rollover_transition("NEXT_RECONCILED")
 
-            old_market_hash = hashlib.sha256(
-                self._market.market_identity_json.encode("utf-8")
-            ).hexdigest()
-            await self._submit_write("MARKET_IDENTITY", market)
-            for event in (*history, *market.current_events):
-                await self._submit_source(event, authoritative_replay=True)
+        if self._market is None:
+            raise RuntimeError("CURRENT_MARKET_REQUIRED")
+        old_market_hash = hashlib.sha256(
+            self._market.market_identity_json.encode("utf-8")
+        ).hexdigest()
+        new_market_hash = hashlib.sha256(
+            market.market_identity_json.encode("utf-8")
+        ).hexdigest()
+        await self._submit_write("MARKET_IDENTITY", market)
+        for event in (*history, *market.current_events):
+            await self._submit_source(event, authoritative_replay=True)
+        await self._submit_write("SET_MARKET", market)
+        for event in market.current_events:
+            await self._submit_source(event, authoritative_replay=True)
+        for event in buffered:
+            await self._submit_source(event, authoritative_replay=True)
+        del self._next_live_buffer[: len(buffered)]
+        await self._submit_write(
+            "BUILD_SNAPSHOT",
+            {
+                "evaluation_origin": CURRENT_EVALUATION_ORIGIN,
+                "trigger_committed_after_live_ready": True,
+            },
+        )
+        self._next_market = market
+        self._market = market
+        await self._rollover_transition(
+            "CUTOVER_COMMITTED",
+            {
+                "market_id": market.market_id,
+                "market_identity_sha256": new_market_hash,
+                "previous_market_identity_sha256": old_market_hash,
+            },
+        )
+        ingress.promote()
+        pending = tuple(self._next_live_buffer)
+        self._next_live_buffer.clear()
+        for event in pending:
+            await self._submit_source(event, authoritative_replay=True)
 
-            await self._submit_write("SET_MARKET", market)
-            for event in market.current_events:
-                await self._submit_source(event, authoritative_replay=True)
-            for event in buffered:
-                await self._submit_source(event, authoritative_replay=True)
-            self._next_live_buffer.clear()
-            self._rollover_committed = True
-            await self._submit_write(
-                "BUILD_SNAPSHOT",
-                {
-                    "evaluation_origin": CURRENT_EVALUATION_ORIGIN,
-                    "trigger_committed_after_live_ready": True,
-                },
-            )
-            self._next_market = market
-            self._market = market
-            await self._rollover_transition("CUTOVER_COMMITTED")
+        current = self._tasks.get("polymarket_stream")
+        if self._current_rollover_ingress is not None:
+            self._current_rollover_ingress.retire()
+        if current is not None and not current.done():
+            current.cancel()
+            await asyncio.gather(current, return_exceptions=True)
+        self._tasks["polymarket_stream"] = next_task
+        self._tasks.pop("next_polymarket_stream", None)
+        self._current_rollover_ingress = ingress
+        await self._rollover_transition("CURRENT_LIVE")
 
-            current = self._tasks.get("polymarket_stream")
-            if current is not None and not current.done():
-                current.cancel()
-                await asyncio.gather(current, return_exceptions=True)
-            self._tasks["polymarket_stream"] = next_task
-            self._tasks.pop("next_polymarket_stream", None)
-            await self._rollover_transition("CURRENT_LIVE")
+        adapter_summary = getattr(
+            self._polymarket, "last_recovery_summary", None
+        )
+        completed = (
+            len(market.asset_ids)
+            if adapter_summary is None
+            else len(adapter_summary.completed_asset_ids)
+        )
+        return {
+            "buffered_count": len(buffered) + len(pending),
+            "completed": completed,
+            "market": market,
+            "new_market_hash": new_market_hash,
+            "old_market_hash": old_market_hash,
+        }
 
-            adapter_summary = getattr(
-                self._polymarket, "last_recovery_summary", None
-            )
-            completed = (
-                len(market.asset_ids)
-                if adapter_summary is None
-                else len(adapter_summary.completed_asset_ids)
-            )
-            new_market = hashlib.sha256(
-                market.market_identity_json.encode("utf-8")
-            ).hexdigest()
-            self._rollover_summary = C3RolloverSummary(
-                status="C3_MARKET_ROLLOVER_PASS",
-                old_market_identity_sha256=old_market_hash,
-                new_market_identity_sha256=new_market,
-                market_count=len(market.market_ids),
-                asset_count=len(market.asset_ids),
-                current_book_count=len(market.current_events),
-                history_completed_asset_count=completed,
-                buffered_event_count=len(buffered),
-                drained_event_count=len(buffered),
-                active_subscription_count=1,
-                writer_consumer_count=self.writer_consumer_count,
-            )
-            await self._append_rollover_incident(
-                "C3_MARKET_ROLLOVER_PASS",
-                self._rollover_summary.as_dict(),
-            )
-        except asyncio.CancelledError:
-            raise
-        except BaseException as error:
-            await self._block_rollover(str(error))
-
-    async def _next_provider_stream(self, operation: Any) -> None:
+    async def _next_provider_stream(
+        self,
+        operation: Any,
+        ingress: _NextPolymarketIngress,
+    ) -> None:
         try:
             await operation
             if not self._stopping:
@@ -929,17 +1004,83 @@ class C1RuntimeOrchestrator:
             self._next_stream_error = error
         finally:
             self._next_progress.set()
-            if self._rollover_committed and not self._stopping:
+            if ingress.promoted and not self._stopping:
                 await self._fail(
                     f"POLYMARKET_STREAM_FAILED: {self._next_stream_error}",
                     source="polymarket",
                 )
 
-    async def _rollover_transition(self, state: str) -> None:
+    async def _restore_committed_rollover_pair(
+        self,
+        pair: MarketDiscoveryPair,
+    ) -> MarketDiscoveryPair:
+        committed = self._store.latest_committed_rollover_identity()
+        if committed is None:
+            return pair
+        if self._discovery_matches_commit(pair.current, committed):
+            return pair
+        if not self._discovery_matches_commit(pair.next, committed):
+            raise RuntimeError("DURABLE_ROLLOVER_IDENTITY_CONFLICT")
+        refreshed = await self._polymarket.discover_market_pair()
+        if type(refreshed) is not MarketDiscoveryPair:
+            raise ValueError("INVALID_RUNTIME_MARKET_PAIR")
+        self._validate_market_discovery(refreshed.current)
+        self._validate_market_discovery(refreshed.next)
+        if not self._discovery_matches_commit(refreshed.current, committed):
+            raise RuntimeError("DURABLE_ROLLOVER_REFRESH_CONFLICT")
+        return refreshed
+
+    async def _refresh_market_pair(
+        self,
+        promoted: MarketReconciliation,
+    ) -> None:
+        pair = await self._polymarket.discover_market_pair()
+        if type(pair) is not MarketDiscoveryPair:
+            raise ValueError("INVALID_RUNTIME_MARKET_PAIR")
+        self._validate_market_discovery(pair.current)
+        self._validate_market_discovery(pair.next)
+        if (
+            pair.current.market_id != promoted.market_id
+            or pair.current.market_identity_json
+            != promoted.market_identity_json
+            or pair.current.market_ids != promoted.market_ids
+            or pair.current.asset_ids != promoted.asset_ids
+            or pair.current.historical_depth != promoted.historical_depth
+        ):
+            raise RuntimeError("ROLLOVER_REFRESH_CURRENT_IDENTITY_CONFLICT")
+        self._current_discovery = pair.current
+        self._next_discovery = pair.next
+
+    @staticmethod
+    def _discovery_matches_commit(
+        discovery: MarketDiscovery,
+        committed: dict[str, str],
+    ) -> bool:
+        return (
+            discovery.market_id == committed["market_id"]
+            and discovery.market_identity_json
+            == committed["market_identity_json"]
+            and hashlib.sha256(
+                discovery.market_identity_json.encode("utf-8")
+            ).hexdigest()
+            == committed["market_identity_sha256"]
+        )
+
+    async def _rollover_transition(
+        self,
+        state: str,
+        evidence: dict[str, Any] | None = None,
+    ) -> None:
         self._rollover_lifecycle.transition(state)
+        payload: dict[str, Any] = {
+            "record_type": "MARKET_ROLLOVER_STATE",
+            "state": state,
+        }
+        if evidence is not None:
+            payload.update(evidence)
         await self._append_rollover_incident(
             state,
-            {"record_type": "MARKET_ROLLOVER_STATE", "state": state},
+            payload,
         )
 
     async def _block_rollover(self, reason: str) -> None:
