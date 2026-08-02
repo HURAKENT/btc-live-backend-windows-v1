@@ -641,12 +641,12 @@ def default_command_specs(python_executable: str, source_commit: str) -> tuple[C
         CommandSpec(
             "focused_tests",
             (python_executable, "-m", "unittest", "-v", *focused),
-            expected_test_count=98,
+            expected_test_count=100,
         ),
         CommandSpec(
             "full_offline_tests",
             (python_executable, "-m", "unittest", "discover", "-s", "tests", "-v"),
-            expected_test_count=639,
+            expected_test_count=642,
         ),
         CommandSpec("compileall", (python_executable, "-m", "compileall", "-q", "src", "tests", "tools", "run_backend.py")),
         CommandSpec("pip_check", (python_executable, "-m", "pip", "check")),

@@ -258,6 +258,175 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(self.runtime.status().live_ready)
 
+    async def test_next_stream_failure_before_commit_blocks_without_live_pass(
+        self,
+    ) -> None:
+        await self.runtime.stop()
+        self.adapter = FailingPromotedStreamAdapter()
+        rollover_gate = asyncio.Event()
+
+        async def controlled_wait(_discovery: MarketDiscovery) -> None:
+            await rollover_gate.wait()
+
+        self.runtime = _runtime(
+            run_id="phase0-precommit-stream-failure",
+            store=self.store,
+            adapter=self.adapter,
+            rollover_wait=controlled_wait,
+        )
+        await self.runtime.start()
+        writer_paused = asyncio.Event()
+        release_writer = asyncio.Event()
+        submit_write = self.runtime._submit_write
+        pause_once = True
+
+        async def pause_precommit_write(
+            operation,
+            payload,
+            *,
+            allow_failed=False,
+        ):
+            nonlocal pause_once
+            if operation == "MARKET_IDENTITY" and pause_once:
+                pause_once = False
+                writer_paused.set()
+                await release_writer.wait()
+            return await submit_write(
+                operation,
+                payload,
+                allow_failed=allow_failed,
+            )
+
+        self.runtime._submit_write = pause_precommit_write
+        rollover_gate.set()
+        await asyncio.wait_for(writer_paused.wait(), timeout=10)
+        self.adapter.stream_failures[0].set()
+
+        async def wait_for_next_stream_exit() -> None:
+            while not self.runtime._tasks["next_polymarket_stream"].done():
+                await asyncio.sleep(0)
+
+        await asyncio.wait_for(wait_for_next_stream_exit(), timeout=10)
+        release_writer.set()
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT",
+        ):
+            await self.runtime.wait_rollover()
+        self.assertEqual(self.runtime.status().market_id, "a-event")
+        self.assertTrue(self.runtime.status().live_ready)
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM incidents WHERE status IN "
+                "('CUTOVER_COMMITTED', 'CURRENT_LIVE', "
+                "'C3_MARKET_ROLLOVER_PASS')"
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM incidents "
+                "WHERE status = 'ROLLOVER_BLOCKED'"
+            ),
+            1,
+        )
+
+    async def test_next_stream_failure_after_commit_never_installs_done_task(
+        self,
+    ) -> None:
+        await self.runtime.stop()
+        self.adapter = FailingPromotedStreamAdapter()
+        rollover_gate = asyncio.Event()
+
+        async def controlled_wait(_discovery: MarketDiscovery) -> None:
+            await rollover_gate.wait()
+
+        self.runtime = _runtime(
+            run_id="phase0-postcommit-stream-failure",
+            store=self.store,
+            adapter=self.adapter,
+            rollover_wait=controlled_wait,
+        )
+        await self.runtime.start()
+        old_current_task = self.runtime._tasks["polymarket_stream"]
+        cutover_return_paused = asyncio.Event()
+        release_cutover_return = asyncio.Event()
+        append_incident = self.runtime._append_rollover_incident
+
+        async def pause_after_durable_cutover(
+            status,
+            payload,
+            *,
+            severity="INFO",
+        ):
+            await append_incident(status, payload, severity=severity)
+            if status == "CUTOVER_COMMITTED":
+                cutover_return_paused.set()
+                await release_cutover_return.wait()
+
+        self.runtime._append_rollover_incident = pause_after_durable_cutover
+        rollover_gate.set()
+        await asyncio.wait_for(cutover_return_paused.wait(), timeout=10)
+        self.adapter.stream_failures[0].set()
+
+        async def wait_for_next_stream_exit() -> None:
+            while not self.runtime._tasks["next_polymarket_stream"].done():
+                await asyncio.sleep(0)
+
+        await asyncio.wait_for(wait_for_next_stream_exit(), timeout=10)
+        release_cutover_return.set()
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT",
+        ):
+            await self.runtime.wait_rollover()
+
+        self.assertIs(
+            self.runtime._tasks["polymarket_stream"],
+            old_current_task,
+        )
+        self.assertFalse(old_current_task.done())
+        self.assertEqual(self.runtime.status().market_id, "a-event")
+        self.assertTrue(self.runtime.status().live_ready)
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM incidents "
+                "WHERE status = 'CUTOVER_COMMITTED'"
+            ),
+            1,
+        )
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM incidents WHERE status IN "
+                "('CURRENT_LIVE', 'C3_MARKET_ROLLOVER_PASS')"
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM incidents "
+                "WHERE status = 'ROLLOVER_BLOCKED'"
+            ),
+            1,
+        )
+
+        await self.runtime.stop()
+        restarted_adapter = SanitizedABCRolloverAdapter()
+
+        async def do_not_roll_again(_discovery: MarketDiscovery) -> None:
+            await asyncio.Event().wait()
+
+        self.adapter = restarted_adapter
+        self.runtime = _runtime(
+            run_id="phase0-postcommit-restart",
+            store=self.store,
+            adapter=restarted_adapter,
+            rollover_wait=do_not_roll_again,
+        )
+        await self.runtime.start()
+        self.assertEqual(self.runtime.status().market_id, "b-event")
+
     async def test_stop_cancels_recurring_rollover_and_all_streams(self) -> None:
         await self.runtime.start()
         self.gates["a-event"].set()

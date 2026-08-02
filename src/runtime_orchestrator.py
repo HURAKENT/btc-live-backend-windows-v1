@@ -944,8 +944,8 @@ class C1RuntimeOrchestrator:
                 "trigger_committed_after_live_ready": True,
             },
         )
-        self._next_market = market
-        self._market = market
+        if next_task.done() or self._next_stream_error is not None:
+            raise RuntimeError("UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT")
         await self._rollover_transition(
             "CUTOVER_COMMITTED",
             {
@@ -954,7 +954,11 @@ class C1RuntimeOrchestrator:
                 "previous_market_identity_sha256": old_market_hash,
             },
         )
+        if next_task.done() or self._next_stream_error is not None:
+            raise RuntimeError("UNEXPECTED_NEXT_PROVIDER_STREAM_EXIT")
         ingress.promote()
+        self._next_market = market
+        self._market = market
         pending = tuple(self._next_live_buffer)
         self._next_live_buffer.clear()
         for event in pending:
