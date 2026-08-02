@@ -38,13 +38,10 @@ class FakeProviderServer:
                 encoding="utf-8"
             )
         )[0]
-        current_resolution = (
-            datetime.now(timezone.utc) + timedelta(seconds=2)
-            if enable_rollover
-            else datetime.fromisoformat(
-                fixture["endDate"].replace("Z", "+00:00")
-            )
+        current_resolution = datetime.fromisoformat(
+            fixture["endDate"].replace("Z", "+00:00")
         )
+        self._rollover_schedule_armed = False
         self.event = self._event_variant(
             fixture,
             suffix="current",
@@ -138,6 +135,7 @@ class FakeProviderServer:
         ):
             self.startup_barrier_reached.set()
             await self.startup_barrier.wait()
+        self._arm_rollover_schedule()
         self.gamma_requests += 1
         return web.json_response(
             {
@@ -145,6 +143,30 @@ class FakeProviderServer:
                 "next_cursor": "",
             }
         )
+
+    def _arm_rollover_schedule(self) -> None:
+        if not self.enable_rollover or self._rollover_schedule_armed:
+            return
+        current_resolution = self._rollover_now() + timedelta(seconds=2)
+        self.event = self._event_variant(
+            self.event,
+            suffix="current",
+            resolution=current_resolution,
+        )
+        self.next_event = self._event_variant(
+            self.next_event,
+            suffix="next",
+            resolution=current_resolution + timedelta(days=1),
+        )
+        self.later_event = self._event_variant(
+            self.later_event,
+            suffix="later",
+            resolution=current_resolution + timedelta(days=2),
+        )
+        self._rollover_schedule_armed = True
+
+    def _rollover_now(self) -> datetime:
+        return datetime.now(timezone.utc)
 
     async def _binance_rest(self, request: web.Request) -> web.Response:
         start = int(request.query["startTime"])

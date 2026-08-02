@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -152,6 +153,67 @@ class IntegrationEndpointContractTests(unittest.TestCase):
             "polymarket_clob_base_url": "http://127.0.0.1:49124/polymarket",
             "polymarket_websocket_url": "ws://127.0.0.1:49124/polymarket/ws",
         }
+
+
+class FakeProviderRolloverScheduleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rollover_schedule_arms_once_at_first_gamma_response(self):
+        clock_calls = 0
+
+        class ClockedFakeProviderServer(FakeProviderServer):
+            def _rollover_now(self):
+                nonlocal clock_calls
+                clock_calls += 1
+                return datetime(2035, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+
+        server = ClockedFakeProviderServer(enable_rollover=True)
+        initial_event_ids = (
+            server.event["id"],
+            server.next_event["id"],
+            server.later_event["id"],
+        )
+        initial_asset_ids = (
+            server.asset_ids,
+            server.next_asset_ids,
+            server.later_asset_ids,
+        )
+        self.assertEqual(clock_calls, 0)
+        self.assertEqual(server.event["endDate"], "2026-08-02T04:00:00Z")
+
+        await server.start()
+        try:
+            url = f"http://127.0.0.1:{server.port}/gamma/events/keyset"
+            async with ClientSession() as session:
+                async with session.get(url) as response:
+                    first_body = await response.read()
+                async with session.get(url) as response:
+                    second_body = await response.read()
+
+            self.assertEqual(clock_calls, 1)
+            self.assertEqual(first_body, second_body)
+            payload = json.loads(first_body)
+            events = payload["events"]
+            self.assertEqual(
+                tuple(event["endDate"] for event in events),
+                (
+                    "2035-01-02T03:04:07Z",
+                    "2035-01-03T03:04:07Z",
+                    "2035-01-04T03:04:07Z",
+                ),
+            )
+            self.assertEqual(
+                tuple(event["id"] for event in events),
+                initial_event_ids,
+            )
+            self.assertEqual(
+                (
+                    server.asset_ids,
+                    server.next_asset_ids,
+                    server.later_asset_ids,
+                ),
+                initial_asset_ids,
+            )
+        finally:
+            await server.close()
 
 
 class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
