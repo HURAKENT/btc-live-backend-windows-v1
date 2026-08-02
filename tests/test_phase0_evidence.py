@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -10,6 +11,7 @@ import unittest
 import warnings
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 
 class Phase0EvidenceTests(unittest.TestCase):
@@ -153,6 +155,172 @@ class Phase0EvidenceTests(unittest.TestCase):
                     "SHA256SUMS",
                 },
             )
+
+    def test_command_outputs_are_sanitized_and_bind_raw_and_stored_hashes(self) -> None:
+        from tools.phase0_evidence import _sanitize_output
+
+        windows_root = Path(
+            "/mnt/c/Users/gegos/Documents/Codex/btc_live_backend_windows_v1"
+        )
+        variants = (
+            b"C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\tests\n"
+            b"/mnt/c/Users/gegos/Documents/Codex/btc_live_backend_windows_v1/src\n"
+        )
+        sanitized_variants, variant_count = _sanitize_output(
+            variants,
+            root=windows_root,
+        )
+        self.assertEqual(variant_count, 2)
+        self.assertEqual(sanitized_variants.count(b"<PROJECT_ROOT>"), 2)
+
+        _, generate, verify = self.api()
+        (self.root / "sitecustomize.py").write_text(
+            (
+                "from pathlib import Path\n"
+                "import sys\n"
+                "print('root=' + str(Path.cwd()))\n"
+                "print('stderr-root=' + str(Path.cwd()), file=sys.stderr)\n"
+            ),
+            encoding="utf-8",
+        )
+        subprocess.run(
+            ["git", "-C", str(self.root), "add", "sitecustomize.py"],
+            check=True,
+        )
+        self._commit("test output hook")
+        self.commit = subprocess.run(
+            ["git", "-C", str(self.root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        with mock.patch.dict(
+            os.environ,
+            {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONPATH": str(self.root),
+            },
+        ):
+            result = generate(
+                root=self.root,
+                source_commit=self.commit,
+                harness_commit=self.commit,
+                command_specs=self.command_specs(),
+                historical_paths=("seed.txt",),
+                test_only=True,
+            )
+
+        receipt = json.loads(result.receipt_path.read_text(encoding="utf-8"))
+        report = json.loads(result.report_path.read_text(encoding="utf-8"))
+        first = receipt["commands"][0]
+        stdout = (self.root / first["stdout_path"]).read_text(encoding="utf-8")
+        stderr = (self.root / first["stderr_path"]).read_text(encoding="utf-8")
+        self.assertNotIn(str(self.root.resolve()), stdout + stderr)
+        self.assertEqual((stdout + stderr).count("<PROJECT_ROOT>"), 2)
+        self.assertEqual(first["stdout_sanitization_replacements"], 1)
+        self.assertEqual(first["stderr_sanitization_replacements"], 1)
+        self.assertEqual(
+            first["stdout_sha256"],
+            hashlib.sha256(stdout.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            first["stderr_sha256"],
+            hashlib.sha256(stderr.encode("utf-8")).hexdigest(),
+        )
+        self.assertNotEqual(first["raw_stdout_sha256"], first["stdout_sha256"])
+        self.assertNotEqual(first["raw_stderr_sha256"], first["stderr_sha256"])
+        self.assertEqual(
+            receipt["output_sanitization_policy"],
+            "EXACT_PROJECT_ROOT_REPLACEMENT_V1",
+        )
+        self.assertEqual(receipt["output_sanitization_replacement_count"], 10)
+        self.assertEqual(
+            report["output_sanitization_policy"],
+            receipt["output_sanitization_policy"],
+        )
+        self.assertEqual(report["output_sanitization_replacement_count"], 10)
+        self.assertEqual(
+            report["raw_output_commitment_sha256"],
+            receipt["raw_output_commitment_sha256"],
+        )
+        self.assertEqual(
+            report["stored_output_commitment_sha256"],
+            receipt["stored_output_commitment_sha256"],
+        )
+        with zipfile.ZipFile(result.pack_path) as archive:
+            packed = b"\n".join(archive.read(name) for name in archive.namelist())
+        self.assertNotIn(str(self.root.resolve()).encode("utf-8"), packed)
+        self.assertIn(b"<PROJECT_ROOT>", packed)
+        verify(result.report_path, root=self.root, verify_repository=False)
+
+    def test_verifier_rejects_residual_windows_or_wsl_user_paths(self) -> None:
+        _, _, verify = self.api()
+        result = self.generate_fixture()
+        original_receipt_bytes = result.receipt_path.read_bytes()
+        original_report_bytes = result.report_path.read_bytes()
+        original_outputs = {
+            path: (self.root / path).read_bytes()
+            for path in result.command_output_paths
+        }
+        residual_paths = (
+            r"C:\Users\gegos\Documents\Codex\btc_live_backend_windows_v1\tests",
+            "/mnt/c/Users/gegos/Documents/Codex/btc_live_backend_windows_v1/tests",
+        )
+        for residual in residual_paths:
+            with self.subTest(residual=residual):
+                result.receipt_path.write_bytes(original_receipt_bytes)
+                result.report_path.write_bytes(original_report_bytes)
+                for path, payload in original_outputs.items():
+                    (self.root / path).write_bytes(payload)
+                receipt = json.loads(original_receipt_bytes.decode("utf-8"))
+                report = json.loads(original_report_bytes.decode("utf-8"))
+                command = receipt["commands"][0]
+                output = (residual + "\nRan 7 tests\n").encode("utf-8")
+                (self.root / command["stdout_path"]).write_bytes(output)
+                command["stdout_sha256"] = hashlib.sha256(output).hexdigest()
+                self.resign_receipt(result, receipt, report)
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "PHASE0_UNSANITIZED_USER_PATH",
+                ):
+                    verify(
+                        result.report_path,
+                        root=self.root,
+                        verify_repository=False,
+                    )
+
+    def test_verifier_rejects_tampered_output_bindings_and_report_summary(self) -> None:
+        _, _, verify = self.api()
+        result = self.generate_fixture()
+        original_receipt = json.loads(result.receipt_path.read_text(encoding="utf-8"))
+        original_report = json.loads(result.report_path.read_text(encoding="utf-8"))
+
+        receipt = copy.deepcopy(original_receipt)
+        report = copy.deepcopy(original_report)
+        receipt["commands"][0]["raw_stdout_sha256"] = "0" * 64
+        self.resign_receipt(result, receipt, report)
+        with self.assertRaisesRegex(
+            ValueError,
+            "PHASE0_RAW_OUTPUT_COMMITMENT_MISMATCH",
+        ):
+            verify(result.report_path, root=self.root, verify_repository=False)
+
+        receipt = copy.deepcopy(original_receipt)
+        report = copy.deepcopy(original_report)
+        receipt["commands"][0]["stdout_sha256"] = "1" * 64
+        self.resign_receipt(result, receipt, report)
+        with self.assertRaisesRegex(ValueError, "COMMAND_OUTPUT_SHA256_MISMATCH"):
+            verify(result.report_path, root=self.root, verify_repository=False)
+
+        result.receipt_path.write_bytes(self.canonical_bytes(original_receipt))
+        report = copy.deepcopy(original_report)
+        report["output_sanitization_replacement_count"] += 1
+        report["receipt_sha256"] = hashlib.sha256(
+            result.receipt_path.read_bytes()
+        ).hexdigest()
+        result.report_path.write_bytes(self.canonical_bytes(report))
+        with self.assertRaisesRegex(ValueError, "PHASE0_REPORT_RECEIPT_MISMATCH"):
+            verify(result.report_path, root=self.root, verify_repository=False)
 
     def test_hand_edited_pass_or_output_cannot_verify(self) -> None:
         _, generate, verify = self.api()

@@ -41,6 +41,10 @@ PACK_MANIFEST = "MANIFEST.json"
 PACK_SHA256SUMS = "SHA256SUMS"
 _TEST_COUNT = re.compile(r"Ran (\d+) tests?")
 _HEX_64 = re.compile(r"[0-9a-f]{64}")
+_WINDOWS_USER_PATH = re.compile(r"(?i)[a-z]:[\\/]+users[\\/]")
+_WSL_USER_PATH = re.compile(r"(?i)/mnt/[a-z]/users/")
+OUTPUT_SANITIZATION_POLICY = "EXACT_PROJECT_ROOT_REPLACEMENT_V1"
+PROJECT_ROOT_PLACEHOLDER = "<PROJECT_ROOT>"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +89,83 @@ def _json_bytes(value: object) -> bytes:
 
 def _sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _project_root_variants(root: Path) -> tuple[str, ...]:
+    variants = {str(root), root.as_posix()}
+    posix = root.as_posix()
+    wsl_match = re.fullmatch(r"/mnt/([a-zA-Z])/(.+)", posix)
+    if wsl_match is not None:
+        drive = wsl_match.group(1)
+        tail = wsl_match.group(2)
+        variants.update(
+            {
+                f"{drive.upper()}:\\{tail.replace('/', chr(92))}",
+                f"{drive.lower()}:\\{tail.replace('/', chr(92))}",
+                f"{drive.upper()}:/{tail}",
+                f"{drive.lower()}:/{tail}",
+            }
+        )
+    windows_match = re.fullmatch(r"([a-zA-Z]):[\\/](.+)", str(root))
+    if windows_match is not None:
+        drive = windows_match.group(1)
+        tail = windows_match.group(2).replace("\\", "/")
+        variants.update(
+            {
+                f"{drive.upper()}:\\{tail.replace('/', chr(92))}",
+                f"{drive.lower()}:\\{tail.replace('/', chr(92))}",
+                f"{drive.upper()}:/{tail}",
+                f"{drive.lower()}:/{tail}",
+            }
+        )
+    return tuple(sorted(filter(None, variants), key=lambda value: (-len(value), value)))
+
+
+def _sanitize_output(payload: bytes, *, root: Path) -> tuple[bytes, int]:
+    text = payload.decode("utf-8", errors="replace")
+    replacements = 0
+    for variant in _project_root_variants(root):
+        count = text.count(variant)
+        if count:
+            text = text.replace(variant, PROJECT_ROOT_PLACEHOLDER)
+            replacements += count
+    sanitized = text.encode("utf-8")
+    _require_no_user_path(sanitized)
+    return sanitized, replacements
+
+
+def _require_no_user_path(payload: bytes) -> None:
+    text = payload.decode("utf-8", errors="replace")
+    if _WINDOWS_USER_PATH.search(text) or _WSL_USER_PATH.search(text):
+        raise ValueError("PHASE0_UNSANITIZED_USER_PATH")
+
+
+def _output_commitment(commands: Sequence[dict], *, raw: bool) -> str:
+    if raw:
+        fields = (
+            {
+                "name": item["name"],
+                "stderr_sha256": item["raw_stderr_sha256"],
+                "stdout_sha256": item["raw_stdout_sha256"],
+            }
+            for item in commands
+        )
+    else:
+        fields = (
+            {
+                "name": item["name"],
+                "stderr_sanitization_replacements": item[
+                    "stderr_sanitization_replacements"
+                ],
+                "stderr_sha256": item["stderr_sha256"],
+                "stdout_sanitization_replacements": item[
+                    "stdout_sanitization_replacements"
+                ],
+                "stdout_sha256": item["stdout_sha256"],
+            }
+            for item in commands
+        )
+    return _sha256(_json_bytes(list(fields)))
 
 
 def _git(root: Path, *args: str) -> str:
@@ -301,8 +382,16 @@ def generate_phase0_evidence(
         ended = datetime.now(timezone.utc)
         stdout_path = OUTPUT_DIRECTORY / f"{index:02d}-{spec.name}.stdout.txt"
         stderr_path = OUTPUT_DIRECTORY / f"{index:02d}-{spec.name}.stderr.txt"
-        stdout_bytes = bytes(result.stdout)
-        stderr_bytes = bytes(result.stderr)
+        raw_stdout_bytes = bytes(result.stdout)
+        raw_stderr_bytes = bytes(result.stderr)
+        stdout_bytes, stdout_replacements = _sanitize_output(
+            raw_stdout_bytes,
+            root=root,
+        )
+        stderr_bytes, stderr_replacements = _sanitize_output(
+            raw_stderr_bytes,
+            root=root,
+        )
         (root / stdout_path).write_bytes(stdout_bytes)
         (root / stderr_path).write_bytes(stderr_bytes)
         output_paths.extend((stdout_path.as_posix(), stderr_path.as_posix()))
@@ -312,7 +401,7 @@ def generate_phase0_evidence(
                 "PHASE0_COMMAND_DIRTIED_REPOSITORY:"
                 + ",".join(sorted(unexpected_dirt))
             )
-        combined = (stdout_bytes + b"\n" + stderr_bytes).decode(
+        combined = (raw_stdout_bytes + b"\n" + raw_stderr_bytes).decode(
             "utf-8", errors="replace"
         )
         matches = _TEST_COUNT.findall(combined)
@@ -330,10 +419,14 @@ def generate_phase0_evidence(
                 "exit_code": result.returncode,
                 "name": spec.name,
                 "expected_test_count": spec.expected_test_count,
+                "raw_stderr_sha256": _sha256(raw_stderr_bytes),
+                "raw_stdout_sha256": _sha256(raw_stdout_bytes),
                 "started_at_utc": started.isoformat().replace("+00:00", "Z"),
                 "stderr_path": stderr_path.as_posix(),
+                "stderr_sanitization_replacements": stderr_replacements,
                 "stderr_sha256": _sha256(stderr_bytes),
                 "stdout_path": stdout_path.as_posix(),
+                "stdout_sanitization_replacements": stdout_replacements,
                 "stdout_sha256": _sha256(stdout_bytes),
                 "test_count": test_count,
             }
@@ -346,6 +439,13 @@ def generate_phase0_evidence(
             raise ValueError(f"PHASE0_HISTORICAL_ARTIFACT_MISSING:{relative}")
         historical_hashes[relative] = _sha256(path.read_bytes())
     receipt_ended = datetime.now(timezone.utc)
+    replacement_count = sum(
+        item["stdout_sanitization_replacements"]
+        + item["stderr_sanitization_replacements"]
+        for item in command_receipts
+    )
+    raw_output_commitment = _output_commitment(command_receipts, raw=True)
+    stored_output_commitment = _output_commitment(command_receipts, raw=False)
     receipt = {
         "branch": branch,
         "clean_state_before": True,
@@ -356,17 +456,22 @@ def generate_phase0_evidence(
         "harness_commit": harness_commit,
         "historical_sha256": historical_hashes,
         "network_mode": "OFFLINE_COMMAND_ALLOWLIST",
+        "output_sanitization_policy": OUTPUT_SANITIZATION_POLICY,
+        "output_sanitization_replacement_count": replacement_count,
         "provider_network_observation": "NOT_PERFORMED",
         "public_provider_requests": "NOT_OBSERVED",
         "python_executable": python_executable,
         "registry_executions": "NOT_RUN_BY_EVIDENCE_HARNESS",
-        "schema_version": "BTC_DAILY_RANGE_PHASE0_COMMAND_RECEIPT_V1",
+        "raw_output_commitment_sha256": raw_output_commitment,
+        "schema_version": "BTC_DAILY_RANGE_PHASE0_COMMAND_RECEIPT_V2",
         "source_commit": source_commit,
         "started_at_utc": receipt_started.isoformat().replace("+00:00", "Z"),
+        "stored_output_commitment_sha256": stored_output_commitment,
         "task14_runs": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "trading_approval": False,
     }
     receipt_bytes = _json_bytes(receipt)
+    _require_no_user_path(receipt_bytes)
     receipt_path = root / RECEIPT_PATH
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_bytes(receipt_bytes)
@@ -380,19 +485,25 @@ def generate_phase0_evidence(
         "harness_commit": harness_commit,
         "historical_sha256": historical_hashes,
         "network_mode": "OFFLINE_COMMAND_ALLOWLIST",
+        "output_sanitization_policy": OUTPUT_SANITIZATION_POLICY,
+        "output_sanitization_replacement_count": replacement_count,
         "provider_network_observation": "NOT_PERFORMED",
         "public_provider_requests": "NOT_OBSERVED",
         "receipt_path": RECEIPT_PATH.as_posix(),
         "receipt_sha256": receipt_sha256,
+        "raw_output_commitment_sha256": raw_output_commitment,
         "registry_executions": "NOT_RUN_BY_EVIDENCE_HARNESS",
-        "schema_version": "BTC_DAILY_RANGE_PHASE0_ACCEPTED_BASELINE_V1",
+        "schema_version": "BTC_DAILY_RANGE_PHASE0_ACCEPTED_BASELINE_V2",
         "source_commit": source_commit,
         "status": "PASS",
+        "stored_output_commitment_sha256": stored_output_commitment,
         "task14_runs": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "trading_approval": False,
     }
     report_path = root / REPORT_PATH
-    report_path.write_bytes(_json_bytes(report))
+    report_bytes = _json_bytes(report)
+    _require_no_user_path(report_bytes)
+    report_path.write_bytes(report_bytes)
     pack_path = root / PACK_PATH
     _build_pack(
         root=root,
@@ -424,6 +535,7 @@ def verify_phase0_report(
     report = json.loads(report_bytes.decode("utf-8"))
     if report_bytes != _json_bytes(report):
         raise ValueError("NONCANONICAL_PHASE0_REPORT")
+    _require_no_user_path(report_bytes)
     receipt_path = root / report.get("receipt_path", "")
     if not receipt_path.is_file():
         raise ValueError("PHASE0_RECEIPT_MISSING")
@@ -433,6 +545,7 @@ def verify_phase0_report(
     receipt = json.loads(receipt_bytes.decode("utf-8"))
     if receipt_bytes != _json_bytes(receipt):
         raise ValueError("NONCANONICAL_PHASE0_RECEIPT")
+    _require_no_user_path(receipt_bytes)
     profile = receipt.get("contract_profile")
     python_executable = receipt.get("python_executable")
     source_commit = receipt.get("source_commit")
@@ -450,9 +563,11 @@ def verify_phase0_report(
     else:
         raise ValueError("INVALID_PHASE0_CONTRACT_PROFILE")
     if (
-        receipt.get("schema_version") != "BTC_DAILY_RANGE_PHASE0_COMMAND_RECEIPT_V1"
+        receipt.get("schema_version") != "BTC_DAILY_RANGE_PHASE0_COMMAND_RECEIPT_V2"
         or receipt.get("clean_state_before") is not True
         or receipt.get("network_mode") != "OFFLINE_COMMAND_ALLOWLIST"
+        or receipt.get("output_sanitization_policy")
+        != OUTPUT_SANITIZATION_POLICY
         or receipt.get("provider_network_observation") != "NOT_PERFORMED"
         or receipt.get("public_provider_requests") != "NOT_OBSERVED"
         or receipt.get("task14_runs") != "NOT_RUN_BY_EVIDENCE_HARNESS"
@@ -472,10 +587,14 @@ def verify_phase0_report(
         "exit_code",
         "expected_test_count",
         "name",
+        "raw_stderr_sha256",
+        "raw_stdout_sha256",
         "started_at_utc",
         "stderr_path",
+        "stderr_sanitization_replacements",
         "stderr_sha256",
         "stdout_path",
+        "stdout_sanitization_replacements",
         "stdout_sha256",
         "test_count",
     }
@@ -501,8 +620,21 @@ def verify_phase0_report(
             raise ValueError("FAILED_PHASE0_COMMAND_RECEIPT")
         for stream in ("stdout", "stderr"):
             path = root / item.get(f"{stream}_path", "")
-            if not path.is_file() or item.get(f"{stream}_sha256") != _sha256(path.read_bytes()):
+            if not path.is_file():
                 raise ValueError("COMMAND_OUTPUT_SHA256_MISMATCH")
+            output_bytes = path.read_bytes()
+            _require_no_user_path(output_bytes)
+            if item.get(f"{stream}_sha256") != _sha256(output_bytes):
+                raise ValueError("COMMAND_OUTPUT_SHA256_MISMATCH")
+            raw_sha256 = item.get(f"raw_{stream}_sha256")
+            replacements = item.get(f"{stream}_sanitization_replacements")
+            if (
+                type(raw_sha256) is not str
+                or _HEX_64.fullmatch(raw_sha256) is None
+                or type(replacements) is not int
+                or replacements < 0
+            ):
+                raise ValueError("INVALID_PHASE0_OUTPUT_SANITIZATION")
         combined = (
             (root / item["stdout_path"]).read_bytes()
             + b"\n"
@@ -517,6 +649,19 @@ def verify_phase0_report(
             and observed_count != spec.expected_test_count
         ):
             raise ValueError("PHASE0_EXPECTED_TEST_COUNT_MISMATCH")
+    replacement_count = sum(
+        item["stdout_sanitization_replacements"]
+        + item["stderr_sanitization_replacements"]
+        for item in commands
+    )
+    if receipt.get("output_sanitization_replacement_count") != replacement_count:
+        raise ValueError("PHASE0_SANITIZATION_COUNTER_MISMATCH")
+    raw_output_commitment = _output_commitment(commands, raw=True)
+    if receipt.get("raw_output_commitment_sha256") != raw_output_commitment:
+        raise ValueError("PHASE0_RAW_OUTPUT_COMMITMENT_MISMATCH")
+    stored_output_commitment = _output_commitment(commands, raw=False)
+    if receipt.get("stored_output_commitment_sha256") != stored_output_commitment:
+        raise ValueError("PHASE0_STORED_OUTPUT_COMMITMENT_MISMATCH")
     historical = receipt.get("historical_sha256")
     if type(historical) is not dict or set(historical) != set(
         required_historical
@@ -535,14 +680,18 @@ def verify_phase0_report(
         "harness_commit": receipt["harness_commit"],
         "historical_sha256": historical,
         "network_mode": "OFFLINE_COMMAND_ALLOWLIST",
+        "output_sanitization_policy": OUTPUT_SANITIZATION_POLICY,
+        "output_sanitization_replacement_count": replacement_count,
         "provider_network_observation": "NOT_PERFORMED",
         "public_provider_requests": "NOT_OBSERVED",
         "receipt_path": RECEIPT_PATH.as_posix(),
         "receipt_sha256": _sha256(receipt_bytes),
+        "raw_output_commitment_sha256": raw_output_commitment,
         "registry_executions": "NOT_RUN_BY_EVIDENCE_HARNESS",
-        "schema_version": "BTC_DAILY_RANGE_PHASE0_ACCEPTED_BASELINE_V1",
+        "schema_version": "BTC_DAILY_RANGE_PHASE0_ACCEPTED_BASELINE_V2",
         "source_commit": receipt["source_commit"],
         "status": "PASS",
+        "stored_output_commitment_sha256": stored_output_commitment,
         "task14_runs": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "trading_approval": False,
     }
@@ -646,7 +795,7 @@ def default_command_specs(python_executable: str, source_commit: str) -> tuple[C
         CommandSpec(
             "full_offline_tests",
             (python_executable, "-m", "unittest", "discover", "-s", "tests", "-v"),
-            expected_test_count=643,
+            expected_test_count=646,
         ),
         CommandSpec("compileall", (python_executable, "-m", "compileall", "-q", "src", "tests", "tools", "run_backend.py")),
         CommandSpec("pip_check", (python_executable, "-m", "pip", "check")),
