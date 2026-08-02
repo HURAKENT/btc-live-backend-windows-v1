@@ -39,3 +39,14 @@ Date: 2026-08-02
 
 Decision: C11 uses a durable observer and 48 actual valid hours. Synthetic time
 may test the controller but cannot satisfy the observation gate.
+
+## D-006 — Source discovery is not C4 completion
+
+Date: 2026-08-02
+
+Decision: the bounded local search located hash-matching exact source lineage for
+34 V1 and 13 V2 identities. This closes the missing-source search risk only.
+No identity advances to `RULE_SPEC_FROZEN`, `EVALUATOR_IMPLEMENTED` or a parity
+status until the minimum verified artifacts are copied, specified and replayed
+inside the backend repository. Ancillary manifest mismatches are preserved as
+risks and are never silently substituted.

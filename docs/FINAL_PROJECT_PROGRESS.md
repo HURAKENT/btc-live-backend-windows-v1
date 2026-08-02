@@ -35,7 +35,21 @@
 - [ ] C11 actual 48-hour observation.
 - [ ] Final acceptance pack and terminal closure.
 
+## C4 source-discovery preparation
+
+- Bounded local search completed read-only while Phase 0 corrections were
+  isolated in a linked worktree.
+- V1 exact source/ledger status: `34/34 SOURCE_VERIFIED`, including Strict A
+  and PF1 source modules and primary ledger hashes.
+- V2 exact composed source status: `13/13 SOURCE_VERIFIED`; activation remains
+  `DISABLED_RESEARCH_ONLY` and no evaluator/parity claim has been made.
+- Primary ledger hashes independently rechecked: `1deb95da...d4aa1`,
+  `4765ae6f...a950`, `6d6d71d0...5361`, `74e0c479...1440`.
+- C4 implementation status remains `NOT_STARTED`: verified discovery is not a
+  frozen backend spec, evaluator or parity result.
+
 ## Locked next step
 
-Complete Phase 0 source/code review, run the clean baseline offline gate, and
-reproduce or reject the three C3 review hypotheses before any production fix.
+Complete the reproduced Phase 0 rollover/cutover corrections through RED/GREEN,
+receipt-backed acceptance, independent review and a fresh offline gate. Then
+freeze the verified C4 source artifacts and begin evaluator/parity TDD.
