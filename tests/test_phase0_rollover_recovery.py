@@ -184,7 +184,7 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(self.runtime.writer_consumer_count, 1)
 
-    async def test_refresh_identity_mismatch_fails_closed_after_committed_pass(
+    async def test_refresh_identity_mismatch_blocks_without_pass(
         self,
     ) -> None:
         await self.runtime.stop()
@@ -214,7 +214,7 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
                 "SELECT COUNT(*) FROM incidents "
                 "WHERE status = 'C3_MARKET_ROLLOVER_PASS'"
             ),
-            1,
+            0,
         )
         self.assertEqual(
             self.store.scalar(

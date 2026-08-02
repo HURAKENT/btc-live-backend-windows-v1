@@ -818,6 +818,7 @@ class C1RuntimeOrchestrator:
         while not self._stopping:
             try:
                 cycle = await self._run_market_rollover_cycle()
+                await self._refresh_market_pair(cycle["market"])
                 self._rollover_summary = C3RolloverSummary(
                     status="C3_MARKET_ROLLOVER_PASS",
                     old_market_identity_sha256=cycle["old_market_hash"],
@@ -836,7 +837,6 @@ class C1RuntimeOrchestrator:
                     self._rollover_summary.as_dict(),
                 )
                 self._rollover_cycle_count += 1
-                await self._refresh_market_pair(cycle["market"])
                 if self._rollover_cycle_count == 1:
                     self._first_rollover_done.set()
             except asyncio.CancelledError:

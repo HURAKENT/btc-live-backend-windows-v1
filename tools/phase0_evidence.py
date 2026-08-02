@@ -10,7 +10,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Sequence
 
 
@@ -36,6 +36,9 @@ HISTORICAL_PATHS = (
     "reports/C2_C3_FINAL_ACCEPTANCE.json",
     "artifacts/C2_C3_ACCEPTANCE_PACK.zip",
 )
+TEST_ONLY_HISTORICAL_PATHS = ("seed.txt",)
+PACK_MANIFEST = "MANIFEST.json"
+PACK_SHA256SUMS = "SHA256SUMS"
 _TEST_COUNT = re.compile(r"Ran (\d+) tests?")
 _HEX_64 = re.compile(r"[0-9a-f]{64}")
 
@@ -76,7 +79,7 @@ def _json_bytes(value: object) -> bytes:
             sort_keys=True,
             separators=(",", ":"),
         )
-        + "\n"
+        + "\r\n"
     ).encode("utf-8")
 
 
@@ -102,6 +105,135 @@ def _require_commit(root: Path, commit: str, code: str) -> None:
         raise ValueError(code)
 
 
+def _dirty_paths(root: Path) -> set[str]:
+    paths = set(
+        filter(
+            None,
+            _git(root, "diff", "--name-only").splitlines(),
+        )
+    )
+    paths.update(
+        filter(
+            None,
+            _git(root, "diff", "--cached", "--name-only").splitlines(),
+        )
+    )
+    paths.update(
+        filter(
+            None,
+            _git(root, "ls-files", "--others", "--exclude-standard").splitlines(),
+        )
+    )
+    return paths
+
+
+def _zip_info(name: str) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o100644 << 16
+    return info
+
+
+def _build_pack(
+    *,
+    root: Path,
+    pack_path: Path,
+    payload_paths: Sequence[Path],
+) -> None:
+    payloads = {
+        path.as_posix(): (root / path).read_bytes()
+        for path in payload_paths
+    }
+    member_hashes = {
+        name: _sha256(payload) for name, payload in sorted(payloads.items())
+    }
+    manifest_bytes = _json_bytes(
+        {
+            "members": member_hashes,
+            "schema_version": "BTC_DAILY_RANGE_PHASE0_PACK_MANIFEST_V1",
+        }
+    )
+    sums = {
+        **member_hashes,
+        PACK_MANIFEST: _sha256(manifest_bytes),
+    }
+    sums_bytes = "".join(
+        f"{digest}  {name}\n" for name, digest in sorted(sums.items())
+    ).encode("utf-8")
+    pack_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(
+        pack_path,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+    ) as archive:
+        for name, payload in sorted(payloads.items()):
+            archive.writestr(_zip_info(name), payload)
+        archive.writestr(_zip_info(PACK_MANIFEST), manifest_bytes)
+        archive.writestr(_zip_info(PACK_SHA256SUMS), sums_bytes)
+
+
+def _verify_pack(
+    *,
+    root: Path,
+    pack_path: Path,
+    payload_paths: Sequence[str],
+) -> None:
+    if not pack_path.is_file():
+        raise ValueError("PHASE0_PACK_MISSING")
+    expected_payloads = set(payload_paths)
+    expected_names = expected_payloads | {PACK_MANIFEST, PACK_SHA256SUMS}
+    try:
+        with zipfile.ZipFile(pack_path) as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            if len(names) != len(set(names)):
+                raise ValueError("PHASE0_PACK_DUPLICATE_MEMBER")
+            for name in names:
+                pure = PurePosixPath(name)
+                if (
+                    pure.is_absolute()
+                    or ".." in pure.parts
+                    or "\\" in name
+                ):
+                    raise ValueError("PHASE0_PACK_UNSAFE_MEMBER")
+            if set(names) != expected_names:
+                raise ValueError("PHASE0_PACK_MEMBER_SET_MISMATCH")
+            if archive.testzip() is not None:
+                raise ValueError("PHASE0_PACK_CRC_FAILURE")
+            archived = {name: archive.read(name) for name in names}
+    except (zipfile.BadZipFile, OSError, RuntimeError) as error:
+        raise ValueError("INVALID_PHASE0_PACK") from error
+
+    for name in expected_payloads:
+        path = root / name
+        if not path.is_file() or archived[name] != path.read_bytes():
+            raise ValueError("PHASE0_PACK_PAYLOAD_MISMATCH")
+    try:
+        manifest = json.loads(archived[PACK_MANIFEST].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("INVALID_PHASE0_PACK_MANIFEST") from error
+    if archived[PACK_MANIFEST] != _json_bytes(manifest):
+        raise ValueError("NONCANONICAL_PHASE0_PACK_MANIFEST")
+    expected_member_hashes = {
+        name: _sha256(archived[name]) for name in sorted(expected_payloads)
+    }
+    if manifest != {
+        "members": expected_member_hashes,
+        "schema_version": "BTC_DAILY_RANGE_PHASE0_PACK_MANIFEST_V1",
+    }:
+        raise ValueError("PHASE0_PACK_MANIFEST_MISMATCH")
+    expected_sums = {
+        **expected_member_hashes,
+        PACK_MANIFEST: _sha256(archived[PACK_MANIFEST]),
+    }
+    expected_sums_bytes = "".join(
+        f"{digest}  {name}\n"
+        for name, digest in sorted(expected_sums.items())
+    ).encode("utf-8")
+    if archived[PACK_SHA256SUMS] != expected_sums_bytes:
+        raise ValueError("PHASE0_PACK_SHA256SUMS_MISMATCH")
+
+
 def generate_phase0_evidence(
     *,
     root: Path,
@@ -109,9 +241,11 @@ def generate_phase0_evidence(
     harness_commit: str,
     command_specs: Sequence[CommandSpec],
     historical_paths: Sequence[str] = HISTORICAL_PATHS,
+    test_only: bool = False,
+    test_only_allow_custom_commands: bool = False,
 ) -> EvidenceResult:
     root = root.resolve()
-    if _git(root, "status", "--porcelain", "--untracked-files=all"):
+    if _dirty_paths(root):
         raise ValueError("PHASE0_EVIDENCE_DIRTY_START")
     branch = _git(root, "branch", "--show-current")
     if not branch:
@@ -125,8 +259,33 @@ def generate_phase0_evidence(
         check=False,
     ).returncode != 0:
         raise ValueError("PHASE0_SOURCE_NOT_ANCESTOR")
+    command_specs = tuple(command_specs)
+    historical_paths = tuple(historical_paths)
     if tuple(spec.name for spec in command_specs) != REQUIRED_COMMANDS:
         raise ValueError("INCOMPLETE_PHASE0_COMMAND_SET")
+    if not command_specs:
+        raise ValueError("INCOMPLETE_PHASE0_COMMAND_SET")
+    python_executable = command_specs[0].argv[0]
+    if test_only:
+        contract_profile = "TEST_ONLY"
+        if historical_paths != TEST_ONLY_HISTORICAL_PATHS:
+            raise ValueError("INVALID_TEST_HISTORICAL_CONTRACT")
+        expected_specs = test_only_command_specs(python_executable)
+        if (
+            not test_only_allow_custom_commands
+            and command_specs != expected_specs
+        ):
+            raise ValueError("INVALID_TEST_COMMAND_CONTRACT")
+    else:
+        contract_profile = "PRODUCTION"
+        if historical_paths != HISTORICAL_PATHS:
+            raise ValueError("PHASE0_HISTORICAL_CONTRACT_WEAKENED")
+        expected_specs = default_command_specs(
+            python_executable,
+            source_commit,
+        )
+        if command_specs != expected_specs:
+            raise ValueError("PHASE0_COMMAND_CONTRACT_WEAKENED")
 
     output_directory = root / OUTPUT_DIRECTORY
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -147,6 +306,12 @@ def generate_phase0_evidence(
         (root / stdout_path).write_bytes(stdout_bytes)
         (root / stderr_path).write_bytes(stderr_bytes)
         output_paths.extend((stdout_path.as_posix(), stderr_path.as_posix()))
+        unexpected_dirt = _dirty_paths(root) - set(output_paths)
+        if unexpected_dirt:
+            raise ValueError(
+                "PHASE0_COMMAND_DIRTIED_REPOSITORY:"
+                + ",".join(sorted(unexpected_dirt))
+            )
         combined = (stdout_bytes + b"\n" + stderr_bytes).decode(
             "utf-8", errors="replace"
         )
@@ -164,6 +329,7 @@ def generate_phase0_evidence(
                 "ended_at_utc": ended.isoformat().replace("+00:00", "Z"),
                 "exit_code": result.returncode,
                 "name": spec.name,
+                "expected_test_count": spec.expected_test_count,
                 "started_at_utc": started.isoformat().replace("+00:00", "Z"),
                 "stderr_path": stderr_path.as_posix(),
                 "stderr_sha256": _sha256(stderr_bytes),
@@ -184,17 +350,20 @@ def generate_phase0_evidence(
         "branch": branch,
         "clean_state_before": True,
         "commands": command_receipts,
+        "contract_profile": contract_profile,
         "elapsed_ms": (time.monotonic_ns() - monotonic_started) // 1_000_000,
         "ended_at_utc": receipt_ended.isoformat().replace("+00:00", "Z"),
         "harness_commit": harness_commit,
         "historical_sha256": historical_hashes,
-        "network_mode": "OFFLINE_LOOPBACK_ONLY",
-        "public_provider_requests": 0,
-        "registry_executions": 0,
+        "network_mode": "OFFLINE_COMMAND_ALLOWLIST",
+        "provider_network_observation": "NOT_PERFORMED",
+        "public_provider_requests": "NOT_OBSERVED",
+        "python_executable": python_executable,
+        "registry_executions": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "schema_version": "BTC_DAILY_RANGE_PHASE0_COMMAND_RECEIPT_V1",
         "source_commit": source_commit,
         "started_at_utc": receipt_started.isoformat().replace("+00:00", "Z"),
-        "task14_runs": 0,
+        "task14_runs": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "trading_approval": False,
     }
     receipt_bytes = _json_bytes(receipt)
@@ -210,29 +379,31 @@ def generate_phase0_evidence(
         "gate": "BTC_DAILY_RANGE_WINDOWS_V1_PHASE0_PASS",
         "harness_commit": harness_commit,
         "historical_sha256": historical_hashes,
-        "network_mode": "OFFLINE_LOOPBACK_ONLY",
-        "public_provider_requests": 0,
+        "network_mode": "OFFLINE_COMMAND_ALLOWLIST",
+        "provider_network_observation": "NOT_PERFORMED",
+        "public_provider_requests": "NOT_OBSERVED",
         "receipt_path": RECEIPT_PATH.as_posix(),
         "receipt_sha256": receipt_sha256,
-        "registry_executions": 0,
+        "registry_executions": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "schema_version": "BTC_DAILY_RANGE_PHASE0_ACCEPTED_BASELINE_V1",
         "source_commit": source_commit,
         "status": "PASS",
-        "task14_runs": 0,
+        "task14_runs": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "trading_approval": False,
     }
     report_path = root / REPORT_PATH
     report_path.write_bytes(_json_bytes(report))
-    verify_phase0_report(report_path, root=root, verify_repository=False)
     pack_path = root / PACK_PATH
-    pack_path.parent.mkdir(parents=True, exist_ok=True)
-    members = (RECEIPT_PATH, REPORT_PATH, *(Path(path) for path in output_paths))
-    with zipfile.ZipFile(pack_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for relative in members:
-            info = zipfile.ZipInfo(relative.as_posix(), (1980, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o100644 << 16
-            archive.writestr(info, (root / relative).read_bytes())
+    _build_pack(
+        root=root,
+        pack_path=pack_path,
+        payload_paths=(
+            RECEIPT_PATH,
+            REPORT_PATH,
+            *(Path(path) for path in output_paths),
+        ),
+    )
+    verify_phase0_report(report_path, root=root, verify_repository=False)
     return EvidenceResult(
         receipt_path=receipt_path,
         report_path=report_path,
@@ -249,9 +420,10 @@ def verify_phase0_report(
     verify_repository: bool = True,
 ) -> dict:
     root = root.resolve()
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    if report.get("status") != "PASS" or report.get("trading_approval") is not False:
-        raise ValueError("INVALID_PHASE0_PASS_REPORT")
+    report_bytes = report_path.read_bytes()
+    report = json.loads(report_bytes.decode("utf-8"))
+    if report_bytes != _json_bytes(report):
+        raise ValueError("NONCANONICAL_PHASE0_REPORT")
     receipt_path = root / report.get("receipt_path", "")
     if not receipt_path.is_file():
         raise ValueError("PHASE0_RECEIPT_MISSING")
@@ -261,20 +433,70 @@ def verify_phase0_report(
     receipt = json.loads(receipt_bytes.decode("utf-8"))
     if receipt_bytes != _json_bytes(receipt):
         raise ValueError("NONCANONICAL_PHASE0_RECEIPT")
+    profile = receipt.get("contract_profile")
+    python_executable = receipt.get("python_executable")
+    source_commit = receipt.get("source_commit")
+    if type(python_executable) is not str or not python_executable:
+        raise ValueError("INVALID_PHASE0_PYTHON_EXECUTABLE")
+    if profile == "PRODUCTION":
+        required_historical = HISTORICAL_PATHS
+        expected_specs = default_command_specs(
+            python_executable,
+            source_commit,
+        )
+    elif profile == "TEST_ONLY":
+        required_historical = TEST_ONLY_HISTORICAL_PATHS
+        expected_specs = test_only_command_specs(python_executable)
+    else:
+        raise ValueError("INVALID_PHASE0_CONTRACT_PROFILE")
     if (
         receipt.get("schema_version") != "BTC_DAILY_RANGE_PHASE0_COMMAND_RECEIPT_V1"
         or receipt.get("clean_state_before") is not True
-        or receipt.get("network_mode") != "OFFLINE_LOOPBACK_ONLY"
-        or receipt.get("public_provider_requests") != 0
-        or receipt.get("task14_runs") != 0
-        or receipt.get("registry_executions") != 0
+        or receipt.get("network_mode") != "OFFLINE_COMMAND_ALLOWLIST"
+        or receipt.get("provider_network_observation") != "NOT_PERFORMED"
+        or receipt.get("public_provider_requests") != "NOT_OBSERVED"
+        or receipt.get("task14_runs") != "NOT_RUN_BY_EVIDENCE_HARNESS"
+        or receipt.get("registry_executions")
+        != "NOT_RUN_BY_EVIDENCE_HARNESS"
         or receipt.get("trading_approval") is not False
     ):
         raise ValueError("INVALID_PHASE0_RECEIPT_CONTRACT")
     commands = receipt.get("commands")
-    if type(commands) is not list or tuple(item.get("name") for item in commands) != REQUIRED_COMMANDS:
+    if type(commands) is not list or len(commands) != len(expected_specs):
         raise ValueError("INCOMPLETE_PHASE0_COMMAND_SET")
-    for item in commands:
+    command_keys = {
+        "argv",
+        "command",
+        "elapsed_ms",
+        "ended_at_utc",
+        "exit_code",
+        "expected_test_count",
+        "name",
+        "started_at_utc",
+        "stderr_path",
+        "stderr_sha256",
+        "stdout_path",
+        "stdout_sha256",
+        "test_count",
+    }
+    for index, (item, spec) in enumerate(
+        zip(commands, expected_specs, strict=True),
+        start=1,
+    ):
+        expected_prefix = f"{index:02d}-{spec.name}"
+        if (
+            type(item) is not dict
+            or set(item) != command_keys
+            or item.get("name") != spec.name
+            or item.get("argv") != list(spec.argv)
+            or item.get("command") != subprocess.list2cmdline(spec.argv)
+            or item.get("expected_test_count") != spec.expected_test_count
+            or item.get("stdout_path")
+            != (OUTPUT_DIRECTORY / f"{expected_prefix}.stdout.txt").as_posix()
+            or item.get("stderr_path")
+            != (OUTPUT_DIRECTORY / f"{expected_prefix}.stderr.txt").as_posix()
+        ):
+            raise ValueError("PHASE0_COMMAND_IDENTITY_MISMATCH")
         if item.get("exit_code") != 0:
             raise ValueError("FAILED_PHASE0_COMMAND_RECEIPT")
         for stream in ("stdout", "stderr"):
@@ -290,17 +512,75 @@ def verify_phase0_report(
         observed_count = int(matches[-1]) if matches else None
         if item.get("test_count") != observed_count:
             raise ValueError("COMMAND_TEST_COUNT_MISMATCH")
-    for relative, expected_hash in receipt.get("historical_sha256", {}).items():
+        if (
+            spec.expected_test_count is not None
+            and observed_count != spec.expected_test_count
+        ):
+            raise ValueError("PHASE0_EXPECTED_TEST_COUNT_MISMATCH")
+    historical = receipt.get("historical_sha256")
+    if type(historical) is not dict or set(historical) != set(
+        required_historical
+    ):
+        raise ValueError("PHASE0_HISTORICAL_CONTRACT_MISMATCH")
+    for relative, expected_hash in historical.items():
         path = root / relative
         if not path.is_file() or not _HEX_64.fullmatch(expected_hash) or _sha256(path.read_bytes()) != expected_hash:
             raise ValueError("HISTORICAL_ARTIFACT_SHA256_MISMATCH")
+    expected_report = {
+        "branch": receipt["branch"],
+        "command_count": len(commands),
+        "focused_test_count": commands[0]["test_count"],
+        "full_offline_test_count": commands[1]["test_count"],
+        "gate": "BTC_DAILY_RANGE_WINDOWS_V1_PHASE0_PASS",
+        "harness_commit": receipt["harness_commit"],
+        "historical_sha256": historical,
+        "network_mode": "OFFLINE_COMMAND_ALLOWLIST",
+        "provider_network_observation": "NOT_PERFORMED",
+        "public_provider_requests": "NOT_OBSERVED",
+        "receipt_path": RECEIPT_PATH.as_posix(),
+        "receipt_sha256": _sha256(receipt_bytes),
+        "registry_executions": "NOT_RUN_BY_EVIDENCE_HARNESS",
+        "schema_version": "BTC_DAILY_RANGE_PHASE0_ACCEPTED_BASELINE_V1",
+        "source_commit": receipt["source_commit"],
+        "status": "PASS",
+        "task14_runs": "NOT_RUN_BY_EVIDENCE_HARNESS",
+        "trading_approval": False,
+    }
+    if report != expected_report:
+        raise ValueError("PHASE0_REPORT_RECEIPT_MISMATCH")
+    payload_paths = (
+        RECEIPT_PATH.as_posix(),
+        REPORT_PATH.as_posix(),
+        *(item["stdout_path"] for item in commands),
+        *(item["stderr_path"] for item in commands),
+    )
+    _verify_pack(
+        root=root,
+        pack_path=root / PACK_PATH,
+        payload_paths=payload_paths,
+    )
     if verify_repository:
-        if _git(root, "status", "--porcelain", "--untracked-files=all"):
+        if _dirty_paths(root):
             raise ValueError("PHASE0_EVIDENCE_DIRTY")
         if _git(root, "branch", "--show-current") != receipt["branch"]:
             raise ValueError("PHASE0_BRANCH_MISMATCH")
         harness_commit = receipt["harness_commit"]
+        source_commit = receipt["source_commit"]
         _require_commit(root, harness_commit, "INVALID_PHASE0_HARNESS_COMMIT")
+        _require_commit(root, source_commit, "INVALID_PHASE0_SOURCE_COMMIT")
+        if subprocess.run(
+            (
+                "git",
+                "-C",
+                str(root),
+                "merge-base",
+                "--is-ancestor",
+                source_commit,
+                harness_commit,
+            ),
+            check=False,
+        ).returncode != 0:
+            raise ValueError("PHASE0_SOURCE_NOT_ANCESTOR")
         if subprocess.run(
             ("git", "-C", str(root), "merge-base", "--is-ancestor", harness_commit, "HEAD"),
             check=False,
@@ -316,7 +596,36 @@ def verify_phase0_report(
         changed = set(filter(None, _git(root, "diff", "--name-only", f"{harness_commit}..HEAD").splitlines()))
         if not changed <= allowed:
             raise ValueError("PHASE0_EVIDENCE_STALE")
+        if profile == "PRODUCTION":
+            audit_scope(root, "1197109", source_commit)
     return report
+
+
+def test_only_command_specs(python_executable: str) -> tuple[CommandSpec, ...]:
+    return (
+        CommandSpec(
+            "focused_tests",
+            (python_executable, "-c", "print('Ran 7 tests')"),
+            expected_test_count=7,
+        ),
+        CommandSpec(
+            "full_offline_tests",
+            (python_executable, "-c", "print('Ran 11 tests')"),
+            expected_test_count=11,
+        ),
+        CommandSpec(
+            "compileall",
+            (python_executable, "-c", "print('compile ok')"),
+        ),
+        CommandSpec(
+            "pip_check",
+            (python_executable, "-c", "print('pip check ok')"),
+        ),
+        CommandSpec(
+            "scope_audit",
+            (python_executable, "-c", "print('scope audit ok')"),
+        ),
+    )
 
 
 def default_command_specs(python_executable: str, source_commit: str) -> tuple[CommandSpec, ...]:
@@ -329,8 +638,16 @@ def default_command_specs(python_executable: str, source_commit: str) -> tuple[C
         "tests.test_c2_recovery_hardening",
     )
     return (
-        CommandSpec("focused_tests", (python_executable, "-m", "unittest", "-v", *focused)),
-        CommandSpec("full_offline_tests", (python_executable, "-m", "unittest", "discover", "-s", "tests", "-v")),
+        CommandSpec(
+            "focused_tests",
+            (python_executable, "-m", "unittest", "-v", *focused),
+            expected_test_count=98,
+        ),
+        CommandSpec(
+            "full_offline_tests",
+            (python_executable, "-m", "unittest", "discover", "-s", "tests", "-v"),
+            expected_test_count=639,
+        ),
         CommandSpec("compileall", (python_executable, "-m", "compileall", "-q", "src", "tests", "tools", "run_backend.py")),
         CommandSpec("pip_check", (python_executable, "-m", "pip", "check")),
         CommandSpec("scope_audit", (python_executable, "tools/phase0_evidence.py", "audit-scope", "--baseline", "1197109", "--source-commit", source_commit)),
