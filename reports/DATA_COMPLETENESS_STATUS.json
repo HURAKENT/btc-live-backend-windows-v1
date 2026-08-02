@@ -1,0 +1,27 @@
+{
+  "schema_version": "BTC_DATA_COMPLETENESS_STATUS_V1",
+  "source_baseline_commit": "579289b550cff3793a74bbafba0d8e78670f0c2a",
+  "status": "PHASE_0_AUDIT_PENDING",
+  "database_contract": {
+    "source_of_truth": "SQLITE_WAL",
+    "one_writer": true,
+    "append_required": true,
+    "backfill_required": true,
+    "reconcile_required": true,
+    "import_required": true,
+    "future_daily_markets_required": true,
+    "migration_version_at_baseline": 2,
+    "baseline_table_count": 9
+  },
+  "completeness_states": [
+    "COMPLETE",
+    "EXPECTED_ABSENT",
+    "SOURCE_UNAVAILABLE_RETRYABLE",
+    "SOURCE_CONFLICT_FATAL",
+    "NOT_REQUIRED_BY_CONTRACT"
+  ],
+  "source_ranges": [],
+  "import_runs": [],
+  "unknown_ranges": "NOT_YET_INVENTORIED",
+  "trading_approval": false
+}
