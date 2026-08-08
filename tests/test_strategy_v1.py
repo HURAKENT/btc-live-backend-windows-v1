@@ -489,6 +489,59 @@ class StrategyV1Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "IDENTITY_EVALUATOR_MISMATCH"):
             self._api("evaluate_no_fade_historical")("NO_A0", 60, rows)
 
+    def test_execution_eligibility_requires_all_evidence_and_numeric_gates(self):
+        strict_rows = self._replace(
+            self._buckets(), 5, model_p=0.26, vwap5=0.21
+        )
+        strict_accepted = self._strict(60, strict_rows)
+        strict_rejected = self._api("evaluate_strict_a")(
+            "YES_STRICT_A_T60", 60, strict_rows
+        )
+        pf1_rows = self._replace(self._buckets(), 2, model_p=0.40, vwap5=0.35)
+        pf1_accepted = self._pf1(60, pf1_rows)
+        pf1_rejected = self._api("evaluate_pf1")(
+            "YES_PF1_T60", 60, pf1_rows
+        )
+        no_rows = self._replace(
+            self._buckets(), 2, model_p=0.05, market_q_yes=0.10
+        )
+        no_accepted = self._no_fade("P1", 60, no_rows)
+        no_rejected = self._api("evaluate_no_fade")(
+            "NO_FADE_P1_U1_OPERATIONAL", 60, no_rows, no_execution=()
+        )
+        strict_numeric_rejected = self._strict(
+            60,
+            self._replace(strict_rows, 5, vwap5=0.25),
+        )
+        pf1_numeric_rejected = self._pf1(
+            60,
+            self._replace(pf1_rows, 2, vwap5=0.39),
+        )
+        no_numeric_rejected = self._api("evaluate_no_fade")(
+            "NO_FADE_P1_U1_OPERATIONAL",
+            60,
+            no_rows,
+            no_execution=self._no_execution(actual_no_vwap5=0.94),
+        )
+
+        for result in (strict_accepted, pf1_accepted, no_accepted):
+            with self.subTest(accepted=result.reason):
+                self.assertTrue(result.accepted)
+                self.assertFalse(result.historical_only)
+                self.assertTrue(result.execution_eligible)
+        for result in (
+            strict_rejected,
+            pf1_rejected,
+            no_rejected,
+            strict_numeric_rejected,
+            pf1_numeric_rejected,
+            no_numeric_rejected,
+        ):
+            with self.subTest(rejected=result.reason):
+                self.assertFalse(result.accepted)
+                self.assertFalse(result.historical_only)
+                self.assertFalse(result.execution_eligible)
+
     def test_no_fade_uses_distinct_actual_no_vwap_depth_and_fee(self):
         rows = self._replace(
             self._buckets(), 2, model_p=0.05, market_q_yes=0.10, vwap5=0.01

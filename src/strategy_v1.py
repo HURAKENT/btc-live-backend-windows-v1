@@ -438,6 +438,7 @@ def evaluate_strict_a(
         historical_edge,
         execution_cost,
         executable_edge,
+        execution_eligible=True,
     )
 
 
@@ -573,6 +574,7 @@ def evaluate_pf1(
         historical_edge=edge,
         execution_cost=selected_q,
         executable_edge=edge,
+        execution_eligible=True,
     )
 
 
@@ -746,6 +748,7 @@ def evaluate_no_fade(
         actual_no_depth_shares=execution.available_depth_shares,
         actual_no_execution_cost=actual_cost,
         actual_no_executable_edge=actual_edge,
+        execution_eligible=True,
     )
 
 
