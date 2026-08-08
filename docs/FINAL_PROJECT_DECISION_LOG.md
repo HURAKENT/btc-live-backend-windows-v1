@@ -69,3 +69,22 @@ prefixes with fixed placeholders. The receipt binds raw per-stream SHA-256,
 stored per-stream SHA-256, replacement counters and aggregate commitments.
 Any residual Windows or WSL user path fails closed. This preserves command
 integrity without persisting an absolute user path.
+
+## D-009 — C4 parity and C7 execution evidence are separate gates
+
+Date: 2026-08-08
+
+Decision: C4 accepts an identity only after exact source/spec binding, a trusted
+dispatcher route and full accepted-plus-rejected decision parity. Historical V1
+parity is explicitly labelled non-execution evidence; depth, fee, fill and
+restart-safe accounting evidence remains mandatory in C7 and is not inferred
+from historical profitability.
+
+## D-010 — C5 activation never follows automatically from C4
+
+Date: 2026-08-08
+
+Decision: `EVALUATOR_IMPLEMENTED` and `PARITY_PASS` establish deterministic
+behavior, not permission to activate. Every identity remains
+`PENDING_C5_CLASSIFICATION` until C5 records a separate machine-readable
+decision. `trading_approval=false` remains invariant.

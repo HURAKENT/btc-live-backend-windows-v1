@@ -3,7 +3,7 @@
 ## Current state
 
 - Goal status: `ACTIVE`.
-- Current train: `C4_EXECUTABLE_RULES_AND_PARITY`.
+- Current train: `C5_ACTIVATION_CLASSIFICATION`.
 - Verified baseline: `579289b550cff3793a74bbafba0d8e78670f0c2a`.
 - Integration branch: `codex/final-project-completion`.
 - Branch published: yes.
@@ -24,7 +24,7 @@
 ## Gate checklist
 
 - [x] Phase 0 baseline offline gate and hypothesis reproduction.
-- [ ] C4 executable rules and parity.
+- [x] C4 executable rules and parity.
 - [ ] C5 activation classification.
 - [ ] C6 persistent scheduler/replay.
 - [ ] C7 paper execution.
@@ -45,8 +45,30 @@
   `DISABLED_RESEARCH_ONLY` and no evaluator/parity claim has been made.
 - Primary ledger hashes independently rechecked: `1deb95da...d4aa1`,
   `4765ae6f...a950`, `6d6d71d0...5361`, `74e0c479...1440`.
-- C4 implementation status remains `NOT_STARTED`: verified discovery is not a
-  frozen backend spec, evaluator or parity result.
+- C4 implementation and acceptance are now complete; source discovery alone
+  was not used as acceptance evidence.
+
+## C4 accepted strategy gate
+
+- Gate: `C4_STRATEGY_47_ACCEPTANCE_PASS`.
+- Exact immutable rule/spec sources: `47/47`; trusted rule-pack SHA-256:
+  `9d402e9a1e2e0dd2fdae3443e3641dfb777efdc29b88ae14b529689972e8d727`.
+- Trusted dispatcher: `47/47` ordered registry identities (`34 V1`, `13 V2`),
+  with fail-closed evaluator/input-schema/checkpoint binding.
+- V1 full-decision historical parity: `34/34`, split into non-overlapping
+  Early Horizon (`17`), Early Confidence (`11`) and Confirmation/Basket (`6`)
+  source populations. The gate evaluates `5,135` identity decisions across
+  `1,647` sanitized fixture records, including accepted and rejected rows.
+- V2 volatility-overlay full-decision parity: `13/13`, `694` rows; outcome,
+  five-share turnover and PnL are independently recomputed.
+- C4 does not activate strategies or perform paper execution. Depth-backed
+  executable eligibility and accounting remain C7 responsibilities.
+- Acceptance report SHA-256:
+  `641daca9fc68689f60baaf857a3a8711006802d9d1e28c8b5b09062f73180e5b`.
+- Strategy status matrix SHA-256:
+  `7ab18b6782f359177d7dde78ed4caa51cd7166eb9055d75755fd8919466ff7fc`.
+- Provider requests, backend runs and Task 14 runs for C4: `0`.
+- `trading_approval=false`.
 
 ## Phase 0 accepted baseline
 
@@ -71,6 +93,6 @@
 
 ## Locked next step
 
-Freeze the verified minimum C4 rule sources/specifications, then implement and
-replay all 47 evaluators through strict RED → minimal GREEN → parity evidence.
-Activation classification remains a separate C5 decision.
+Classify activation for every one of the 47 identities using the frozen C5
+policy. C4 implementation/parity status must not be used as automatic
+authorization for paper activation.

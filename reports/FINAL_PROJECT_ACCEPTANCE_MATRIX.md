@@ -9,8 +9,8 @@ Source baseline: `579289b550cff3793a74bbafba0d8e78670f0c2a`
 | Phase 0 baseline/hardening | PASS | Receipt `4e1ceb2a...4155d`; report `c7172837...2574b`; pack `b6bd4965...dee39`; focused 101/full 647 |
 | C2 Recovery hardening | PASS_REVALIDATED_PHASE0 | Historical report plus receipt-bound recovery/restart regressions |
 | C3 Market rollover | PASS_REVALIDATED_PHASE0 | Recurring A→B→C, durable cutover restart and stream-liveness regressions |
-| C4 Executable rules/parity | NOT_STARTED | 47/47 exact sources/specs/evaluators/parity |
-| C5 Activation classification | NOT_STARTED | 47/47 machine-readable activation decisions |
+| C4 Executable rules/parity | PASS | 47/47 exact sources/specs/evaluators/dispatcher; V1 full-decision historical parity 34/34, V2 full-decision parity 13/13; `C4_STRATEGY_47_ACCEPTANCE.json` |
+| C5 Activation classification | IN_PROGRESS | 47/47 machine-readable activation decisions; independent of C4 implementation/parity |
 | C6 Scheduler/replay | NOT_STARTED | Exactly-once checkpoints and recovered replay |
 | C7 Paper execution | NOT_STARTED | Five-share depth-backed restart-safe accounting |
 | C8 API | NOT_STARTED | Versioned bootstrap and resumable WebSocket |

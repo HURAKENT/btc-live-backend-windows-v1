@@ -115,6 +115,24 @@ class StrategyC4AcceptanceTests(unittest.TestCase):
                     json.loads(raw.decode("utf-8")),
                 )
 
+    def test_committed_outputs_equal_fresh_gate_result(self) -> None:
+        from src.strategy_c4_acceptance import (
+            acceptance_report_payload,
+            build_strategy_status_matrix,
+            verify_c4_strategy_acceptance,
+        )
+
+        source_commit = "dde6707e719897d253e233815be2ddd5d46789c9"
+        report = verify_c4_strategy_acceptance(PROJECT_ROOT)
+        self.assertEqual(
+            json.loads((PROJECT_ROOT / "reports/C4_STRATEGY_47_ACCEPTANCE.json").read_text("utf-8")),
+            json.loads(json.dumps(acceptance_report_payload(report, source_commit=source_commit))),
+        )
+        self.assertEqual(
+            json.loads((PROJECT_ROOT / "reports/STRATEGY_47_STATUS_MATRIX.json").read_text("utf-8")),
+            build_strategy_status_matrix(report, source_commit=source_commit),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,61 +1,439 @@
 {
-  "schema_version": "BTC_STRATEGY_47_STATUS_MATRIX_V1",
+  "schema_version": "BTC_STRATEGY_47_STATUS_MATRIX_V2",
+  "source_commit": "dde6707e719897d253e233815be2ddd5d46789c9",
   "source_registry_sha256": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f",
-  "source_baseline_commit": "579289b550cff3793a74bbafba0d8e78670f0c2a",
-  "strategy_count": 47,
   "status_counts": {
-    "SOURCE_NOT_SEARCHED": 47,
-    "UNIMPLEMENTED": 47,
-    "NOT_RUN": 47
+    "EVALUATOR_IMPLEMENTED": 47,
+    "PARITY_PASS": 47,
+    "PENDING_C5_CLASSIFICATION": 47,
+    "SOURCE_VERIFIED": 47,
+    "SPEC_FROZEN": 47
   },
   "strategies": [
-    {"strategy_id": "NO_C1", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_A2", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U2_T18", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_A0", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_FAVORITE_NEIGHBOR_BASKET", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_T60_U1_EQUALS_U2", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_STRICT_A_T60", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_STRICT_A_OPERATIONAL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_OPERATIONAL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_STRICT_A_T30", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_T60", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U2_T60", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U1_T60", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_T6H", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U2_OPERATIONAL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U2_T12", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U1_OPERATIONAL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U1_EARLY_LATEST_ONLY", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U1_T18", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U2_OPERATIONAL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U1_EARLY_COMBINED", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U2_T12", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U1_OPERATIONAL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U1_T12", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_FAVORITE_ONLY", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U2_T30", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_T30", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U1_T30", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U1_T12", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_B2", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U2_T4H", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_T8H", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U1_T2H", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_A0_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_A2_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P1_U1_T18_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U1_OPERATIONAL_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U1_T60_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U2_OPERATIONAL_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "NO_FADE_P2_U2_T60_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_FAVORITE_ONLY_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_OPERATIONAL_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_T30_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_PF1_T60_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_STRICT_A_OPERATIONAL_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false},
-    {"strategy_id": "YES_STRICT_A_T60_V2_VOL", "rule_source_status": "SOURCE_NOT_SEARCHED", "rule_spec_status": "NOT_FROZEN", "evaluator_status": "UNIMPLEMENTED", "parity_status": "NOT_RUN", "activation_status": "DISABLED_EXECUTABLE_RULE_GAP", "paper_eligible": false}
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_C1"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_A2"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U2_T18"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_A0"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_FAVORITE_NEIGHBOR_BASKET"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_T60_U1_EQUALS_U2"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_STRICT_A_T60"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_STRICT_A_OPERATIONAL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_OPERATIONAL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_STRICT_A_T30"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_T60"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U2_T60"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U1_T60"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_T6H"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U2_OPERATIONAL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U2_T12"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U1_OPERATIONAL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U1_EARLY_LATEST_ONLY"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U1_T18"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U1_EARLY_COMBINED"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U2_T12"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U1_T12"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_FAVORITE_ONLY"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U2_T30"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_T30"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U1_T30"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U1_T12"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_B2"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U2_T4H"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_T8H"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U1_T2H"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_A0_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_A2_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P1_U1_T18_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U1_T60_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "NO_FADE_P2_U2_T60_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_FAVORITE_ONLY_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_OPERATIONAL_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_T30_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_PF1_T60_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_STRICT_A_OPERATIONAL_V2_VOL"
+    },
+    {
+      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "paper_eligible": false,
+      "parity_status": "PARITY_PASS",
+      "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_status": "SPEC_FROZEN",
+      "strategy_id": "YES_STRICT_A_T60_V2_VOL"
+    }
   ],
+  "strategy_count": 47,
   "trading_approval": false
 }
