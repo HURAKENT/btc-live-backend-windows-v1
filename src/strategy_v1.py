@@ -303,7 +303,7 @@ def evaluate_no_fade(
     if type(partition) is not str or partition not in {"P1", "P2"}:
         raise ValueError("UNKNOWN_NO_FADE_PARTITION")
     checkpoint = _checkpoint(
-        checkpoint_minutes, frozenset({12, 18, 30, 60, 120, 240})
+        checkpoint_minutes, frozenset({30, 60, 120, 240, 720, 1080})
     )
     ordered = _ordered(buckets)
     favorite = _favorite(ordered, tolerance=_STRICT_TOL)

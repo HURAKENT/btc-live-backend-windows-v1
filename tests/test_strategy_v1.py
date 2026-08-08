@@ -200,6 +200,25 @@ class StrategyV1Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "UNKNOWN_NO_FADE_PARTITION"):
             self._api("evaluate_no_fade")("P3", 60, self._buckets())
 
+    def test_no_fade_t12_and_t18_identities_use_minute_horizons(self):
+        rows = self._replace(self._buckets(), 2, model_p=0.05, market_q_yes=0.10)
+
+        t12 = self._api("evaluate_no_fade")("P1", 720, rows)
+        t18 = self._api("evaluate_no_fade")("P1", 1080, rows)
+
+        self.assertTrue(t12.accepted)
+        self.assertEqual(720, t12.checkpoint_minutes)
+        self.assertTrue(t18.accepted)
+        self.assertEqual(1080, t18.checkpoint_minutes)
+
+    def test_no_fade_rejects_hour_labels_as_minute_values(self):
+        for invalid_checkpoint in (12, 18):
+            with self.subTest(checkpoint_minutes=invalid_checkpoint):
+                with self.assertRaisesRegex(ValueError, "INVALID_CHECKPOINT"):
+                    self._api("evaluate_no_fade")(
+                        "P1", invalid_checkpoint, self._buckets()
+                    )
+
     def test_favorite_only_accepts_inclusive_stressed_edge(self):
         rows = self._replace(self._buckets(), 5, model_p=0.25)
         result = self._api("evaluate_favorite_only")(60, rows)
