@@ -27,6 +27,55 @@ class StrategyV2ModuleContractTests(unittest.TestCase):
         self.assertNotIn("pandas", source.lower())
         self.assertNotIn("forecast_variance", source)
 
+    def test_exact_thirteen_overlay_bindings_are_immutable(self):
+        module = _module()
+        observed = {
+            child: (binding.parent_strategy_id, binding.side, binding.regime)
+            for child, binding in module.V2_OVERLAY_BINDINGS.items()
+        }
+        self.assertEqual(
+            observed,
+            {
+                "NO_A0_V2_VOL": ("NO_A0", "NO", "VOL_VETO_ONLY"),
+                "NO_A2_V2_VOL": ("NO_A2", "NO", "VOL_CONFIRMATION"),
+                "NO_FADE_P1_U1_T18_V2_VOL": (
+                    "NO_FADE_P1_U1_T18", "NO", "VOL_VETO_ONLY"
+                ),
+                "NO_FADE_P2_U1_OPERATIONAL_V2_VOL": (
+                    "NO_FADE_P2_U1_OPERATIONAL", "NO", "VOL_VETO_ONLY"
+                ),
+                "NO_FADE_P2_U1_T60_V2_VOL": (
+                    "NO_FADE_P2_U1_T60", "NO", "VOL_VETO_ONLY"
+                ),
+                "NO_FADE_P2_U2_OPERATIONAL_V2_VOL": (
+                    "NO_FADE_P2_U2_OPERATIONAL", "NO", "VOL_VETO_ONLY"
+                ),
+                "NO_FADE_P2_U2_T60_V2_VOL": (
+                    "NO_FADE_P2_U2_T60", "NO", "VOL_VETO_ONLY"
+                ),
+                "YES_FAVORITE_ONLY_V2_VOL": (
+                    "YES_FAVORITE_ONLY", "YES", "VOL_CONFIRMATION"
+                ),
+                "YES_PF1_OPERATIONAL_V2_VOL": (
+                    "YES_PF1_OPERATIONAL", "YES", "VOL_CONFIRMATION"
+                ),
+                "YES_PF1_T30_V2_VOL": (
+                    "YES_PF1_T30", "YES", "VOL_CONFIRMATION"
+                ),
+                "YES_PF1_T60_V2_VOL": (
+                    "YES_PF1_T60", "YES", "VOL_CONFIRMATION"
+                ),
+                "YES_STRICT_A_OPERATIONAL_V2_VOL": (
+                    "YES_STRICT_A_OPERATIONAL", "YES", "VOL_CONFIRMATION"
+                ),
+                "YES_STRICT_A_T60_V2_VOL": (
+                    "YES_STRICT_A_T60", "YES", "VOL_VETO_ONLY"
+                ),
+            },
+        )
+        with self.assertRaises(TypeError):
+            module.V2_OVERLAY_BINDINGS["EXTRA"] = None
+
 
 class StrategyV2EvaluationTests(unittest.TestCase):
     def _parent(self, **overrides):
@@ -35,13 +84,12 @@ class StrategyV2EvaluationTests(unittest.TestCase):
             "decision_identity": "decision:2026-08-08:NO_A2:T60",
             "strategy_id": "NO_A2",
             "side": "NO",
-            "selected_bucket": "$115,000-$120,000",
+            "selected_buckets": ("$115,000-$120,000",),
             "horizon": "T-60m",
             "fallback_policy": "T60_ONLY",
             "shares": 5,
             "baseline_accept": True,
             "actual_price_micros": 400_000,
-            "leg_count": 1,
             "source_decision_sha256": _sha("parent-decision"),
         }
         values.update(overrides)
@@ -57,10 +105,17 @@ class StrategyV2EvaluationTests(unittest.TestCase):
         values.update(overrides)
         return module.VolatilityOverlayInput(**values)
 
-    def _evaluate(self, *, regime="VOL_CONFIRMATION", parent=None, forecast=None):
+    def _evaluate(
+        self,
+        *,
+        overlay_strategy_id="NO_A2_V2_VOL",
+        regime="VOL_CONFIRMATION",
+        parent=None,
+        forecast=None,
+    ):
         module = _module()
         return module.evaluate_volatility_overlay(
-            overlay_strategy_id="NO_A2_V2_VOL",
+            overlay_strategy_id=overlay_strategy_id,
             regime=regime,
             parent=self._parent() if parent is None else parent,
             volatility_input=self._forecast() if forecast is None else forecast,
@@ -89,11 +144,15 @@ class StrategyV2EvaluationTests(unittest.TestCase):
 
     def test_veto_only_accepts_zero_edge_and_rejects_negative_edge(self):
         accepted = self._evaluate(
+            overlay_strategy_id="NO_A0_V2_VOL",
             regime="VOL_VETO_ONLY",
+            parent=self._parent(strategy_id="NO_A0"),
             forecast=self._forecast(p_vol_side_micros=430_000),
         )
         rejected = self._evaluate(
+            overlay_strategy_id="NO_A0_V2_VOL",
             regime="VOL_VETO_ONLY",
+            parent=self._parent(strategy_id="NO_A0"),
             forecast=self._forecast(p_vol_side_micros=429_999),
         )
         self.assertTrue(accepted.accepted)
@@ -103,7 +162,6 @@ class StrategyV2EvaluationTests(unittest.TestCase):
 
     def test_parent_baseline_rejection_is_never_overridden(self):
         result = self._evaluate(
-            regime="VOL_VETO_ONLY",
             parent=self._parent(baseline_accept=False),
             forecast=self._forecast(p_vol_side_micros=1_000_000),
         )
@@ -115,22 +173,25 @@ class StrategyV2EvaluationTests(unittest.TestCase):
             decision_identity="immutable-parent-identity",
             strategy_id="YES_FAVORITE_ONLY",
             side="YES",
-            selected_bucket="favorite|neighbor",
+            selected_buckets=("favorite", "neighbor"),
             horizon="T-60-primary-T-30-fallback",
             fallback_policy="T60_THEN_T30",
-            shares=7,
+            shares=5,
             actual_price_micros=510_000,
-            leg_count=2,
         )
         forecast = self._forecast(
             p_vol_side_micros=600_000,
             source_decision_sha256=parent.source_decision_sha256,
         )
-        result = self._evaluate(parent=parent, forecast=forecast)
+        result = self._evaluate(
+            overlay_strategy_id="YES_FAVORITE_ONLY_V2_VOL",
+            parent=parent,
+            forecast=forecast,
+        )
         self.assertEqual(result.parent_decision_identity, parent.decision_identity)
         self.assertEqual(result.parent_strategy_id, parent.strategy_id)
         self.assertEqual(result.side, parent.side)
-        self.assertEqual(result.selected_bucket, parent.selected_bucket)
+        self.assertEqual(result.selected_buckets, parent.selected_buckets)
         self.assertEqual(result.horizon, parent.horizon)
         self.assertEqual(result.fallback_policy, parent.fallback_policy)
         self.assertEqual(result.shares, parent.shares)
@@ -139,11 +200,17 @@ class StrategyV2EvaluationTests(unittest.TestCase):
 
     def test_stress_adds_thirty_thousand_per_leg_and_caps_at_one_million(self):
         two_leg = self._evaluate(
-            parent=self._parent(actual_price_micros=510_000, leg_count=2),
+            parent=self._parent(
+                actual_price_micros=510_000,
+                selected_buckets=("favorite", "neighbor"),
+            ),
             forecast=self._forecast(p_vol_side_micros=600_000),
         )
         capped = self._evaluate(
-            parent=self._parent(actual_price_micros=980_000, leg_count=2),
+            parent=self._parent(
+                actual_price_micros=980_000,
+                selected_buckets=("favorite", "neighbor"),
+            ),
             forecast=self._forecast(p_vol_side_micros=1_000_000),
         )
         self.assertEqual(two_leg.stressed_q_3c_micros, 570_000)
@@ -176,8 +243,6 @@ class StrategyV2EvaluationTests(unittest.TestCase):
             ("actual_price_micros", True),
             ("actual_price_micros", -1),
             ("actual_price_micros", 1_000_001),
-            ("leg_count", True),
-            ("leg_count", 0),
             ("shares", True),
             ("shares", 0),
         ):
@@ -206,7 +271,7 @@ class StrategyV2EvaluationTests(unittest.TestCase):
 
     def test_invalid_regime_and_nonexact_input_objects_are_rejected(self):
         module = _module()
-        with self.assertRaisesRegex(ValueError, "INVALID_OVERLAY_REGIME"):
+        with self.assertRaisesRegex(ValueError, "V2_OVERLAY_REGIME_MISMATCH"):
             self._evaluate(regime="BASELINE")
         with self.assertRaisesRegex(ValueError, "INVALID_PARENT_OVERLAY_DECISION_TYPE"):
             module.evaluate_volatility_overlay(
@@ -227,6 +292,76 @@ class StrategyV2EvaluationTests(unittest.TestCase):
         first = self._evaluate()
         second = self._evaluate()
         self.assertEqual(first, second)
+
+    def test_unregistered_overlay_child_is_rejected(self):
+        module = _module()
+        with self.assertRaisesRegex(
+            ValueError,
+            "UNREGISTERED_V2_OVERLAY_STRATEGY",
+        ):
+            module.evaluate_volatility_overlay(
+                overlay_strategy_id="UNREGISTERED_V2_VOL",
+                regime="VOL_CONFIRMATION",
+                parent=self._parent(),
+                volatility_input=self._forecast(),
+            )
+
+    def test_registered_child_rejects_parent_side_and_mode_mismatch(self):
+        module = _module()
+        cases = (
+            (
+                "V2_OVERLAY_PARENT_MISMATCH",
+                self._parent(strategy_id="NO_A0"),
+                "VOL_CONFIRMATION",
+            ),
+            (
+                "V2_OVERLAY_SIDE_MISMATCH",
+                self._parent(side="YES"),
+                "VOL_CONFIRMATION",
+            ),
+            (
+                "V2_OVERLAY_REGIME_MISMATCH",
+                self._parent(),
+                "VOL_VETO_ONLY",
+            ),
+        )
+        for reason, parent, regime in cases:
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    module.evaluate_volatility_overlay(
+                        overlay_strategy_id="NO_A2_V2_VOL",
+                        regime=regime,
+                        parent=parent,
+                        volatility_input=self._forecast(),
+                    )
+
+    def test_parent_requires_exactly_five_shares(self):
+        with self.assertRaisesRegex(ValueError, "INVALID_SHARES"):
+            self._parent(shares=6)
+
+    def test_structured_selected_buckets_derive_leg_count(self):
+        module = _module()
+        parent = module.ParentOverlayDecision(
+            decision_identity="decision:basket",
+            strategy_id="YES_FAVORITE_ONLY",
+            side="YES",
+            selected_buckets=("favorite", "neighbor"),
+            horizon="T-60m",
+            fallback_policy="T60_THEN_T30",
+            shares=5,
+            baseline_accept=True,
+            actual_price_micros=510_000,
+            source_decision_sha256=_sha("parent-decision"),
+        )
+        result = module.evaluate_volatility_overlay(
+            overlay_strategy_id="YES_FAVORITE_ONLY_V2_VOL",
+            regime="VOL_CONFIRMATION",
+            parent=parent,
+            volatility_input=self._forecast(p_vol_side_micros=600_000),
+        )
+        self.assertEqual(result.selected_buckets, ("favorite", "neighbor"))
+        self.assertEqual(result.leg_count, 2)
+        self.assertEqual(result.stressed_q_3c_micros, 570_000)
 
 
 if __name__ == "__main__":
