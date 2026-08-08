@@ -213,25 +213,27 @@ class Phase0EvidenceTests(unittest.TestCase):
         receipt = json.loads(result.receipt_path.read_text(encoding="utf-8"))
         report = json.loads(result.report_path.read_text(encoding="utf-8"))
         first = receipt["commands"][0]
-        stdout = (self.root / first["stdout_path"]).read_text(encoding="utf-8")
-        stderr = (self.root / first["stderr_path"]).read_text(encoding="utf-8")
+        stdout_bytes = (self.root / first["stdout_path"]).read_bytes()
+        stderr_bytes = (self.root / first["stderr_path"]).read_bytes()
+        stdout = stdout_bytes.decode("utf-8")
+        stderr = stderr_bytes.decode("utf-8")
         self.assertNotIn(str(self.root.resolve()), stdout + stderr)
         self.assertEqual((stdout + stderr).count("<PROJECT_ROOT>"), 2)
         self.assertEqual(first["stdout_sanitization_replacements"], 1)
         self.assertEqual(first["stderr_sanitization_replacements"], 1)
         self.assertEqual(
             first["stdout_sha256"],
-            hashlib.sha256(stdout.encode("utf-8")).hexdigest(),
+            hashlib.sha256(stdout_bytes).hexdigest(),
         )
         self.assertEqual(
             first["stderr_sha256"],
-            hashlib.sha256(stderr.encode("utf-8")).hexdigest(),
+            hashlib.sha256(stderr_bytes).hexdigest(),
         )
         self.assertNotEqual(first["raw_stdout_sha256"], first["stdout_sha256"])
         self.assertNotEqual(first["raw_stderr_sha256"], first["stderr_sha256"])
         self.assertEqual(
             receipt["output_sanitization_policy"],
-            "EXACT_PROJECT_ROOT_REPLACEMENT_V1",
+            "PROJECT_ROOT_AND_USER_HOME_REPLACEMENT_V2",
         )
         self.assertEqual(receipt["output_sanitization_replacement_count"], 10)
         self.assertEqual(
@@ -252,6 +254,24 @@ class Phase0EvidenceTests(unittest.TestCase):
         self.assertNotIn(str(self.root.resolve()).encode("utf-8"), packed)
         self.assertIn(b"<PROJECT_ROOT>", packed)
         verify(result.report_path, root=self.root, verify_repository=False)
+
+    def test_command_output_sanitizer_redacts_user_home_outside_project(self) -> None:
+        from tools.phase0_evidence import _sanitize_output
+
+        payload = (
+            b"C:\\Users\\gegos\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio.py\n"
+            b"/mnt/c/Users/gegos/AppData/Local/Temp/phase0.txt\n"
+        )
+        sanitized, replacement_count = _sanitize_output(
+            payload,
+            root=Path(
+                "/mnt/c/Users/gegos/Documents/Codex/btc_live_backend_windows_v1"
+            ),
+        )
+
+        self.assertEqual(replacement_count, 2)
+        self.assertEqual(sanitized.count(b"<USER_HOME>"), 2)
+        self.assertNotIn(b"gegos", sanitized)
 
     def test_verifier_rejects_residual_windows_or_wsl_user_paths(self) -> None:
         _, _, verify = self.api()

@@ -4,6 +4,7 @@ import asyncio
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.integration_endpoints import IntegrationEndpoints
@@ -13,12 +14,19 @@ from src.storage import SqliteStore
 from tests.support.fake_provider_servers import FakeProviderServer
 
 
+class _StableRestartFakeProviderServer(FakeProviderServer):
+    """Arm one future market pair once, then keep it stable across restarts."""
+
+    def _rollover_now(self) -> datetime:
+        return datetime.now(timezone.utc) + timedelta(hours=12)
+
+
 class SameDatabaseRestartIdentityTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.database_path = self.root / "runtime.sqlite3"
-        self.server = FakeProviderServer()
+        self.server = _StableRestartFakeProviderServer(enable_rollover=True)
         await self.server.start()
         payload = self.server.endpoint_payload(api_port=49123)
         self.endpoints = IntegrationEndpoints(

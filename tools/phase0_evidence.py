@@ -41,10 +41,15 @@ PACK_MANIFEST = "MANIFEST.json"
 PACK_SHA256SUMS = "SHA256SUMS"
 _TEST_COUNT = re.compile(r"Ran (\d+) tests?")
 _HEX_64 = re.compile(r"[0-9a-f]{64}")
+_WINDOWS_USER_HOME = re.compile(
+    r"(?i)[a-z]:[\\/]+users[\\/]+[^\\/\r\n\"'<>]+"
+)
+_WSL_USER_HOME = re.compile(r"(?i)/mnt/[a-z]/users/[^/\r\n\"'<>]+")
 _WINDOWS_USER_PATH = re.compile(r"(?i)[a-z]:[\\/]+users[\\/]")
 _WSL_USER_PATH = re.compile(r"(?i)/mnt/[a-z]/users/")
-OUTPUT_SANITIZATION_POLICY = "EXACT_PROJECT_ROOT_REPLACEMENT_V1"
+OUTPUT_SANITIZATION_POLICY = "PROJECT_ROOT_AND_USER_HOME_REPLACEMENT_V2"
 PROJECT_ROOT_PLACEHOLDER = "<PROJECT_ROOT>"
+USER_HOME_PLACEHOLDER = "<USER_HOME>"
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,9 +134,23 @@ def _sanitize_output(payload: bytes, *, root: Path) -> tuple[bytes, int]:
         if count:
             text = text.replace(variant, PROJECT_ROOT_PLACEHOLDER)
             replacements += count
+    text, windows_home_count = _WINDOWS_USER_HOME.subn(
+        USER_HOME_PLACEHOLDER,
+        text,
+    )
+    text, wsl_home_count = _WSL_USER_HOME.subn(
+        USER_HOME_PLACEHOLDER,
+        text,
+    )
+    replacements += windows_home_count + wsl_home_count
     sanitized = text.encode("utf-8")
     _require_no_user_path(sanitized)
     return sanitized, replacements
+
+
+def _sanitize_evidence_text(value: str, *, root: Path) -> str:
+    sanitized, _ = _sanitize_output(value.encode("utf-8"), root=root)
+    return sanitized.decode("utf-8")
 
 
 def _require_no_user_path(payload: bytes) -> None:
@@ -412,8 +431,14 @@ def generate_phase0_evidence(
             raise ValueError(f"PHASE0_TEST_COUNT_MISMATCH:{spec.name}")
         command_receipts.append(
             {
-                "argv": list(spec.argv),
-                "command": subprocess.list2cmdline(spec.argv),
+                "argv": [
+                    _sanitize_evidence_text(value, root=root)
+                    for value in spec.argv
+                ],
+                "command": _sanitize_evidence_text(
+                    subprocess.list2cmdline(spec.argv),
+                    root=root,
+                ),
                 "elapsed_ms": elapsed_ms,
                 "ended_at_utc": ended.isoformat().replace("+00:00", "Z"),
                 "exit_code": result.returncode,
@@ -460,7 +485,10 @@ def generate_phase0_evidence(
         "output_sanitization_replacement_count": replacement_count,
         "provider_network_observation": "NOT_PERFORMED",
         "public_provider_requests": "NOT_OBSERVED",
-        "python_executable": python_executable,
+        "python_executable": _sanitize_evidence_text(
+            python_executable,
+            root=root,
+        ),
         "registry_executions": "NOT_RUN_BY_EVIDENCE_HARNESS",
         "raw_output_commitment_sha256": raw_output_commitment,
         "schema_version": "BTC_DAILY_RANGE_PHASE0_COMMAND_RECEIPT_V2",
@@ -795,7 +823,7 @@ def default_command_specs(python_executable: str, source_commit: str) -> tuple[C
         CommandSpec(
             "full_offline_tests",
             (python_executable, "-m", "unittest", "discover", "-s", "tests", "-v"),
-            expected_test_count=646,
+            expected_test_count=647,
         ),
         CommandSpec("compileall", (python_executable, "-m", "compileall", "-q", "src", "tests", "tools", "run_backend.py")),
         CommandSpec("pip_check", (python_executable, "-m", "pip", "check")),
