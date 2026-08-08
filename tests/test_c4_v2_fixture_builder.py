@@ -2,7 +2,21 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import hashlib
+import json
 import unittest
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BUILDER = PROJECT_ROOT / "tools" / "build_c4_v2_parity_fixture.py"
+RECEIPT = (
+    PROJECT_ROOT
+    / "strategy_sources"
+    / "frozen"
+    / "parity"
+    / "VOL_OVERLAY_DECISION_PARITY_RECEIPT.json"
+)
 
 
 class C4V2FixtureBuilderTests(unittest.TestCase):
@@ -36,6 +50,18 @@ class C4V2FixtureBuilderTests(unittest.TestCase):
     def test_builder_module_exists(self) -> None:
         self.assertIsNotNone(
             importlib.util.find_spec("tools.build_c4_v2_parity_fixture")
+        )
+
+    def test_converter_receipt_is_checkout_independent(self) -> None:
+        receipt = json.loads(RECEIPT.read_text(encoding="utf-8"))
+        self.assertEqual(
+            hashlib.sha256(BUILDER.read_bytes()).hexdigest(),
+            receipt["converter_sha256"],
+        )
+        attributes = (PROJECT_ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn(
+            "tools/build_c4_v2_parity_fixture.py text eol=lf",
+            attributes.splitlines(),
         )
 
     def test_exact_row_is_quantized_and_sanitized(self) -> None:

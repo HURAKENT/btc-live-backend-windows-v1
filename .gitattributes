@@ -1,4 +1,5 @@
 /.gitattributes text eol=lf
+tools/build_c4_v2_parity_fixture.py text eol=lf
 *.json -text
 registry/STRATEGY_REGISTRY_47.csv text eol=crlf
 strategy_sources/frozen/contracts/* -text whitespace=cr-at-eol,-blank-at-eof
