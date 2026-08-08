@@ -2,12 +2,14 @@
 
 | ID | Risk | Current evidence | Control | Status |
 |---|---|---|---|---|
-| R-001 | C3 may not re-arm after one rollover | V2 review hypothesis only | Reproduce A→B→C with real orchestrator/storage path before patching | OPEN |
-| R-002 | Mid-cutover crash recovery may be incomplete | V2 review hypothesis only | Inject crashes at durable cutover boundaries and same-DB restart | OPEN |
-| R-003 | C2/C3 PASS reports may have weak receipt linkage | Static report concern only | Compare executable logs/commits/pack contents; classify evidence | OPEN |
+| R-001 | C3 may not re-arm after one rollover | Reproduced before correction; recurring A→B→C now passes focused/process regression in Phase 0 | Receipt-backed Phase 0 report and pack | CLOSED_PHASE0 |
+| R-002 | Mid-cutover crash recovery may be incomplete | Durable committed-cutover identity and every other persisted rollover state pass same-DB restart tests | Receipt-backed Phase 0 report and pack | CLOSED_PHASE0 |
+| R-003 | C2/C3 PASS reports may have weak receipt linkage | Phase 0 stores command receipt, raw/stored hashes, report linkage and internally checksummed pack | Preserve historical reports; use Phase 0 revalidation evidence | CLOSED_PHASE0 |
 | R-004 | Exact Strict A/PF1 selector source may be absent | Bounded read-only search found 34/34 V1 sources; primary ledgers and Strict A/PF1 source hashes independently match | Freeze only the verified minimum source/spec and prove trade-level parity; never infer | SOURCE_DISCOVERY_VERIFIED |
 | R-005 | Embedded analysis packs omit some files referenced by their internal checksum lists | CRC passes, but EARLY_HORIZON references five absent files; EARLY_CONFIDENCE references `FINAL_REPORT.json`; NO_FADE pack references omitted cache files | Treat outer hashes as package integrity only; locate authoritative local artifacts by hash before C4 | OPEN |
 | R-006 | Existing schema may not support C7/import ledger | Current schema v2 has nine C1–C3 tables | Require RED persistence/restart evidence and versioned migration decision before schema change | OPEN |
 | R-007 | C11 may be interrupted by sleep/session loss | Real 48h requirement | Durable heartbeat, monotonic validity, single observer and resumable state | OPEN |
 | R-008 | Forbidden real-money surface could enter through paper abstractions | C7 adds execution/accounting concepts | Static/behavioral forbidden-surface audit; no auth/write adapter; trading_approval=false | OPEN |
 | R-009 | Source workspaces contain ancillary manifest variance | Early Horizon launcher differs from its manifest; volatility `src/sources.py` differs while `sources.py.before_numeric_tolerance_hotfix` matches the locked hash | Do not freeze the mismatched files; record exact candidate hashes and use only independently locked evaluator/contract inputs | OPEN |
+| R-010 | Test fixtures tied to calendar dates can expire | Static Gamma fixture expired on 2026-08-02 and caused an offline restart data gap on 2026-08-08 | Arm a stable future fake schedule once per restart test; keep production clock unchanged | CLOSED_PHASE0 |
+| R-011 | Evidence logs can disclose absolute user paths | Windows tracebacks include both repository and Python-install paths | Root/home placeholder sanitization plus residual path rejection and raw/stored hash commitments | CLOSED_PHASE0 |

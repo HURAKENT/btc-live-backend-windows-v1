@@ -6,8 +6,9 @@ Source baseline: `579289b550cff3793a74bbafba0d8e78670f0c2a`
 |---|---|---|
 | C0 Registry lock | PASS_HISTORICAL | Immutable 47-ID registry and hashes |
 | C1 Walking skeleton | PASS_HISTORICAL | Canonical C1 reports and pack |
-| C2 Recovery hardening | PASS_PROVISIONAL_REVIEW | Deterministic recovery report plus Phase 0 receipt audit |
-| C3 Market rollover | PASS_PROVISIONAL_REVIEW | Existing deterministic rollover plus A→B→C/crash hypothesis tests |
+| Phase 0 baseline/hardening | PASS | Receipt `4e1ceb2a...4155d`; report `c7172837...2574b`; pack `b6bd4965...dee39`; focused 101/full 647 |
+| C2 Recovery hardening | PASS_REVALIDATED_PHASE0 | Historical report plus receipt-bound recovery/restart regressions |
+| C3 Market rollover | PASS_REVALIDATED_PHASE0 | Recurring A→B→C, durable cutover restart and stream-liveness regressions |
 | C4 Executable rules/parity | NOT_STARTED | 47/47 exact sources/specs/evaluators/parity |
 | C5 Activation classification | NOT_STARTED | 47/47 machine-readable activation decisions |
 | C6 Scheduler/replay | NOT_STARTED | Exactly-once checkpoints and recovered replay |

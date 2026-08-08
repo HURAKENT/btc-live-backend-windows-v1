@@ -50,3 +50,22 @@ No identity advances to `RULE_SPEC_FROZEN`, `EVALUATOR_IMPLEMENTED` or a parity
 status until the minimum verified artifacts are copied, specified and replayed
 inside the backend repository. Ancillary manifest mismatches are preserved as
 risks and are never silently substituted.
+
+## D-007 — Phase 0 replaces provisional C2/C3 hardening evidence
+
+Date: 2026-08-08
+
+Decision: accept the reproduced recurring-rollover, durable-cutover and stream-
+liveness corrections only through the receipt-linked Phase 0 report and pack at
+evidence commit `b435e0e`. Historical C1/C2/C3 reports remain byte-immutable;
+their product gates are revalidated by new evidence rather than rewritten.
+
+## D-008 — Evidence output is sanitized but raw-output committed
+
+Date: 2026-08-08
+
+Decision: stored command output replaces exact project-root and user-home
+prefixes with fixed placeholders. The receipt binds raw per-stream SHA-256,
+stored per-stream SHA-256, replacement counters and aggregate commitments.
+Any residual Windows or WSL user path fails closed. This preserves command
+integrity without persisting an absolute user path.
