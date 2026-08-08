@@ -260,6 +260,15 @@ def apply_identity_checkpoint_policy(
             raise ValueError("MISSING_PRIMARY_IDENTITY_CHECKPOINT")
         if primary.accepted:
             return (primary,)
+        if (
+            identity_id == "YES_FAVORITE_ONLY"
+            and primary.reason == "CANDIDATE_B_SELECTED_NOT_UNIQUE_FAVORITE"
+        ):
+            # The frozen identity is a filter over the already-selected
+            # operational Candidate-B trade.  A valid T60 Candidate-B trade
+            # that is not the unique favorite is terminal; it must not be
+            # reinterpreted as a missing T60 trade eligible for T30 fallback.
+            return (primary,)
         fallback = by_checkpoint.get(policy.checkpoints[1])
         if fallback is None:
             raise ValueError("MISSING_FALLBACK_IDENTITY_CHECKPOINT")

@@ -603,6 +603,23 @@ class StrategyV1Tests(unittest.TestCase):
         self.assertEqual("CANDIDATE_B_SELECTED_NOT_UNIQUE_FAVORITE", result.reason)
         self.assertEqual((2,), result.selected_bucket_indices)
 
+    def test_favorite_only_does_not_fallback_after_candidate_b_nonfavorite_trade(self):
+        t60 = self._replace(
+            self._buckets(), 2, model_p=0.40, market_q_yes=0.10
+        )
+        t30 = self._replace(self._buckets(), 5, model_p=0.25)
+        primary = self._api("evaluate_favorite_only")(60, t60)
+        fallback = self._api("evaluate_favorite_only")(30, t30)
+
+        selected = self._api("apply_identity_checkpoint_policy")(
+            "YES_FAVORITE_ONLY", (primary, fallback)
+        )
+
+        self.assertFalse(selected[0].accepted)
+        self.assertEqual(
+            "CANDIDATE_B_SELECTED_NOT_UNIQUE_FAVORITE", selected[0].reason
+        )
+
     def test_confirmation_a2_b2_near_tie_chooses_lower_index(self):
         rows = self._replace(self._buckets(), 2, model_p=0.20, market_q_no=0.70)
         rows = self._replace(rows, 3, model_p=0.20, market_q_no=0.6999999999995)
