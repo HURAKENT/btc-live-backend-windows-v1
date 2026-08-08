@@ -23,6 +23,7 @@ V1_SOURCE_SHA256: Mapping[str, str] = MappingProxyType(
         "EARLY_HORIZON_STRATEGIES": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0",
         "EARLY_CONFIDENCE_SELECTORS": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430",
         "NO_CONFIRMATION_CONCEPTS": "45be74ea8825e504fda85d3d3b365275c92ceec37831080f422f370704b661c2",
+        "NO_A0_FROZEN_RULES": "a510e45a5dfa4399bf05d8a418d28c055383cc0dfb8062e725c86ef105215e70",
         "NO_FADE_RULES": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822",
         "NO_FADE_ENGINE": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c",
         "FAVORITE_BASKET_RULES": "d942e94f11fe4318de048f22e4864006f7bd1d64e06a00520c971160c8c800ef",
@@ -247,22 +248,28 @@ def apply_identity_checkpoint_policy(
             raise ValueError("DUPLICATE_IDENTITY_CHECKPOINT")
         by_checkpoint[result.checkpoint_minutes] = result
     policy = V1_IDENTITY_POLICIES[identity_id]
+    if policy.mode == "FALLBACK":
+        primary = by_checkpoint.get(policy.checkpoints[0])
+        if primary is None:
+            raise ValueError("MISSING_PRIMARY_IDENTITY_CHECKPOINT")
+        if primary.accepted:
+            return (primary,)
+        fallback = by_checkpoint.get(policy.checkpoints[1])
+        if fallback is None:
+            raise ValueError("MISSING_FALLBACK_IDENTITY_CHECKPOINT")
+        return (fallback,)
+    if any(checkpoint not in by_checkpoint for checkpoint in policy.checkpoints):
+        raise ValueError("MISSING_REQUIRED_IDENTITY_CHECKPOINTS")
     ordered = tuple(
         by_checkpoint[checkpoint]
         for checkpoint in policy.checkpoints
-        if checkpoint in by_checkpoint
     )
-    if not ordered:
-        raise ValueError("MISSING_IDENTITY_CHECKPOINT")
     if policy.mode in {"FIXED", "PAIR", "INDEPENDENT"}:
         return ordered
     if policy.mode == "EARLIEST_ONLY":
         return (ordered[0],)
     if policy.mode == "LATEST_ONLY":
         return (ordered[-1],)
-    if policy.mode == "FALLBACK":
-        accepted = next((result for result in ordered if result.accepted), None)
-        return (accepted if accepted is not None else ordered[-1],)
     raise ValueError("INVALID_IDENTITY_POLICY")
 
 
@@ -658,7 +665,7 @@ def evaluate_no_fade(
             no_execution=execution,
         )
     actual_cost = execution.actual_no_vwap5 + execution.confirmed_fee
-    actual_edge = p_no - actual_cost
+    actual_edge = p_no - execution.actual_no_vwap5
     if actual_edge < _EDGE_MINIMUM - _STRICT_TOL:
         return _rejected(
             "NO_EXECUTABLE_EDGE_GATE_REJECTED",
@@ -803,13 +810,17 @@ def _confirmation_single(
                 "NO_UNIQUE_MARKET_FAVORITE", side="NO", checkpoint_minutes=checkpoint
             )
         pool = tuple(row for row in ordered if row is not favorite)
-        selected = max(
-            pool,
-            key=lambda row: (
-                row.market_q_yes - row.model_p,
-                -row.bucket_index,
-            ),
-        )
+        scores = tuple((row.market_q_yes - row.model_p, row) for row in pool)
+        maximum = max(score for score, _ in scores)
+        tied = tuple(row for score, row in scores if score == maximum)
+        if len(tied) != 1:
+            return _rejected(
+                "A0_TIED_SELECTOR_SCORE",
+                side="NO",
+                checkpoint_minutes=checkpoint,
+                favorite=favorite.bucket_index,
+            )
+        selected = tied[0]
         edge = selected.market_q_yes - selected.model_p
         accepted = edge + _CONFIRMATION_TOL >= _NO_EDGE_MINIMUM
         actual_q = _actual_no(selected)

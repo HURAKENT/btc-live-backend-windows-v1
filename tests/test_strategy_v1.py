@@ -144,6 +144,10 @@ class StrategyV1Tests(unittest.TestCase):
             hashes["NO_CONFIRMATION_CONCEPTS"],
         )
         self.assertEqual(
+            "a510e45a5dfa4399bf05d8a418d28c055383cc0dfb8062e725c86ef105215e70",
+            hashes["NO_A0_FROZEN_RULES"],
+        )
+        self.assertEqual(
             "d942e94f11fe4318de048f22e4864006f7bd1d64e06a00520c971160c8c800ef",
             hashes["FAVORITE_BASKET_RULES"],
         )
@@ -409,7 +413,33 @@ class StrategyV1Tests(unittest.TestCase):
         self.assertAlmostEqual(0.85, result.actual_no_vwap5)
         self.assertAlmostEqual(0.01, result.actual_no_fee)
         self.assertAlmostEqual(0.86, result.actual_no_execution_cost)
-        self.assertAlmostEqual(0.09, result.actual_no_executable_edge)
+        self.assertAlmostEqual(0.10, result.actual_no_executable_edge)
+
+    def test_no_fade_execution_edge_excludes_fee_but_fee_remains_required(self):
+        rows = self._replace(self._buckets(), 2, model_p=0.05, market_q_yes=0.10)
+        result = self._api("evaluate_no_fade")(
+            "NO_FADE_P1_U1_OPERATIONAL",
+            60,
+            rows,
+            no_execution=self._no_execution(
+                actual_no_vwap5=0.92,
+                confirmed_fee=0.02,
+            ),
+        )
+        self.assertTrue(result.accepted)
+        self.assertAlmostEqual(0.94, result.actual_no_execution_cost)
+        self.assertAlmostEqual(0.03, result.actual_no_executable_edge)
+
+        not_calculable = self._api("evaluate_no_fade")(
+            "NO_FADE_P1_U1_OPERATIONAL",
+            60,
+            rows,
+            no_execution=self._no_execution(
+                actual_no_vwap5=0.92,
+                confirmed_fee=None,
+            ),
+        )
+        self.assertEqual("NO_EXECUTION_NOT_CALCULABLE", not_calculable.reason)
 
     def test_no_fade_actual_no_gate_rejects_depth_fee_and_edge(self):
         rows = self._replace(self._buckets(), 2, model_p=0.05, market_q_yes=0.10)
@@ -442,6 +472,16 @@ class StrategyV1Tests(unittest.TestCase):
         tails = self._replace(tails, 1, model_p=0.20, market_q_no=0.6999999999995)
         b2 = self._api("evaluate_confirmation")("NO_B2", tails)
         self.assertEqual((0,), b2.selected_bucket_indices)
+
+    def test_confirmation_a0_exact_selector_score_tie_is_no_signal(self):
+        rows = self._replace(
+            self._buckets(), 2, model_p=0.05, market_q_yes=0.10
+        )
+        rows = self._replace(rows, 3, model_p=0.05, market_q_yes=0.10)
+        result = self._api("evaluate_confirmation")("NO_A0", rows)
+        self.assertFalse(result.accepted)
+        self.assertEqual("A0_TIED_SELECTOR_SCORE", result.reason)
+        self.assertEqual((), result.selected_bucket_indices)
 
     def test_strict_requires_exact_clob_price_history_provenance(self):
         rows = self._replace(self._buckets(), 5, model_p=0.26, vwap5=0.21)
@@ -564,6 +604,45 @@ class StrategyV1Tests(unittest.TestCase):
                 "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY", (early18,)
             ),
         )
+
+    def test_fallback_policy_requires_primary_before_fallback(self):
+        apply_policy = self._api("apply_identity_checkpoint_policy")
+        result_type = self._api("V1Evaluation")
+        accepted30 = result_type(True, "SIGNAL_ACCEPTED", "NO", 30, (2,))
+        with self.assertRaisesRegex(
+            ValueError, "MISSING_PRIMARY_IDENTITY_CHECKPOINT"
+        ):
+            apply_policy("NO_FADE_P1_U1_OPERATIONAL", (accepted30,))
+        accepted60 = dataclasses.replace(accepted30, checkpoint_minutes=60)
+        self.assertEqual(
+            (accepted60,),
+            apply_policy("NO_FADE_P1_U1_OPERATIONAL", (accepted60,)),
+        )
+
+    def test_fallback_policy_requires_fallback_when_primary_rejects(self):
+        apply_policy = self._api("apply_identity_checkpoint_policy")
+        result_type = self._api("V1Evaluation")
+        rejected60 = result_type(False, "REJECT", "NO", 60, ())
+        with self.assertRaisesRegex(
+            ValueError, "MISSING_FALLBACK_IDENTITY_CHECKPOINT"
+        ):
+            apply_policy("NO_FADE_P1_U1_OPERATIONAL", (rejected60,))
+
+    def test_pair_and_independent_policies_require_complete_evidence(self):
+        apply_policy = self._api("apply_identity_checkpoint_policy")
+        result_type = self._api("V1Evaluation")
+        accepted60 = result_type(True, "SIGNAL_ACCEPTED", "NO", 60, (2,))
+        early18 = dataclasses.replace(accepted60, checkpoint_minutes=1080)
+        cases = (
+            ("NO_C1", (accepted60,)),
+            ("NO_FADE_P1_U1_EARLY_COMBINED", (early18,)),
+        )
+        for identity, evaluations in cases:
+            with self.subTest(identity=identity):
+                with self.assertRaisesRegex(
+                    ValueError, "MISSING_REQUIRED_IDENTITY_CHECKPOINTS"
+                ):
+                    apply_policy(identity, evaluations)
 
 
 if __name__ == "__main__":
