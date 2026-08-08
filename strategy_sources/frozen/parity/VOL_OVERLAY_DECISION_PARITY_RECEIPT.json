@@ -1,0 +1,16 @@
+{
+  "analysis_pack_sha256": "75b2048911202790cfbeef4632e2c07cb8d89d123eb57ecddbf599eae44e6927",
+  "converter_sha256": "7f2632bfddd2f96adc1007f2f28f9bc6bed826c5031d9876c47f10a24439b807",
+  "fixture_row_count": 694,
+  "fixture_sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f",
+  "input_parquet_sha256": "8738a6d7850a50071702d4c6dce795021ded7c90b4060894584b2a65a1376c02",
+  "network_requests": 0,
+  "pyarrow_version": "25.0.0",
+  "quantization_ambiguities": 0,
+  "quantization_policy": "Decimal(str(value))*1000000 ROUND_HALF_EVEN",
+  "schema_version": "C4_V2_PARITY_FIXTURE_RECEIPT_V1",
+  "source_commit": "706ebe1f4a815e8a14f7db555c28ae6ab9e88b55",
+  "source_row_count": 4308,
+  "strategy_count": 13,
+  "trading_approval": false
+}

@@ -159,7 +159,13 @@ class StrategyRulePackContractTests(unittest.TestCase):
         overlay = pack.family_spec("VOL_OVERLAY_A_V1")
         self.assertEqual(
             set(overlay.artifact_ids),
-            {"SRC_VOL_OVERLAY", "SRC_VOL_PROBABILITY", "CONTRACT_VOL_OVERLAY"},
+            {
+                "SRC_VOL_OVERLAY",
+                "SRC_VOL_PROBABILITY",
+                "CONTRACT_VOL_OVERLAY",
+                "PARITY_VOL_OVERLAY_DECISIONS",
+                "PARITY_VOL_OVERLAY_RECEIPT",
+            },
         )
         self.assertEqual(
             pack.artifact("SRC_VOL_PROBABILITY").sha256,

@@ -113,6 +113,20 @@
       "size_bytes": 150652
     },
     {
+      "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+      "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+      "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+      "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f",
+      "size_bytes": 475036
+    },
+    {
+      "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+      "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+      "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+      "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566",
+      "size_bytes": 757
+    },
+    {
       "artifact_id": "SRC_EARLY_CONFIDENCE_EXPERIMENT",
       "relative_path": "source_snapshots/early_confidence_experiment.py.source",
       "role": "EXACT_COMPOSITION_SOURCE",
@@ -429,7 +443,9 @@
       "artifact_ids": [
         "SRC_VOL_OVERLAY",
         "SRC_VOL_PROBABILITY",
-        "CONTRACT_VOL_OVERLAY"
+        "CONTRACT_VOL_OVERLAY",
+        "PARITY_VOL_OVERLAY_DECISIONS",
+        "PARITY_VOL_OVERLAY_RECEIPT"
       ],
       "evaluator_key": "VOL_OVERLAY_A_V1",
       "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
