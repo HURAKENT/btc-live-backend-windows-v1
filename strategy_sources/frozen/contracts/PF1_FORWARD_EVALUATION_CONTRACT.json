@@ -1,0 +1,104 @@
+{
+  "contract_id": "LSMV-PF1-FORWARD-EVAL-v1",
+  "strategy_id": "LSMV-PF1",
+  "status": "FROZEN_BEFORE_FIRST_FORWARD_OBSERVATION",
+  "purpose": "Prospective paper-forward evaluation only; not a live or trading approval.",
+  "base_trade_size_shares": 5,
+  "data_separation": {
+    "historical_label": "HISTORICAL_DIAGNOSTIC",
+    "forward_label": "FORWARD_PAPER",
+    "merge_prohibited": true
+  },
+  "signal_entities": {
+    "MODEL_CANDIDATE": "Checkpoint-level model ranking over all 11 buckets. May exist without sufficient 5-share depth. It is diagnostic only and is not a PF1 signal.",
+    "PF1_SIGNAL": "A selected bucket for which a valid synchronized snapshot exists, actual 5-share VWAP is computable, model_p - VWAP5 >= 0.02, VWAP5 <= 0.95, and all frozen data gates pass.",
+    "EXECUTABLE_PAPER_TRADE": "A PF1_SIGNAL recorded at exactly 5 shares under the frozen one-position/fallback rules."
+  },
+  "primary_metric": {
+    "name": "actual_vwap5_net_pnl",
+    "formula": "5 * (settlement_payout_per_share - actual_vwap5 - actual_fee_per_share)",
+    "notes": "No fixed historical stress is substituted for actual VWAP5."
+  },
+  "mandatory_secondary_metrics": [
+    "total_actual_vwap5_net_pnl",
+    "roi_on_fixed_100_usd_deposit",
+    "roi_on_turnover",
+    "t60_trade_count_and_pnl",
+    "t30_fallback_trade_count_and_pnl",
+    "model_candidate_count",
+    "pf1_signal_count",
+    "executable_paper_trade_count",
+    "checkpoint_validity_rate",
+    "pf1_signal_rate",
+    "rejection_counts_by_reason",
+    "average_spread",
+    "average_vwap5_minus_best_ask",
+    "max_drawdown_5_shares",
+    "remove_top_1_3_5_pnl",
+    "top_1_3_5_concentration",
+    "five_nonoverlapping_20_signal_blocks",
+    "rolling_30_day_pnl_and_roi",
+    "model_mean_p_vs_observed_hit_rate",
+    "brier_model",
+    "brier_executable_q",
+    "q_bins_le_90_and_90_to_95",
+    "price_age_bins_0_5_6_15_16_30_31_60_seconds",
+    "model_p_exact_one_flag_results"
+  ],
+  "checkpoint_50": {
+    "type": "INTERIM_INTEGRITY_AND_PROGRESS_AUDIT",
+    "requires_settled_executable_paper_trades": 50,
+    "parameter_changes_allowed": false,
+    "performance_based_stop_allowed": false,
+    "allowed_actions": [
+      "continue unchanged",
+      "stop only for implementation/data-integrity/safety failure",
+      "publish descriptive interim metrics without promotion"
+    ],
+    "prohibited_actions": [
+      "change threshold",
+      "change q cap",
+      "change models",
+      "change checkpoints",
+      "add probability clipping selected from outcomes",
+      "exclude losing trades or dates",
+      "promote to live review"
+    ]
+  },
+  "checkpoint_100": {
+    "type": "PRIMARY_FROZEN_REVIEW",
+    "requires_settled_executable_paper_trades": 100,
+    "block_definition": "Five consecutive non-overlapping blocks of 20 settled executable paper trades, ordered by decision timestamp.",
+    "core_gates": {
+      "aggregate_actual_vwap5_net_pnl_gt_0": true,
+      "t60_component_pnl_gt_0": true,
+      "no_contract_or_integrity_breach": true
+    },
+    "robustness_gates": {
+      "remove_top_5_pnl_gt_0": true,
+      "top_5_concentration_lte": 0.35,
+      "positive_20_signal_blocks_gte": 4,
+      "q_le_90_component_pnl_gt_0": true,
+      "model_overconfidence_mean_p_minus_hit_rate_lte": 0.05,
+      "brier_model_minus_brier_executable_q_lte": 0.01,
+      "max_drawdown_on_100_usd_lte": 25.0
+    },
+    "operational_gates": {
+      "valid_checkpoint_rate_gte": 0.9,
+      "pf1_signal_to_model_candidate_rate_report_only": true,
+      "missing_depth_and_other_rejections_must_be_reported": true
+    }
+  },
+  "status_mapping_at_100": {
+    "FORWARD_PAPER_SUPPORTED": "All core, robustness and operational gates pass. This remains paper evidence only and is not a live verdict.",
+    "FORWARD_PAPER_WEAK": "All core gates pass, but at least one robustness or operational gate fails.",
+    "FORWARD_PAPER_FAILED": "Aggregate actual-VWAP5 net PnL <= 0 or T60 component PnL <= 0.",
+    "FORWARD_CONTRACT_INVALIDATED": "Config/hash drift, lookahead, journal corruption, missing immutable provenance, trading write path, or other material implementation/safety breach."
+  },
+  "immutability": {
+    "freeze_before_first_forward_observation": true,
+    "changes_require_new_strategy_id": "LSMV-PF2",
+    "pf1_and_pf2_results_must_not_be_combined": true
+  },
+  "no_live_permission": true
+}

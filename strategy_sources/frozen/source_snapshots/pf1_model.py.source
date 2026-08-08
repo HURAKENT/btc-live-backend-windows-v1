@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+import bisect
+import json
+import math
+from pathlib import Path
+
+import numpy as np
+from scipy.stats import t
+
+from .core import assert_no_future_candles, contract_hash
+
+
+def load_bundle(path: Path) -> dict:
+    bundle = json.loads(path.read_text(encoding="utf-8"))
+    if contract_hash(bundle, "bundle_sha256") != bundle["bundle_sha256"]:
+        raise ValueError("model bundle hash mismatch")
+    return bundle
+
+
+def empirical_cdf(sorted_values: list[float], x: float) -> float:
+    return bisect.bisect_right(sorted_values, x) / len(sorted_values)
+
+
+def terminal_probabilities(candles: list[list], decision_ms: int, horizon_minutes: int,
+                           bounds: list[tuple[float | None, float | None]], bundle: dict) -> dict:
+    closed = [row for row in candles if int(row[6]) <= decision_ms]
+    if len(closed) < 181:
+        raise ValueError("MODEL_INPUT_MISSING")
+    assert_no_future_candles(closed, decision_ms)
+    close = np.array([float(row[4]) for row in closed[-181:]], dtype=float)
+    returns = np.diff(np.log(close))
+    sigma = float(np.std(returns, ddof=1))
+    if not math.isfinite(sigma) or sigma <= 0:
+        raise ValueError("MODEL_INPUT_MISSING")
+    spot = float(close[-1])
+    scale = sigma * math.sqrt(horizon_minutes)
+    spec = bundle["checkpoints"][str(horizon_minutes)]
+    model_name = spec["model_name"]
+
+    def cdf_price(price: float | None, upper: bool) -> float:
+        if price is None:
+            return 1.0 if upper else 0.0
+        z = math.log(float(price) / spot) / scale
+        if model_name == "student_t":
+            return float(t.cdf(z, spec["df"], loc=spec["loc"], scale=spec["scale"]))
+        if model_name == "volatility_scaled_empirical":
+            return empirical_cdf(spec["sorted_z"], z)
+        raise ValueError(model_name)
+
+    probabilities = []
+    for lower, upper in bounds:
+        lo = cdf_price(lower, False)
+        hi = cdf_price(upper, True)
+        probabilities.append(max(0.0, hi - lo))
+    return {"model_name": model_name, "probabilities": probabilities,
+            "probability_sum": float(sum(probabilities)), "spot": spot,
+            "training_cutoff": bundle["training_cutoff"],
+            "sigma_180m": sigma, "max_feature_close_time_ms": int(closed[-1][6]),
+            "no_lookahead": int(closed[-1][6]) <= decision_ms}

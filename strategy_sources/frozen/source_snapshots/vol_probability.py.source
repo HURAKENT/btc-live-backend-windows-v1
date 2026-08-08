@@ -1,0 +1,39 @@
+from __future__ import annotations
+import math,re
+from typing import Any
+from scipy.stats import norm,t
+
+def parse_bucket_title(title:str)->tuple[float|None,float|None]:
+    s=str(title).strip().replace('$','').replace(',','').replace(' ','').replace('–','-').replace('—','-').lower()
+    s=s.replace('lessthan','<').replace('orless','<').replace('ormore','+').replace('orhigher','+')
+    if s.startswith('<'):return None,float(s[1:])
+    if s.startswith('≤') or s.startswith('<='):return None,float(s.lstrip('≤<='))
+    if s.endswith('+'):return float(s[:-1]),None
+    if s.startswith('>'):return float(s[1:]),None
+    m=re.fullmatch(r'([0-9.]+)-([0-9.]+)',s)
+    if not m:raise ValueError(f'BUCKET_TITLE_UNPARSEABLE:{title}')
+    return float(m.group(1)),float(m.group(2))
+def _bounds(lower,upper,spot):
+    if spot<=0:raise ValueError('SPOT_NONPOSITIVE')
+    return (-math.inf if lower is None else math.log(lower/spot),math.inf if upper is None else math.log(upper/spot))
+def gaussian_bucket_probability(lower,upper,spot,variance)->float:
+    lo,hi=_bounds(lower,upper,spot); sd=math.sqrt(max(float(variance),1e-18)); return float(npclip(norm.cdf(hi/sd)-norm.cdf(lo/sd)))
+def student_t_bucket_probability(lower,upper,spot,variance,nu)->float:
+    lo,hi=_bounds(lower,upper,spot); nu=float(max(nu,4.1)); scale=math.sqrt(max(float(variance),1e-18)*(nu-2)/nu); return float(npclip(t.cdf(hi/scale,nu)-t.cdf(lo/scale,nu)))
+def npclip(x):return min(1.0,max(0.0,float(x)))
+def basket_probability(probabilities:list[float])->float:
+    total=sum(map(float,probabilities))
+    if total>1+1e-9 or total<0:raise ValueError('BASKET_PROBABILITY_INVALID')
+    return min(1.0,max(0.0,total))
+def split_bucket_expression(expr:str)->list[str]:return [x.strip() for x in str(expr).split('|') if x.strip()]
+def build_vol_aware_probabilities(decisions:list[dict[str,Any]],features:list[dict[str,Any]])->list[dict[str,Any]]:
+    fmap={(r['market_date'],int(r['checkpoint_minutes'])):r for r in features}; out=[]
+    for d in decisions:
+        f=fmap.get((d['market_date'],int(d['checkpoint_minutes'])))
+        if f is None:continue
+        probs=[]; gauss=[]
+        for title in split_bucket_expression(d['selected_bucket']):
+            lo,hi=parse_bucket_title(title); probs.append(student_t_bucket_probability(lo,hi,float(f['spot']),float(f['forecast_variance']),float(f['student_t_df']))); gauss.append(gaussian_bucket_probability(lo,hi,float(f['spot']),float(f['forecast_variance'])))
+        pyes=basket_probability(probs); pgauss=basket_probability(gauss); pside=pyes if d['side']=='YES' else 1-pyes
+        out.append({**d,'evaluation_block':int(f['evaluation_block']),'p_vol_yes':pyes,'p_vol_no':1-pyes,'p_vol_side':pside,'p_vol_yes_gaussian':pgauss,'forecast_variance':f['forecast_variance'],'forecast_model':f['model_config'],'volatility_regime':f['regime'],'forecast_row_sha256':__import__('hashlib').sha256(str(sorted(f.items())).encode()).hexdigest()})
+    return out

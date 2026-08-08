@@ -1,0 +1,33 @@
+from __future__ import annotations
+import numpy as np, pandas as pd
+TOL=1e-12
+def prep(f):
+    x=f.sort_values("bucket_index").copy(); x["pNO"]=1-x.model_p; x["direct_no_edge"]=x.pNO-x.actual_qNO; x["legacy_proxy_no_edge"]=x.market_q_raw-x.model_p; return x
+def favorite(f):
+    m=f.market_q_raw.max(); x=f[np.abs(f.market_q_raw-m)<=TOL]; return x.iloc[0] if len(x)==1 else None
+def choose_single(concept,f):
+    x=prep(f); fav=favorite(x)
+    if concept=="A2": pool=x
+    elif concept=="A0":
+        if fav is None:return None
+        pool=x[x.bucket_index!=fav.bucket_index]; row=pool.sort_values(["legacy_proxy_no_edge","bucket_index"],ascending=[False,True]).iloc[0]
+        return row.to_dict() if row.legacy_proxy_no_edge+TOL>=.05 else None
+    elif concept=="B2": pool=x[x.bucket_index.isin([0,1,9,10])]
+    else: raise ValueError("UNAPPROVED_CONCEPT")
+    row=pool.sort_values(["direct_no_edge","bucket_index"],ascending=[False,True]).iloc[0]
+    return row.to_dict() if row.direct_no_edge+TOL>=.05 else None
+def choose_c1(t60,t30):
+    a=prep(t60); b=prep(t30); f60=favorite(a); f30=favorite(b)
+    if f60 is None or f30 is None or f60.bucket_index==f30.bucket_index:return None
+    r=b[b.no_token_id.astype(str)==str(f60.no_token_id)]
+    if len(r)!=1:return None
+    row=r.iloc[0]; drop=float(f60.model_p-row.model_p)
+    if drop+TOL<.02 or row.direct_no_edge+TOL<.05:return None
+    out=row.to_dict(); out["model_drop"]=drop; return out
+def decision(concept,date_grid):
+    t60=date_grid[date_grid.checkpoint=="T-60"]; t30=date_grid[date_grid.checkpoint=="T-30"]
+    if concept=="C1": return ("T-30",choose_c1(t60,t30)) if choose_c1(t60,t30) is not None else None
+    for cp,f in [("T-60",t60),("T-30",t30)]:
+        r=choose_single(concept,f)
+        if r is not None:return cp,r
+    return None

@@ -1,0 +1,102 @@
+{
+  "checkpoints": {
+    "T30": {
+      "fallback_only": true,
+      "minutes": 30,
+      "model": "volatility_scaled_empirical"
+    },
+    "T60": {
+      "minutes": 60,
+      "model": "student_t",
+      "primary": true
+    }
+  },
+  "config_sha256": "1d2edd796b29e7520a08997f337c9d351182454269fa56c511a7b58d4993bfe5",
+  "created_at_utc": "2026-07-14T16:21:05.443834+00:00",
+  "data_layer": "FORWARD_PAPER",
+  "deployment": "PAPER_SHADOW_ONLY",
+  "diagnostic_overlays_cents": [
+    1,
+    2,
+    3
+  ],
+  "entry": {
+    "comparison": "greater_than_or_equal",
+    "full_depth_required": true,
+    "minimum_raw_edge": 0.02,
+    "shares": 5,
+    "vwap5_cap": 0.95
+  },
+  "evaluation": {
+    "minimum_settled_executable_signals": 50,
+    "no_early_verdict": true,
+    "preferred_settled_executable_signals": 100,
+    "primary_deposit_usd": 100
+  },
+  "evaluation_contract": {
+    "contract_id": "LSMV-PF1-FORWARD-EVAL-v1",
+    "file_path": "config/FORWARD_EVALUATION_CONTRACT.json",
+    "file_sha256": "c6535fe8b2d4327582c1bcbbbf2c7fe67f52e009033721362b8a8e4fb4cc011f",
+    "markdown_path": "config/FORWARD_EVALUATION_CONTRACT.md",
+    "semantic_sha256": "c54dee719210fabb3f3738a29306b83942ebf4edcb2e7d0b215e7a881dd5e356"
+  },
+  "fallback": {
+    "evaluate_T30_only_without_T60_position": true,
+    "preserve_T60_decision_and_rejection": true
+  },
+  "feature_schema_sha256": "f196c893b43bda7491f8656e70cc3ac96c530c78c5fdcb68a15ff21dd70a92ce",
+  "fees": {
+    "default": 0.0,
+    "unresolved_fee_policy_blocks_settlement_finalization": true,
+    "zero_only_when_provenance_confirms_no_fee": true
+  },
+  "live": "DISABLED",
+  "model_bundle_sha256": "8ab6fc181dd875d8c484835afb4375711ce6ff7aeaac8ca304b131f287fb2ea6",
+  "overlays_do_not_change_signal": true,
+  "parent_frozen_model_sha256": "11217a2b2060e9682b365916774ac6feb87cfbe116cd4053a68d6d10021a143a",
+  "position": {
+    "add": false,
+    "exit": "HOLD_TO_SETTLEMENT",
+    "hedge": false,
+    "maximum_per_event": 1,
+    "rescue": false,
+    "rotation": false
+  },
+  "primary_shares": 5,
+  "prohibited": [
+    "wallet connection",
+    "private credentials",
+    "trade authentication",
+    "signing",
+    "approvals",
+    "allowance",
+    "order creation",
+    "order placement",
+    "cancel or replace",
+    "trading write endpoints"
+  ],
+  "research_status": "FROZEN_PAPER_FORWARD_HYPOTHESIS",
+  "schema_version": "1.0",
+  "selector": "argmax(model_p_raw - actual_yes_vwap5); exact tie -> lower bucket_index",
+  "settlement": {
+    "local_time": "12:00:00",
+    "source": "Binance BTCUSDT 1m final close",
+    "tie_rule": "exact boundary maps to higher bucket",
+    "timezone": "America/New_York"
+  },
+  "snapshot": {
+    "all_11_yes_books": true,
+    "first_complete_after_target": true,
+    "max_bucket_skew_seconds": 5,
+    "max_price_age_seconds": 60,
+    "max_target_delay_seconds": 60
+  },
+  "source_inventory_sha256": "dc61eb63c1a38719c393eb5aaa5e39f5b4dd06396940040decce70af06e9f715",
+  "strategy_id": "LSMV-PF1",
+  "universe": {
+    "asset": "BTC",
+    "mutually_exclusive": true,
+    "required_buckets": 11,
+    "series": "Polymarket Bitcoin price on [date]?"
+  }
+}

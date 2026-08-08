@@ -1,0 +1,159 @@
+from __future__ import annotations
+
+import math
+from typing import Any
+
+from .calibration import shrink_probability, zone_for_horizon
+
+TOL = 1e-9
+
+
+class SelectorError(RuntimeError):
+    pass
+
+
+def _ordered(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len(rows) != 11 or len({int(row["bucket_index"]) for row in rows}) != 11:
+        raise SelectorError("EXPECTED_EXACTLY_11_BUCKETS")
+    return sorted(rows, key=lambda row: int(row["bucket_index"]))
+
+
+def unique_yes_favorite(rows: list[dict[str, Any]]) -> int | None:
+    ordered = _ordered(rows)
+    maximum = max(float(row["q_yes"]) for row in ordered)
+    tied = [int(row["bucket_index"]) for row in ordered if abs(float(row["q_yes"]) - maximum) <= TOL]
+    return tied[0] if len(tied) == 1 else None
+
+
+def select_pf1_bucket(rows: list[dict[str, Any]]) -> int:
+    ordered = _ordered(rows)
+    ranked = sorted(
+        ordered,
+        key=lambda row: (-(float(row["model_p"]) - float(row["q_yes"])), int(row["bucket_index"])),
+    )
+    return int(ranked[0]["bucket_index"])
+
+
+def select_no_fade_p1_bucket(rows: list[dict[str, Any]]) -> int | None:
+    ordered = _ordered(rows)
+    favorite = unique_yes_favorite(ordered)
+    if favorite is None:
+        return None
+    candidates = [row for row in ordered if int(row["bucket_index"]) != favorite]
+    scores = [(float(row["model_p"]) - float(row["q_yes"]), int(row["bucket_index"])) for row in candidates]
+    minimum = min(score for score, _ in scores)
+    tied = [bucket for score, bucket in scores if abs(score - minimum) <= TOL]
+    return tied[0] if len(tied) == 1 else None
+
+
+def _finite_probability(value: float, field: str) -> float:
+    number = float(value)
+    if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+        raise SelectorError(f"INVALID_{field}:{number}")
+    return number
+
+
+def _base_record(
+    row: dict[str, Any],
+    strategy: str,
+    universe: str,
+    side: str,
+    regime: str,
+    evaluation_block: int,
+    lambda_value: float,
+) -> dict[str, Any]:
+    return {
+        "trade_id": f"{strategy}|{universe}|{row['market_date']}|{int(row['horizon_minutes'])}|{regime}",
+        "market_date": str(row["market_date"]),
+        "evaluation_block": int(evaluation_block),
+        "strategy": strategy,
+        "universe": universe,
+        "horizon_minutes": int(row["horizon_minutes"]),
+        "regime": regime,
+        "selected_bucket": int(row["bucket_index"]),
+        "side": side,
+        "lambda_zone": zone_for_horizon(int(row["horizon_minutes"])),
+        "lambda_value": float(lambda_value),
+        "model_p_yes": float(row["model_p"]),
+        "q_norm_yes": float(row["q_norm_yes"]),
+        "actual_winner": bool(row["actual_winner"]),
+        "target_timestamp": int(row.get("target_timestamp", 0) or 0),
+        "yes_observation_timestamp": int(row.get("yes_observation_timestamp", 0) or 0),
+        "no_observation_timestamp": int(row.get("no_observation_timestamp", 0) or 0),
+        "observation_age_seconds": max(int(row.get("yes_age_seconds", 0)), int(row.get("no_age_seconds", 0))),
+    }
+
+
+def evaluate_pf1_trade(
+    row: dict[str, Any],
+    regime: str,
+    lambda_value: float,
+    evaluation_block: int,
+    shares: int = 5,
+    stress: float = 0.03,
+    min_edge: float = 0.02,
+) -> dict[str, Any]:
+    record = _base_record(row, "PF1", "ALL", "YES", regime, evaluation_block, lambda_value)
+    p_cons = float(shrink_probability([row["model_p"]], [row["q_norm_yes"]], lambda_value)[0])
+    actual_q = _finite_probability(row["q_yes"], "Q_YES")
+    stressed_q = min(1.0, actual_q + float(stress))
+    raw_edge = float(row["model_p"]) - actual_q
+    conservative_edge = p_cons - actual_q
+    # Baseline exactly preserves V1 PF1 acceptance. Calibration only replaces model p in the same gate.
+    accepted = conservative_edge >= float(min_edge) - TOL and actual_q <= 0.97 + TOL
+    won = bool(row["actual_winner"])
+    record.update({
+        "p_cons": p_cons,
+        "actual_q": actual_q,
+        "stressed_q": stressed_q,
+        "raw_edge": raw_edge,
+        "conservative_edge": conservative_edge,
+        "accepted": bool(accepted),
+        "reason": None if accepted else "PF1_CONSERVATIVE_GATE",
+        "shares": int(shares),
+        "won": won,
+        "turnover": int(shares) * stressed_q if accepted else 0.0,
+        "pnl": int(shares) * ((1.0 if won else 0.0) - stressed_q) if accepted else 0.0,
+    })
+    return record
+
+
+def evaluate_no_fade_p1_trade(
+    row: dict[str, Any],
+    universe: str,
+    regime: str,
+    lambda_value: float,
+    evaluation_block: int,
+    shares: int = 5,
+    stress: float = 0.03,
+    min_edge: float = 0.02,
+) -> dict[str, Any]:
+    record = _base_record(row, "NO_FADE_P1", universe, "NO", regime, evaluation_block, lambda_value)
+    p_cons_yes = float(shrink_probability([row["model_p"]], [row["q_norm_yes"]], lambda_value)[0])
+    p_cons_no = 1.0 - p_cons_yes
+    actual_q = _finite_probability(row["q_no"], "Q_NO")
+    stressed_q = min(1.0, actual_q + float(stress))
+    proxy_no = 1.0 - float(row["q_yes"])
+    proxy_stressed = proxy_no + float(stress)
+    raw_p_no = 1.0 - float(row["model_p"])
+    raw_edge = raw_p_no - proxy_stressed
+    conservative_edge = p_cons_no - proxy_stressed
+    # Baseline exactly preserves the frozen P1 proxy gate; actual qNO remains execution price.
+    accepted = conservative_edge >= float(min_edge) - TOL and proxy_stressed < 1.0 - TOL
+    won = not bool(row["actual_winner"])
+    record.update({
+        "p_cons": p_cons_no,
+        "actual_q": actual_q,
+        "stressed_q": stressed_q,
+        "proxy_q_no": proxy_no,
+        "proxy_stressed_q": proxy_stressed,
+        "raw_edge": raw_edge,
+        "conservative_edge": conservative_edge,
+        "accepted": bool(accepted),
+        "reason": None if accepted else "P1_CONSERVATIVE_PROXY_GATE",
+        "shares": int(shares),
+        "won": won,
+        "turnover": int(shares) * stressed_q if accepted else 0.0,
+        "pnl": int(shares) * ((1.0 if won else 0.0) - stressed_q) if accepted else 0.0,
+    })
+    return record

@@ -1,0 +1,18 @@
+{
+  "base_shares": 5,
+  "candidate_id": "A0_PRIMARY_EDGE_05",
+  "canonical_name": "STANDALONE_LEGACY_NO_FADE",
+  "checkpoint": "T60_PRIMARY_T30_FALLBACK_ONLY_IF_NO_T60_SIGNAL",
+  "edge_threshold": 0.05,
+  "execution_price": "ACTUAL_QNO",
+  "favorite_excluded": true,
+  "historical_price_definition": "ACTUAL_QNO_FROM_FROZEN_NO_PRICE_HISTORY",
+  "immutable": true,
+  "market_favorite": "UNIQUE_MAX_RAW_QYES",
+  "max_trades_per_date": 1,
+  "price_caps": [],
+  "selector": "MIN_PYES_MINUS_QYES",
+  "selector_price_layer": "PROXY_ONLY",
+  "threshold_variants": [],
+  "tie_break": "NO_SIGNAL_ON_FAVORITE_OR_SCORE_TIE"
+}

@@ -1,0 +1,17 @@
+{
+  "strategy_id": "STRICT_FAVORITE_A_V1",
+  "reference_field": "clob_price_history_p",
+  "reference_semantics": "UNRESOLVED_NOT_LAST_TRADE_OR_MIDPOINT",
+  "reference_tie_tolerance": 1e-9,
+  "historical_stress_per_share": 0.03,
+  "minimum_historical_reference_edge": 0.02,
+  "minimum_executable_edge": 0.02,
+  "shares": 5,
+  "checkpoint_priority_minutes": [60, 30],
+  "max_positions_per_market_date": 1,
+  "neighbor_legs": false,
+  "rescue_add": false,
+  "averaging": false,
+  "hold_policy": "order_path_only_not_live_enabled_b1"
+}
+

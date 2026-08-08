@@ -1,0 +1,121 @@
+from __future__ import annotations
+
+from typing import Any
+
+TOL = 1e-9
+
+
+def _ordered(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len(rows) != 11 or len({int(r["bucket_index"]) for r in rows}) != 11:
+        raise ValueError("EXPECTED_EXACTLY_11_BUCKETS")
+    return sorted(rows, key=lambda r: int(r["bucket_index"]))
+
+
+def unique_favorite(rows: list[dict[str, Any]], tol: float = TOL) -> int | None:
+    ordered = _ordered(rows)
+    maximum = max(float(r["q_yes"]) for r in ordered)
+    tied = [int(r["bucket_index"]) for r in ordered if abs(float(r["q_yes"]) - maximum) <= tol]
+    return tied[0] if len(tied) == 1 else None
+
+
+def _base(row: dict[str, Any], side: str, strategy_id: str, accepted: bool, reason: str | None, stress: float) -> dict[str, Any]:
+    q = float(row["q_yes"] if side == "YES" else row["q_no"])
+    winner = bool(row["actual_winner"])
+    won = winner if side == "YES" else not winner
+    return {
+        "strategy_id": strategy_id,
+        "market_date": str(row["market_date"]),
+        "horizon_minutes": int(row["horizon_minutes"]),
+        "bucket_index": int(row["bucket_index"]),
+        "bucket_title": str(row.get("bucket_title", row["bucket_index"])),
+        "side": side,
+        "q": q,
+        "model_p_yes": float(row["model_p"]),
+        "actual_winner": winner,
+        "won": won,
+        "accepted": bool(accepted),
+        "reason": reason,
+        "stress": float(stress),
+        "shares": 5,
+        "yes_age_seconds": int(row.get("yes_age_seconds", 0)),
+        "no_age_seconds": int(row.get("no_age_seconds", 0)),
+    }
+
+
+def evaluate_strict_a(rows: list[dict[str, Any]], stress: float = 0.03) -> dict[str, Any]:
+    ordered = _ordered(rows)
+    favorite = unique_favorite(ordered)
+    if favorite is None:
+        row = ordered[0]
+        result = _base(row, "YES", "STRICT_A", False, "NO_UNIQUE_FAVORITE", stress)
+        result["bucket_index"] = None
+        return result
+    row = next(r for r in ordered if int(r["bucket_index"]) == favorite)
+    stressed = min(1.0, float(row["q_yes"]) + stress)
+    edge = float(row["model_p"]) - stressed
+    accepted = edge >= 0.02 - TOL and stressed < 1.0 - TOL
+    result = _base(row, "YES", "STRICT_A", accepted, None if accepted else "STRICT_EDGE_GATE", stress)
+    result.update({"favorite_bucket_index": favorite, "selection_edge": edge, "stressed_q": stressed})
+    return result
+
+
+def evaluate_pf1(rows: list[dict[str, Any]], stress: float = 0.03) -> dict[str, Any]:
+    ordered = _ordered(rows)
+    ranked = sorted(ordered, key=lambda r: (-(float(r["model_p"]) - float(r["q_yes"])), int(r["bucket_index"])))
+    row = ranked[0]
+    edge = float(row["model_p"]) - float(row["q_yes"])
+    accepted = edge >= 0.02 - TOL and float(row["q_yes"]) <= 0.97 + TOL
+    result = _base(row, "YES", "PF1", accepted, None if accepted else "PF1_GATE", stress)
+    result.update({"selection_edge": edge, "favorite_bucket_index": unique_favorite(ordered), "stressed_q": min(1.0, float(row["q_yes"]) + stress)})
+    return result
+
+
+def evaluate_no_fade(rows: list[dict[str, Any]], partition: str, stress: float = 0.03) -> dict[str, Any]:
+    if partition not in {"P1", "P2"}:
+        raise ValueError(f"UNKNOWN_PARTITION:{partition}")
+    ordered = _ordered(rows)
+    favorite = unique_favorite(ordered)
+    if favorite is None:
+        result = _base(ordered[0], "NO", "NO_FADE", False, "NO_UNIQUE_MARKET_FAVORITE", stress)
+        result.update({"partition": partition, "bucket_index": None, "favorite_bucket_index": None})
+        return result
+    candidates = [r for r in ordered if int(r["bucket_index"]) != favorite]
+    values = [(float(r["model_p"]) - float(r["q_yes"]), int(r["bucket_index"]), r) for r in candidates]
+    minimum = min(v[0] for v in values)
+    tied = [v for v in values if abs(v[0] - minimum) <= TOL]
+    if len(tied) != 1:
+        result = _base(candidates[0], "NO", "NO_FADE", False, "TIED_NO_FADE_SCORE", stress)
+        result.update({"partition": partition, "bucket_index": None, "favorite_bucket_index": favorite})
+        return result
+    _, _, row = tied[0]
+    p_no = 1.0 - float(row["model_p"])
+    q_no_proxy = 1.0 - float(row["q_yes"])
+    raw_edge = p_no - q_no_proxy
+    stressed_proxy = q_no_proxy + stress
+    if partition == "P1":
+        gate = p_no - stressed_proxy >= 0.02 - TOL
+        reason = "P1_STRESSED_PROXY_GATE"
+    else:
+        gate = raw_edge >= 0.02 - TOL
+        reason = "P2_RAW_PROXY_GATE"
+    accepted = gate and stressed_proxy < 1.0 - TOL
+    result = _base(row, "NO", "NO_FADE", accepted, None if accepted else reason, stress)
+    result.update({
+        "partition": partition,
+        "favorite_bucket_index": favorite,
+        "selection_edge": raw_edge,
+        "p_no_proxy": p_no,
+        "q_no_proxy": q_no_proxy,
+        "proxy_stressed_q": stressed_proxy,
+        "stressed_q": min(1.0, float(row["q_no"]) + stress),
+    })
+    return result
+
+
+def evaluate_all_group(rows: list[dict[str, Any]], stress: float = 0.03) -> list[dict[str, Any]]:
+    return [
+        evaluate_strict_a(rows, stress),
+        evaluate_pf1(rows, stress),
+        evaluate_no_fade(rows, "P1", stress),
+        evaluate_no_fade(rows, "P2", stress),
+    ]

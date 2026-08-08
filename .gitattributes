@@ -1,0 +1,6 @@
+/.gitattributes text eol=lf
+*.json -text
+registry/STRATEGY_REGISTRY_47.csv text eol=crlf
+strategy_sources/frozen/contracts/* -text whitespace=cr-at-eol,-blank-at-eof
+strategy_sources/frozen/source_snapshots/* -text whitespace=cr-at-eol,-blank-at-eof
+strategy_sources/frozen/parity/* -text whitespace=cr-at-eol

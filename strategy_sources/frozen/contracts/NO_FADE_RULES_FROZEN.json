@@ -1,0 +1,50 @@
+{
+  "contract_id": "NO-FADE-NONFAVORITE-v1",
+  "mode": "READ_ONLY_HISTORICAL_RESEARCH",
+  "frozen_before_strategy_calculation": true,
+  "universes": {
+    "U1_CANDIDATE_B_DATES": "all independently reproduced Candidate B trade dates",
+    "U2_PF1_FAVORITE_REGIME_DATES": "U1 dates where Candidate B selected the unique max market_q_raw bucket"
+  },
+  "checkpoints": [60, 30],
+  "checkpoint_priority": "T-60_FIRST_T-30_ONLY_IF_NO_T-60_POSITION",
+  "maximum_positions_per_market_date": 1,
+  "market_favorite_source": "market_q_raw",
+  "market_favorite_tie_tolerance": 1e-9,
+  "selector": "minimum(model_p - market_q_raw) after excluding the unique market favorite",
+  "selector_tie_tolerance": 1e-9,
+  "shares": 5,
+  "proxy": {
+    "price_provenance": "COMPLEMENT_PROXY",
+    "execution_status": "PROXY_ONLY",
+    "q_no": "1 - market_q_raw",
+    "p_no": "1 - model_p",
+    "stress": 0.03,
+    "P1_PRIMARY_STRICT": {
+      "stressed_edge_minimum": 0.02,
+      "stressed_cost_strictly_below": 1.0
+    },
+    "P2_PF1_PARITY_CONTROL": {
+      "raw_edge_minimum": 0.02,
+      "stress_used_in_pnl": 0.03,
+      "stressed_cost_strictly_below": 1.0
+    }
+  },
+  "actual_execution": {
+    "selection_must_remain_proxy_selector": true,
+    "primary_gate": "p_no - actual_no_vwap5 >= 0.02",
+    "minimum_depth_shares": 5,
+    "fee_missing_means_net_pnl_not_calculable": true
+  },
+  "boundary_near_usd": 250.0,
+  "fixed_blocks": "five consecutive blocks of 34 dates from the ordered canonical 170-date universe",
+  "sensitivity_stress_values": [0.0, 0.01, 0.02, 0.03, 0.04, 0.05],
+  "verdict_policy": {
+    "promising": "Both U1 and U2 P1 have positive PnL and ROI, remove-top-5 PnL > 0, at least 3 positive fixed blocks, U1 trades >= 30 and U2 trades >= 15",
+    "thin": "At least one of U1 or U2 P1 has positive PnL, but the promising robustness gate is not fully met",
+    "not_established": "Neither U1 nor U2 P1 has positive PnL"
+  },
+  "post_hoc_changes_permitted": false,
+  "network_permitted": false,
+  "trading_permitted": false
+}

@@ -1,0 +1,59 @@
+{
+  "contract_id": "BTC-FAVORITE-NEIGHBOR-BASKET-LAB-v1",
+  "frozen_at_utc": "2026-07-16T11:26:16Z",
+  "mode": "READ_ONLY_HISTORICAL_RESEARCH",
+  "decision_order": [60, 30],
+  "maximum_trades_per_date_per_variant": 1,
+  "market_price_column": "market_q_raw",
+  "normalized_q_allowed": false,
+  "tie_tolerance": 1e-9,
+  "stress_per_purchased_bucket": 0.03,
+  "basket_payout_per_share": 1.0,
+  "five_share_multiplier": 5,
+  "candidate_b": {
+    "selector": "max(model_p - market_q_raw), then lower bucket_index only for deterministic exact tie",
+    "raw_edge_threshold": 0.02,
+    "raw_q_cap": 0.97,
+    "stress_per_fill": 0.03
+  },
+  "variants": {
+    "A": {
+      "buckets": "unique market favorite only",
+      "conditions": ["favorite_model_p - (favorite_market_q_raw + 0.03) >= 0.02", "stressed_cost < 1.0"]
+    },
+    "B": {
+      "buckets": "favorite plus immediate neighbor maximizing basket_stressed_edge",
+      "conditions": ["unique favorite", "basket_stressed_edge >= 0.02", "stressed_cost < 1.0"]
+    },
+    "C": {
+      "buckets": "favorite plus immediate neighbor maximizing neighbor_model_p - neighbor_market_q_raw",
+      "conditions": ["favorite individual raw edge > 0", "neighbor individual raw edge > 0", "basket_stressed_edge >= 0.02", "stressed_cost < 1.0"]
+    },
+    "D": {
+      "buckets": "favorite plus both immediate neighbors",
+      "conditions": ["both neighbors exist", "all three individual raw edges > 0", "basket_stressed_edge >= 0.02", "stressed_cost < 1.0"]
+    },
+    "E": {
+      "buckets": "strict variant C",
+      "conditions": ["favorite individual raw edge > 0", "neighbor individual raw edge > 0", "basket_stressed_edge >= 0.05", "stressed_cost < 1.0"]
+    }
+  },
+  "neighbor_tie_rule": "if two immediate-neighbor scores differ by <= 1e-9, checkpoint is TIED_NEIGHBOR_EDGE and cannot use winner",
+  "basket_pnl": "payout - sum(raw q) - 0.03 * number_of_buckets",
+  "risk_rule_max_drawdown": "historically moderate requires max_drawdown <= positive total_stressed_pnl",
+  "best_risk_return_order": [
+    "historical classification: moderate before thin before not established",
+    "more positive temporal blocks",
+    "lower top-five positive-PnL concentration",
+    "higher ROI divided by (1 + max_drawdown)",
+    "higher remove-top-five PnL",
+    "larger sample"
+  ],
+  "prohibited": [
+    "future winner in selection",
+    "post-hoc parameter changes",
+    "date or month exclusions",
+    "Add, Rescue, Rotation, Hedge",
+    "live trading or authenticated CLOB writes"
+  ]
+}

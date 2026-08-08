@@ -1,0 +1,76 @@
+{
+  "base_stress": 0.03,
+  "canonical_candle_semantic_sha256": "5e28de6af890a8027f50182c1a0a797048233026d925ad089e8b7b328f8126e6",
+  "canonical_candle_sha256": "4bf13e6f9de60cb409b00f47c2efa764d5e8afcf1053f54ae0736a23b9b912f3",
+  "checkpoints_minutes": [
+    1440,
+    1080,
+    720,
+    480,
+    360,
+    240,
+    180,
+    120,
+    90,
+    60,
+    30
+  ],
+  "confirmation_edge": 0.02,
+  "dates_per_block": 34,
+  "egarch_fit_max_points": 25000,
+  "final_gate": "BTC_VOLATILITY_OVERLAY_AUDIT_V1_PASS",
+  "fit_parameter_refit": "once_per_outer_block",
+  "garch_fit_max_points": 75000,
+  "minimum_pre_history_days": 730,
+  "model_candidates": [
+    "EWMA_094",
+    "EWMA_097",
+    "GARCH_T",
+    "EGARCH_T",
+    "HAR_RV"
+  ],
+  "model_input_bar_minutes": 5,
+  "model_maxiter": 60,
+  "model_starts": 3,
+  "network_requests": 0,
+  "no_rows": 24,
+  "outer_blocks": 5,
+  "overlay_regimes": [
+    "BASELINE",
+    "VOL_CONFIRMATION",
+    "VOL_VETO_ONLY"
+  ],
+  "probability_primary": "STUDENT_T",
+  "probability_sensitivity": "GAUSSIAN",
+  "registry_rows": 34,
+  "schema_version": "BTC_VOLATILITY_OVERLAY_AUDIT_V1",
+  "settlement_hour_local": 12,
+  "settlement_timezone": "America/New_York",
+  "shares": 5,
+  "strategy_source_map_sha256": "f568beb0aaf35507c035ae008b09c576ef7361f735a3e249230d253e3e2eeb1e",
+  "stress_sensitivity": [
+    0.05,
+    0.06
+  ],
+  "veto_edge": 0.0,
+  "yes_rows": 10,
+  "zones": {
+    "EARLY": [
+      1440,
+      1080,
+      720
+    ],
+    "LATE": [
+      90,
+      60,
+      30
+    ],
+    "MID": [
+      480,
+      360,
+      240,
+      180,
+      120
+    ]
+  }
+}

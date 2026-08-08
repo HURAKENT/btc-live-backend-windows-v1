@@ -1,0 +1,37 @@
+from __future__ import annotations
+from collections import defaultdict
+from typing import Any
+
+def apply_overlay_regimes(rows:list[dict[str,Any]])->list[dict[str,Any]]:
+    out=[]
+    for row in rows:
+        edge=float(row['p_vol_side'])-float(row['stressed_q_3c'])
+        for regime in ['BASELINE','VOL_CONFIRMATION','VOL_VETO_ONLY']:
+            accepted=bool(row['baseline_accept']) and (regime=='BASELINE' or (edge>=.02 if regime=='VOL_CONFIRMATION' else edge>=0))
+            out.append({**row,'regime':regime,'vol_edge':edge,'accepted':accepted})
+    return out
+def build_trade_record(row:dict[str,Any])->dict[str,Any]:
+    out=dict(row); accepted=bool(row.get('accepted')); q=float(row['stressed_q_3c']); shares=int(row.get('shares',5)); won=bool(row.get('won'))
+    out['turnover_5_shares']=shares*q if accepted else 0.0; out['pnl_5_shares']=shares*((1.0 if won else 0.0)-q) if accepted else 0.0; return out
+def build_overlay_trade_ledgers(rows:list[dict[str,Any]])->list[dict[str,Any]]:return [build_trade_record(r) for r in apply_overlay_regimes(rows)]
+def _max_dd(pnls):
+    eq=peak=dd=0.0
+    for x in pnls:eq+=x;peak=max(peak,eq);dd=max(dd,peak-eq)
+    return dd
+def overlay_metrics(rows:list[dict[str,Any]])->dict[str,Any]:
+    rows=[r for r in rows if r.get('accepted')]
+    if not rows:return {'trades':0,'wins':0,'losses':0,'pnl_5_shares':0.0,'turnover_5_shares':0.0,'roi':None,'max_drawdown':0.0,'positive_blocks':0,'blocks_with_trades':0,'largest_month_pnl_share':None,'status':'NOT_APPLICABLE'}
+    rows=sorted(rows,key=lambda r:(r['market_date'],int(r['checkpoint_minutes']))); wins=sum(bool(r['won']) for r in rows); pnl=sum(float(r['pnl_5_shares']) for r in rows); turn=sum(float(r['turnover_5_shares']) for r in rows)
+    blocks=defaultdict(float); months=defaultdict(float)
+    for r in rows: blocks[int(r.get('evaluation_block',0))]+=float(r['pnl_5_shares']); months[str(r['market_date'])[:7]]+=float(r['pnl_5_shares'])
+    positive=sum(v>0 for v in blocks.values()); positive_month_pnl=sum(max(v,0) for v in months.values()); largest=max((max(v,0) for v in months.values()),default=0.0)
+    return {'trades':len(rows),'wins':wins,'losses':len(rows)-wins,'pnl_5_shares':pnl,'turnover_5_shares':turn,'roi':pnl/turn if turn else None,'max_drawdown':_max_dd([float(r['pnl_5_shares']) for r in rows]),'positive_blocks':positive,'blocks_with_trades':len(blocks),'largest_month_pnl_share':largest/positive_month_pnl if positive_month_pnl else None,'status':'CALCULATED'}
+def summarize_overlay(rows:list[dict[str,Any]],strategy_ids:list[str]|None=None)->list[dict[str,Any]]:
+    grouped=defaultdict(list)
+    for r in rows:grouped[(r['strategy_id'],r['regime'])].append(r)
+    if strategy_ids:
+        for sid in strategy_ids:
+            for regime in ['BASELINE','VOL_CONFIRMATION','VOL_VETO_ONLY']: grouped.setdefault((sid,regime),[])
+    out=[]
+    for (sid,regime),g in sorted(grouped.items()):out.append({'strategy_id':sid,'regime':regime,**overlay_metrics(g)})
+    return out

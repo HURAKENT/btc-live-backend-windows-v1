@@ -1,0 +1,33 @@
+{
+  "bundle_id": "STRICT_A_HISTORICAL_FIDELITY_MODEL_BUNDLE_V1",
+  "cdf_writer": "seven_quantile_linear_interpolation_open_tails_clipping_explicit_normalization",
+  "features": {
+    "closed_candles": 181,
+    "ddof": 1,
+    "interval": "1m",
+    "log_returns": 180,
+    "scale": "sigma_180m * sqrt(horizon_minutes)",
+    "symbol": "BTCUSDT"
+  },
+  "models": {
+    "30": {
+      "empirical_sample_sha256": "c696be1692a32288df834ff889e6eeb2b95bf25bbef5906d5e735696e21d30fd",
+      "family": "volatility_scaled_empirical",
+      "quantile_z": [-1.3713807463624, -0.9963358436304532, -0.5072363503627279, 0.0004653325207750455, 0.5024970105407105, 1.0230392921138989, 1.4214114988152073],
+      "training_sample_count": 1811
+    },
+    "60": {
+      "clip_z": [-20.0, 20.0],
+      "df": 3.7761461947576622,
+      "family": "student_t",
+      "loc": -0.0024993184520989684,
+      "scale": 0.7247818681343177,
+      "training_sample_count": 1811
+    }
+  },
+  "probability_quantiles": [0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95],
+  "training_cutoff_exclusive": "2025-12-29",
+  "training_range": ["2021-01-04", "2025-12-28"],
+  "live_enabled": false
+}
+

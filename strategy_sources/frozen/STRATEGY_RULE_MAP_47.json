@@ -1,0 +1,1267 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": "CONTRACT_A0",
+      "relative_path": "contracts/A0_RULES_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "a510e45a5dfa4399bf05d8a418d28c055383cc0dfb8062e725c86ef105215e70",
+      "size_bytes": 633
+    },
+    {
+      "artifact_id": "CONTRACT_A2",
+      "relative_path": "contracts/A2_RULES_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "f522091255f4718872d9951aa2a466887354870c72b0f2e118f94451d6d5111d",
+      "size_bytes": 656
+    },
+    {
+      "artifact_id": "CONTRACT_B2",
+      "relative_path": "contracts/B2_RULES_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "ec54c0ed7237e3e6b4aef49689b32814a31e143b0e63be12c5a90dd2d89b5062",
+      "size_bytes": 545
+    },
+    {
+      "artifact_id": "CONTRACT_BASKET",
+      "relative_path": "contracts/BASKET_RULES_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "d942e94f11fe4318de048f22e4864006f7bd1d64e06a00520c971160c8c800ef",
+      "size_bytes": 2524
+    },
+    {
+      "artifact_id": "CONTRACT_C1",
+      "relative_path": "contracts/C1_RULES_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "dc76a06624869b552c317a78d88b0d9118f66c313a1162d947f43c0eee90e01a",
+      "size_bytes": 641
+    },
+    {
+      "artifact_id": "CONTRACT_NO_FADE",
+      "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822",
+      "size_bytes": 2026
+    },
+    {
+      "artifact_id": "CONTRACT_PF1",
+      "relative_path": "contracts/PF1_STRATEGY_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "a86aec5cbd499bc6459a30eacb89e82fe966e1e6687b639a1d5b59f1a8438ce8",
+      "size_bytes": 3218
+    },
+    {
+      "artifact_id": "CONTRACT_PF1_FORWARD",
+      "relative_path": "contracts/PF1_FORWARD_EVALUATION_CONTRACT.json",
+      "role": "IMMUTABLE_EVALUATION_CONTRACT",
+      "sha256": "c6535fe8b2d4327582c1bcbbbf2c7fe67f52e009033721362b8a8e4fb4cc011f",
+      "size_bytes": 4359
+    },
+    {
+      "artifact_id": "CONTRACT_STRICT_A",
+      "relative_path": "contracts/STRICT_A_STRATEGY_FROZEN.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "5b95a37b9dbb88a6b0ef9e47439660ab12ac58dcb63697815396f569803bd5cb",
+      "size_bytes": 533
+    },
+    {
+      "artifact_id": "CONTRACT_STRICT_A_MODEL",
+      "relative_path": "contracts/STRICT_A_MODEL_FROZEN.json",
+      "role": "IMMUTABLE_MODEL_CONTRACT",
+      "sha256": "1ad4eb3a69a933e0afd25c8af861f758e39aa22d086af6105e1d4dfa7115b2ee",
+      "size_bytes": 1145
+    },
+    {
+      "artifact_id": "CONTRACT_VOL_OVERLAY",
+      "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+      "role": "IMMUTABLE_RULE_CONTRACT",
+      "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915",
+      "size_bytes": 1583
+    },
+    {
+      "artifact_id": "PARITY_BASKET",
+      "relative_path": "parity/BASKET_TRADE_CLASSIFICATION.csv",
+      "role": "IMMUTABLE_TRADE_LEDGER",
+      "sha256": "6d6d71d03002a5c3e62566b5ddd4cc20d18204affff6debaa6c461c3618d5361",
+      "size_bytes": 170030
+    },
+    {
+      "artifact_id": "PARITY_CONFIRMATION",
+      "relative_path": "parity/CONFIRMATION_TRADE_LEDGER.csv",
+      "role": "IMMUTABLE_TRADE_LEDGER",
+      "sha256": "74e0c479e81558f38c5f152a0ec62c923fe6eda080dda75167f8015a8da51440",
+      "size_bytes": 57343
+    },
+    {
+      "artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+      "role": "IMMUTABLE_TRADE_LEDGER",
+      "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950",
+      "size_bytes": 43681
+    },
+    {
+      "artifact_id": "PARITY_EARLY_HORIZON",
+      "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+      "role": "IMMUTABLE_TRADE_LEDGER",
+      "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1",
+      "size_bytes": 101407
+    },
+    {
+      "artifact_id": "PARITY_VOL_OVERLAY",
+      "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+      "role": "IMMUTABLE_TRADE_LEDGER",
+      "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861",
+      "size_bytes": 150652
+    },
+    {
+      "artifact_id": "SRC_EARLY_CONFIDENCE_EXPERIMENT",
+      "relative_path": "source_snapshots/early_confidence_experiment.py.source",
+      "role": "EXACT_COMPOSITION_SOURCE",
+      "sha256": "6f67e71eef7c595f7d9be7ee5383ade93671d21191db6e15ceba9dfc115da13b",
+      "size_bytes": 12517
+    },
+    {
+      "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+      "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+      "role": "EXECUTABLE_HISTORICAL_SOURCE",
+      "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430",
+      "size_bytes": 6057
+    },
+    {
+      "artifact_id": "SRC_EARLY_HORIZON",
+      "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+      "role": "EXECUTABLE_HISTORICAL_SOURCE",
+      "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0",
+      "size_bytes": 5208
+    },
+    {
+      "artifact_id": "SRC_FAVORITE_BASKET",
+      "relative_path": "source_snapshots/favorite_basket_run_research.py.source",
+      "role": "SANITIZED_EXECUTABLE_RULE_SOURCE",
+      "sha256": "1cf1f4c24f81ba87d1bf583af080d777f88726f68cd78fcf8daa9651f887da30",
+      "size_bytes": 42224
+    },
+    {
+      "artifact_id": "SRC_NO_CONFIRMATION",
+      "relative_path": "source_snapshots/no_confirmation_frozen_concepts.py.source",
+      "role": "EXECUTABLE_RULE_SOURCE",
+      "sha256": "45be74ea8825e504fda85d3d3b365275c92ceec37831080f422f370704b661c2",
+      "size_bytes": 1809
+    },
+    {
+      "artifact_id": "SRC_NO_FADE_REFERENCE",
+      "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+      "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+      "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c",
+      "size_bytes": 14146
+    },
+    {
+      "artifact_id": "SRC_PF1_CORE",
+      "relative_path": "source_snapshots/pf1_core.py.source",
+      "role": "EXECUTABLE_RULE_SOURCE",
+      "sha256": "71fd5851c9dbefae3c2bdc5c3cbc2558728479c13518ad58a9e35ab878983ea4",
+      "size_bytes": 8893
+    },
+    {
+      "artifact_id": "SRC_PF1_MODEL",
+      "relative_path": "source_snapshots/pf1_model.py.source",
+      "role": "EXECUTABLE_MODEL_SOURCE",
+      "sha256": "087e219574833767bfd470b2f3fafe873fdc5c72c11b6f4770de3255c50e6bd4",
+      "size_bytes": 2356
+    },
+    {
+      "artifact_id": "SRC_STRICT_A_SELECTOR",
+      "relative_path": "source_snapshots/strict_a_selector.py.source",
+      "role": "EXECUTABLE_RULE_SOURCE",
+      "sha256": "cb34c5b4df8cdc13629576bf9d326d4ff7debab55a43de8d822756352b973e1c",
+      "size_bytes": 2324
+    },
+    {
+      "artifact_id": "SRC_VOL_OVERLAY",
+      "relative_path": "source_snapshots/vol_overlay.py.source",
+      "role": "EXECUTABLE_RULE_SOURCE",
+      "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591",
+      "size_bytes": 3004
+    },
+    {
+      "artifact_id": "SRC_VOL_PROBABILITY",
+      "relative_path": "source_snapshots/vol_probability.py.source",
+      "role": "EXECUTABLE_PROBABILITY_SOURCE",
+      "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172",
+      "size_bytes": 2976
+    }
+  ],
+  "canonical_sources": {
+    "registry_csv_sha256": "77fc26814e3c05182b0b13dbb3d162c41536328517a40b4a6713d7d6e9bad8fd",
+    "registry_json_sha256": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f",
+    "registry_lock_sha256": "5f4dbf5936c8b456dbe15aceeb4210342a452d6b379e0ee820d7b5de27b92957",
+    "source_map_34_sha256": "f568beb0aaf35507c035ae008b09c576ef7361f735a3e249230d253e3e2eeb1e",
+    "v2_analysis_pack_sha256": "75b2048911202790cfbeef4632e2c07cb8d89d123eb57ecddbf599eae44e6927"
+  },
+  "family_specs": {
+    "FAVORITE_NEIGHBOR_BASKET_V1": {
+      "artifact_ids": [
+        "CONTRACT_BASKET",
+        "SRC_FAVORITE_BASKET"
+      ],
+      "evaluator_key": "FAVORITE_NEIGHBOR_BASKET_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "basket_edge_threshold_micros": 20000,
+        "neighbor_tie_tolerance": "1e-9",
+        "original_source_sha256": "5993a6a37ea7513c69a32da40d951f4128e07ed959781151558df693713cf839",
+        "payout_micros_per_share": 1000000,
+        "required_buckets": 11,
+        "selector": "favorite_plus_best_immediate_neighbor",
+        "shares": 5,
+        "stress_micros_per_leg": 30000,
+        "stressed_cost_lt_micros": 1000000,
+        "unique_favorite_tolerance": "1e-9"
+      },
+      "spec_sha256": "16d1e3d92edde000489838fca0dcc58425fd8547911ae1a30ea3c20e63284851"
+    },
+    "FAVORITE_ONLY_V1": {
+      "artifact_ids": [
+        "CONTRACT_BASKET",
+        "SRC_FAVORITE_BASKET"
+      ],
+      "evaluator_key": "FAVORITE_ONLY_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "original_source_sha256": "5993a6a37ea7513c69a32da40d951f4128e07ed959781151558df693713cf839",
+        "raw_edge_threshold_micros": 20000,
+        "raw_q_cap_micros": 970000,
+        "required_buckets": 11,
+        "selector": "candidate_b_selected_unique_favorite",
+        "shares": 5,
+        "stress_micros": 30000,
+        "unique_favorite_tolerance": "1e-9"
+      },
+      "spec_sha256": "460c1d2414f495bdb23145aea2f34fe471ceef78ccf5c0fc1aaf9d75d330b444"
+    },
+    "NO_CONFIRMATION_A0_V1": {
+      "artifact_ids": [
+        "SRC_NO_CONFIRMATION",
+        "CONTRACT_A0"
+      ],
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "concept_id": "A0",
+        "decision_entrypoint": "decision",
+        "selector_entrypoint": "choose_single",
+        "shares": 5,
+        "side": "NO",
+        "stress_micros": 30000
+      },
+      "spec_sha256": "136a03ff0306353906c9b503acef87c1b5a856ddf0b4be6d2a7ec7462826ff4a"
+    },
+    "NO_CONFIRMATION_A2_V1": {
+      "artifact_ids": [
+        "SRC_NO_CONFIRMATION",
+        "CONTRACT_A2"
+      ],
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "concept_id": "A2",
+        "decision_entrypoint": "decision",
+        "selector_entrypoint": "choose_single",
+        "shares": 5,
+        "side": "NO",
+        "stress_micros": 30000
+      },
+      "spec_sha256": "12138884c493238ce5218aea2a12923f2f23c187d40132ec2aaa285876b6dff1"
+    },
+    "NO_CONFIRMATION_B2_V1": {
+      "artifact_ids": [
+        "SRC_NO_CONFIRMATION",
+        "CONTRACT_B2"
+      ],
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "concept_id": "B2",
+        "decision_entrypoint": "decision",
+        "selector_entrypoint": "choose_single",
+        "shares": 5,
+        "side": "NO",
+        "stress_micros": 30000
+      },
+      "spec_sha256": "b00f416c96c58848637bb0f4d2a6441bd9fbdf9896dc504dc0324cca3f49c937"
+    },
+    "NO_CONFIRMATION_C1_V1": {
+      "artifact_ids": [
+        "SRC_NO_CONFIRMATION",
+        "CONTRACT_C1"
+      ],
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "concept_id": "C1",
+        "decision_entrypoint": "decision",
+        "requires_old_and_new_favorite_identity": true,
+        "selector_entrypoint": "choose_c1",
+        "shares": 5,
+        "side": "NO",
+        "stress_micros": 30000
+      },
+      "spec_sha256": "c4f06be9470af0f882a88442ef47a8f89d31b002eb6d360070514047e259c634"
+    },
+    "NO_FADE_P1_V1": {
+      "artifact_ids": [
+        "CONTRACT_NO_FADE",
+        "SRC_NO_FADE_REFERENCE",
+        "SRC_EARLY_HORIZON",
+        "SRC_EARLY_CONFIDENCE_SELECTORS"
+      ],
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "exclude_unique_favorite": true,
+        "execution_edge_basis": "p_no_minus_actual_no_vwap5",
+        "execution_edge_threshold_micros": 20000,
+        "execution_minimum_depth_shares": 5,
+        "historical_edge_basis": "p_no_minus_stressed_proxy_q_no",
+        "historical_edge_threshold_micros": 20000,
+        "missing_fee_policy": "net_pnl_not_calculable",
+        "proxy": "P1_PRIMARY_STRICT",
+        "required_buckets": 11,
+        "selector": "argmin(model_p_minus_market_q_raw)",
+        "selector_tie_tolerance": "1e-9",
+        "shares": 5,
+        "side": "NO",
+        "stress_micros": 30000,
+        "stressed_cost_strictly_below_one": true,
+        "unique_favorite_tolerance": "1e-9"
+      },
+      "spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e"
+    },
+    "NO_FADE_P2_V1": {
+      "artifact_ids": [
+        "CONTRACT_NO_FADE",
+        "SRC_NO_FADE_REFERENCE",
+        "SRC_EARLY_HORIZON"
+      ],
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "semantic_contract": {
+        "exclude_unique_favorite": true,
+        "execution_edge_basis": "p_no_minus_actual_no_vwap5",
+        "execution_edge_threshold_micros": 20000,
+        "execution_minimum_depth_shares": 5,
+        "historical_edge_basis": "p_no_minus_proxy_q_no",
+        "historical_edge_threshold_micros": 20000,
+        "missing_fee_policy": "net_pnl_not_calculable",
+        "proxy": "P2_PF1_PARITY_CONTROL",
+        "required_buckets": 11,
+        "selector": "argmin(model_p_minus_market_q_raw)",
+        "selector_tie_tolerance": "1e-9",
+        "shares": 5,
+        "side": "NO",
+        "stress_micros": 30000,
+        "stressed_cost_strictly_below_one": true,
+        "unique_favorite_tolerance": "1e-9"
+      },
+      "spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83"
+    },
+    "PF1_COMPOSED_V1": {
+      "artifact_ids": [
+        "SRC_EARLY_HORIZON",
+        "SRC_EARLY_CONFIDENCE_SELECTORS",
+        "SRC_PF1_CORE",
+        "SRC_PF1_MODEL",
+        "CONTRACT_PF1",
+        "CONTRACT_PF1_FORWARD"
+      ],
+      "evaluator_key": "PF1_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "semantic_contract": {
+        "edge_threshold_micros": 20000,
+        "execution_checkpoints_minutes": [
+          60,
+          30
+        ],
+        "execution_stage": "checkpoint_decision",
+        "full_depth_shares": 5,
+        "historical_only_checkpoints_minutes": [
+          480,
+          360
+        ],
+        "historical_parity_stage": "early_horizon_or_confidence_pf1",
+        "max_positions_per_market_date": 1,
+        "non_execution_checkpoint_policy": "execution_eligible_false",
+        "required_buckets": 11,
+        "selector": "argmax(model_p_minus_actual_yes_vwap5)_tie_lower_bucket",
+        "t30_blocked_after_t60_position": true,
+        "vwap5_cap_micros": 950000
+      },
+      "spec_sha256": "a2d764e2859a8c70e628525f114b7f7ef1d84c4f5aeea1687f30316f1953deb7"
+    },
+    "STRICT_A_COMPOSED_V1": {
+      "artifact_ids": [
+        "SRC_EARLY_HORIZON",
+        "SRC_STRICT_A_SELECTOR",
+        "CONTRACT_STRICT_A",
+        "CONTRACT_STRICT_A_MODEL"
+      ],
+      "evaluator_key": "STRICT_A_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "semantic_contract": {
+        "checkpoints_minutes": [
+          60,
+          30
+        ],
+        "effective_cost": "vwap5_plus_fee",
+        "executable_edge_threshold_micros": 20000,
+        "execution_stage": "select_strict_favorite",
+        "full_depth_shares": 5,
+        "historical_edge_threshold_micros": 20000,
+        "historical_parity_stage": "early_horizon_evaluate_strict_a",
+        "historical_reference_stress_micros": 30000,
+        "max_positions_per_market_date": 1,
+        "required_buckets": 11,
+        "t30_blocked_after_t60_position": true,
+        "unique_reference_favorite_tolerance": "1e-9"
+      },
+      "spec_sha256": "f8c643a666aa4e359dcc8fb5fb6eae834fc652da964e81b305dbc12eaa42b145"
+    },
+    "VOL_OVERLAY_A_V1": {
+      "artifact_ids": [
+        "SRC_VOL_OVERLAY",
+        "SRC_VOL_PROBABILITY",
+        "CONTRACT_VOL_OVERLAY"
+      ],
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "semantic_contract": {
+        "VOL_CONFIRMATION_threshold_micros": 20000,
+        "VOL_VETO_ONLY_threshold_micros": 0,
+        "baseline_accept_required": true,
+        "p_vol_side": "YES:p_yes;NO:1-p_yes",
+        "parent_decision_immutable": true,
+        "probability": "student_t_bucket_probability",
+        "required_provenance": [
+          "source_decision_sha256",
+          "forecast_row_sha256"
+        ],
+        "shares": 5,
+        "stress_micros_per_leg": 30000
+      },
+      "spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb"
+    }
+  },
+  "identities": [
+    {
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_CONFIRMATION",
+      "registry_index": 1,
+      "schedule": {
+        "all_confirmation_rows": true,
+        "concept_id": "C1",
+        "execution_stress": 0.03,
+        "shares": 5,
+        "stressed_q_formula": "min(actual_qNO + 0.03, 1.0)"
+      },
+      "spec_id": "NO_CONFIRMATION_C1_V1",
+      "strategy_id": "NO_C1",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_CONFIRMATION",
+      "registry_index": 2,
+      "schedule": {
+        "all_confirmation_rows": true,
+        "concept_id": "A2",
+        "execution_stress": 0.03,
+        "shares": 5,
+        "stressed_q_formula": "min(actual_qNO + 0.03, 1.0)"
+      },
+      "spec_id": "NO_CONFIRMATION_A2_V1",
+      "strategy_id": "NO_A2",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 3,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 1080,
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U2_T18",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_CONFIRMATION",
+      "registry_index": 4,
+      "schedule": {
+        "all_confirmation_rows": true,
+        "concept_id": "A0",
+        "execution_stress": 0.03,
+        "shares": 5,
+        "stressed_q_formula": "min(actual_qNO + 0.03, 1.0)"
+      },
+      "spec_id": "NO_CONFIRMATION_A0_V1",
+      "strategy_id": "NO_A0",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "FAVORITE_NEIGHBOR_BASKET_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_BASKET",
+      "registry_index": 5,
+      "schedule": {
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "primary_horizon_minutes": 60,
+        "strategy_variant": "B"
+      },
+      "spec_id": "FAVORITE_NEIGHBOR_BASKET_V1",
+      "strategy_id": "YES_FAVORITE_NEIGHBOR_BASKET",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 6,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 60,
+        "identity_fields": [
+          "market_date",
+          "horizon_minutes",
+          "selected_bucket",
+          "side",
+          "actual_q",
+          "stressed_q",
+          "won",
+          "turnover",
+          "pnl"
+        ],
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universes": [
+          "U1",
+          "U2"
+        ]
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_T60_U1_EQUALS_U2",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "STRICT_A_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 7,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 60,
+        "partition": "NA",
+        "strategy_id": "STRICT_A",
+        "universe": "ALL"
+      },
+      "spec_id": "STRICT_A_COMPOSED_V1",
+      "strategy_id": "YES_STRICT_A_T60",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "STRICT_A_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 8,
+      "schedule": {
+        "accepted": true,
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "partition": "NA",
+        "primary_horizon_minutes": 60,
+        "strategy_id": "STRICT_A",
+        "universe": "ALL"
+      },
+      "spec_id": "STRICT_A_COMPOSED_V1",
+      "strategy_id": "YES_STRICT_A_OPERATIONAL",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "PF1_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 9,
+      "schedule": {
+        "accepted": true,
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "partition": "NA",
+        "primary_horizon_minutes": 60,
+        "strategy_id": "PF1",
+        "universe": "ALL"
+      },
+      "spec_id": "PF1_COMPOSED_V1",
+      "strategy_id": "YES_PF1_OPERATIONAL",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "STRICT_A_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 10,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 30,
+        "partition": "NA",
+        "strategy_id": "STRICT_A",
+        "universe": "ALL"
+      },
+      "spec_id": "STRICT_A_COMPOSED_V1",
+      "strategy_id": "YES_STRICT_A_T30",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "PF1_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 11,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 60,
+        "regime": "BASELINE",
+        "strategy": "PF1",
+        "universe": "ALL"
+      },
+      "spec_id": "PF1_COMPOSED_V1",
+      "strategy_id": "YES_PF1_T60",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 12,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 60,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U2_T60",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 13,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 60,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U1_T60",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "PF1_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 14,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 360,
+        "regime": "BASELINE",
+        "strategy": "PF1",
+        "universe": "ALL"
+      },
+      "spec_id": "PF1_COMPOSED_V1",
+      "strategy_id": "YES_PF1_T6H",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 15,
+      "schedule": {
+        "accepted": true,
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "partition": "P1",
+        "primary_horizon_minutes": 60,
+        "strategy_id": "NO_FADE",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U2_OPERATIONAL",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 16,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 720,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U2_T12",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 17,
+      "schedule": {
+        "accepted": true,
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "partition": "P1",
+        "primary_horizon_minutes": 60,
+        "strategy_id": "NO_FADE",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U1_OPERATIONAL",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 18,
+      "schedule": {
+        "horizons_minutes": [
+          1080,
+          720
+        ],
+        "policy": "LATEST_ONLY",
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U1_EARLY_LATEST_ONLY",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 19,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 1080,
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U1_T18",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 20,
+      "schedule": {
+        "accepted": true,
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "partition": "P2",
+        "primary_horizon_minutes": 60,
+        "strategy_id": "NO_FADE",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 21,
+      "schedule": {
+        "horizons_minutes": [
+          1080,
+          720
+        ],
+        "policy": "INDEPENDENT",
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U1_EARLY_COMBINED",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 22,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 720,
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U2_T12",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 23,
+      "schedule": {
+        "accepted": true,
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "partition": "P2",
+        "primary_horizon_minutes": 60,
+        "strategy_id": "NO_FADE",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 24,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 720,
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U1_T12",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "FAVORITE_ONLY_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_BASKET",
+      "registry_index": 25,
+      "schedule": {
+        "fallback_horizon_minutes": 30,
+        "maximum_one_trade_per_market_date": true,
+        "primary_horizon_minutes": 60,
+        "strategy_variant": "FAVORITE-ONLY CONTROL"
+      },
+      "spec_id": "FAVORITE_ONLY_V1",
+      "strategy_id": "YES_FAVORITE_ONLY",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P1_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 26,
+      "schedule": {
+        "horizons_minutes": [
+          1080,
+          720
+        ],
+        "policy": "EARLIEST_ONLY",
+        "regime": "BASELINE",
+        "strategy": "NO_FADE_P1",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P1_V1",
+      "strategy_id": "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 27,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 30,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U2_T30",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "PF1_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_CONFIDENCE",
+      "registry_index": 28,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 30,
+        "regime": "BASELINE",
+        "strategy": "PF1",
+        "universe": "ALL"
+      },
+      "spec_id": "PF1_COMPOSED_V1",
+      "strategy_id": "YES_PF1_T30",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 29,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 30,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U1_T30",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 30,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 720,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U1_T12",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_CONFIRMATION_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_CONFIRMATION",
+      "registry_index": 31,
+      "schedule": {
+        "all_confirmation_rows": true,
+        "concept_id": "B2",
+        "execution_stress": 0.03,
+        "shares": 5,
+        "stressed_q_formula": "min(actual_qNO + 0.03, 1.0)"
+      },
+      "spec_id": "NO_CONFIRMATION_B2_V1",
+      "strategy_id": "NO_B2",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 32,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 240,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U2"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U2_T4H",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "PF1_COMPOSED_V1",
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 33,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 480,
+        "partition": "NA",
+        "strategy_id": "PF1",
+        "universe": "ALL"
+      },
+      "spec_id": "PF1_COMPOSED_V1",
+      "strategy_id": "YES_PF1_T8H",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "NO_FADE_P2_V1",
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "parent_strategy_id": null,
+      "parity_artifact_id": "PARITY_EARLY_HORIZON",
+      "registry_index": 34,
+      "schedule": {
+        "accepted": true,
+        "horizon_minutes": 120,
+        "partition": "P2",
+        "strategy_id": "NO_FADE",
+        "universe": "U1"
+      },
+      "spec_id": "NO_FADE_P2_V1",
+      "strategy_id": "NO_FADE_P2_U1_T2H",
+      "version": "V1"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "NO_A0",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 35,
+      "schedule": {
+        "overlay_mode": "VOL_VETO_ONLY",
+        "side": "NO",
+        "threshold_micros": 0
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "NO_A0_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "NO_A2",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 36,
+      "schedule": {
+        "overlay_mode": "VOL_CONFIRMATION",
+        "side": "NO",
+        "threshold_micros": 20000
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "NO_A2_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "NO_FADE_P1_U1_T18",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 37,
+      "schedule": {
+        "overlay_mode": "VOL_VETO_ONLY",
+        "side": "NO",
+        "threshold_micros": 0
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "NO_FADE_P1_U1_T18_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "NO_FADE_P2_U1_OPERATIONAL",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 38,
+      "schedule": {
+        "overlay_mode": "VOL_VETO_ONLY",
+        "side": "NO",
+        "threshold_micros": 0
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "NO_FADE_P2_U1_T60",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 39,
+      "schedule": {
+        "overlay_mode": "VOL_VETO_ONLY",
+        "side": "NO",
+        "threshold_micros": 0
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "NO_FADE_P2_U1_T60_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "NO_FADE_P2_U2_OPERATIONAL",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 40,
+      "schedule": {
+        "overlay_mode": "VOL_VETO_ONLY",
+        "side": "NO",
+        "threshold_micros": 0
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "NO_FADE_P2_U2_T60",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 41,
+      "schedule": {
+        "overlay_mode": "VOL_VETO_ONLY",
+        "side": "NO",
+        "threshold_micros": 0
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "NO_FADE_P2_U2_T60_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "YES_FAVORITE_ONLY",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 42,
+      "schedule": {
+        "overlay_mode": "VOL_CONFIRMATION",
+        "side": "YES",
+        "threshold_micros": 20000
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "YES_FAVORITE_ONLY_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "YES_PF1_OPERATIONAL",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 43,
+      "schedule": {
+        "overlay_mode": "VOL_CONFIRMATION",
+        "side": "YES",
+        "threshold_micros": 20000
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "YES_PF1_OPERATIONAL_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "YES_PF1_T30",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 44,
+      "schedule": {
+        "overlay_mode": "VOL_CONFIRMATION",
+        "side": "YES",
+        "threshold_micros": 20000
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "YES_PF1_T30_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "YES_PF1_T60",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 45,
+      "schedule": {
+        "overlay_mode": "VOL_CONFIRMATION",
+        "side": "YES",
+        "threshold_micros": 20000
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "YES_PF1_T60_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "YES_STRICT_A_OPERATIONAL",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 46,
+      "schedule": {
+        "overlay_mode": "VOL_CONFIRMATION",
+        "side": "YES",
+        "threshold_micros": 20000
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "YES_STRICT_A_OPERATIONAL_V2_VOL",
+      "version": "V2"
+    },
+    {
+      "evaluator_key": "VOL_OVERLAY_A_V1",
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "parent_strategy_id": "YES_STRICT_A_T60",
+      "parity_artifact_id": "PARITY_VOL_OVERLAY",
+      "registry_index": 47,
+      "schedule": {
+        "overlay_mode": "VOL_VETO_ONLY",
+        "side": "YES",
+        "threshold_micros": 0
+      },
+      "spec_id": "VOL_OVERLAY_A_V1",
+      "strategy_id": "YES_STRICT_A_T60_V2_VOL",
+      "version": "V2"
+    }
+  ],
+  "schema_version": "BTC_STRATEGY_RULE_MAP_47_V2",
+  "status": "C4_RULE_SOURCES_FROZEN_PARITY_PENDING",
+  "strategy_count": 47,
+  "trading_approval": false,
+  "v1_count": 34,
+  "v2_count": 13
+}

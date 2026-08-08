@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+import numpy as np
+
+from .decision import StrictADecision
+
+
+def select_strict_favorite(checkpoint_minutes: int, reference_prices: list[float], model_probabilities: list[float],
+                           vwap5: list[float | None], fees: list[float], prior_position: bool = False,
+                           tie_tolerance: float = 1e-9) -> StrictADecision:
+    if checkpoint_minutes not in (60, 30): raise RuntimeError("STRICT_A_INVALID_CHECKPOINT")
+    if len(reference_prices) != 11 or len(model_probabilities) != 11: raise RuntimeError("STRICT_A_REQUIRES_11_BUCKETS")
+    if checkpoint_minutes == 30 and prior_position:
+        return StrictADecision(False, "T30_BLOCKED_EXISTING_T60_POSITION", 30, None, None, None, None, None, None, None, None, None)
+    q = np.asarray(reference_prices, dtype=float); p = np.asarray(model_probabilities, dtype=float)
+    maximum = float(q.max()); favorites = np.flatnonzero(np.abs(q - maximum) <= tie_tolerance)
+    if len(favorites) != 1:
+        return StrictADecision(False, "NO_UNIQUE_REFERENCE_FAVORITE", checkpoint_minutes, None, None, None, None, None, None, None, None, None)
+    index = int(favorites[0]); reference_cost = float(q[index] + 0.03); historical_edge = float(p[index] - reference_cost)
+    if historical_edge < 0.02 or reference_cost >= 1.0:
+        return StrictADecision(False, "HISTORICAL_REFERENCE_GATE_REJECTED", checkpoint_minutes, index, float(q[index]), float(p[index]), vwap5[index], fees[index], reference_cost, historical_edge, None, None)
+    if vwap5[index] is None:
+        return StrictADecision(False, "EXECUTION_REJECTED_MISSING_DEPTH", checkpoint_minutes, index, float(q[index]), float(p[index]), None, fees[index], reference_cost, historical_edge, None, None)
+    effective = float(vwap5[index] + fees[index]); executable_edge = float(p[index] - effective)
+    if executable_edge < 0.02:
+        return StrictADecision(False, "EXECUTABLE_EDGE_GATE_REJECTED", checkpoint_minutes, index, float(q[index]), float(p[index]), vwap5[index], fees[index], reference_cost, historical_edge, effective, executable_edge)
+    return StrictADecision(True, "SIGNAL_ACCEPTED", checkpoint_minutes, index, float(q[index]), float(p[index]), vwap5[index], fees[index], reference_cost, historical_edge, effective, executable_edge)
+

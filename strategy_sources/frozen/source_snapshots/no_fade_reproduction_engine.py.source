@@ -1,0 +1,310 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from hashlib import sha256
+from pathlib import Path
+from typing import Mapping
+
+import numpy as np
+import pandas as pd
+
+
+TOL = 1e-9
+STRESS = 0.03
+
+
+class NOUniqueFavorite(ValueError):
+    pass
+
+
+class TiedNoFadeScore(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class SnapshotSelection:
+    favorite_index: int
+    selected_index: int
+    nonfavorite_indices: tuple[int, ...]
+    yes_discrepancy: float
+    favorite_q: float
+    selected_q: float
+    selected_p: float
+
+
+def sha256_file(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_canonical(path: Path) -> pd.DataFrame:
+    frame = pd.read_parquet(path)
+    required = {
+        "market_date", "dataset_layer", "horizon_minutes", "decision_time_utc",
+        "bucket_index", "market_id", "bucket_title", "lower_bound", "upper_bound",
+        "market_q_raw", "model_p", "actual_winner", "spot", "terminal_close",
+    }
+    missing = required.difference(frame.columns)
+    if missing:
+        raise ValueError(f"CANONICAL_SCHEMA_MISSING:{sorted(missing)}")
+    return frame
+
+
+def _ordered(group: pd.DataFrame) -> pd.DataFrame:
+    if len(group) != 11 or group["bucket_index"].nunique() != 11:
+        raise ValueError("EXPECTED_EXACTLY_11_BUCKETS")
+    return group.sort_values("bucket_index").reset_index(drop=True)
+
+
+def select_nonfavorite_snapshot(group: pd.DataFrame, tol: float = TOL) -> SnapshotSelection:
+    frame = _ordered(group)
+    q = frame["market_q_raw"].astype(float).to_numpy()
+    p = frame["model_p"].astype(float).to_numpy()
+    maximum = float(q.max())
+    favorites = np.flatnonzero(np.abs(q - maximum) <= tol)
+    if len(favorites) != 1:
+        raise NOUniqueFavorite("NO_UNIQUE_MARKET_FAVORITE")
+    favorite_pos = int(favorites[0])
+    candidate_positions = tuple(i for i in range(11) if i != favorite_pos)
+    discrepancies = p - q
+    minimum = min(float(discrepancies[i]) for i in candidate_positions)
+    tied = [i for i in candidate_positions if abs(float(discrepancies[i]) - minimum) <= tol]
+    if len(tied) != 1:
+        raise TiedNoFadeScore("TIED_NO_FADE_SCORE")
+    selected_pos = tied[0]
+    return SnapshotSelection(
+        favorite_index=int(frame.loc[favorite_pos, "bucket_index"]),
+        selected_index=int(frame.loc[selected_pos, "bucket_index"]),
+        nonfavorite_indices=tuple(int(frame.loc[i, "bucket_index"]) for i in candidate_positions),
+        yes_discrepancy=float(discrepancies[selected_pos]),
+        favorite_q=maximum,
+        selected_q=float(q[selected_pos]),
+        selected_p=float(p[selected_pos]),
+    )
+
+
+def proxy_values(model_p_yes: float, market_q_yes_raw: float, stress: float = STRESS) -> dict[str, float]:
+    p_no = 1.0 - float(model_p_yes)
+    q_no = 1.0 - float(market_q_yes_raw)
+    raw_edge = p_no - q_no
+    stressed_cost = q_no + stress
+    return {
+        "p_no": p_no,
+        "q_no_proxy": q_no,
+        "raw_no_edge_proxy": raw_edge,
+        "stressed_no_cost_proxy": stressed_cost,
+        "stressed_no_edge_proxy": p_no - stressed_cost,
+    }
+
+
+def no_won(selected_bucket: str, resolved_winner: str) -> bool:
+    return str(resolved_winner) != str(selected_bucket)
+
+
+def resolved_winner(group: pd.DataFrame) -> str:
+    winners = group.loc[group["actual_winner"].astype(bool), "bucket_title"].astype(str).unique()
+    if len(winners) != 1:
+        raise ValueError("RESOLVED_WINNER_NOT_UNIQUE")
+    return str(winners[0])
+
+
+def reproduce_candidate_b(frame: pd.DataFrame, tol: float = TOL) -> pd.DataFrame:
+    late = frame[frame["horizon_minutes"].isin([60, 30])]
+    groups = {(str(d), int(h)): _ordered(g) for (d, h), g in late.groupby(["market_date", "horizon_minutes"], sort=False)}
+    records: list[dict] = []
+    for market_date in sorted(frame["market_date"].astype(str).unique()):
+        for horizon in (60, 30):
+            group = groups[(market_date, horizon)].copy()
+            group["_edge"] = group["model_p"].astype(float) - group["market_q_raw"].astype(float)
+            selected = group.sort_values(["_edge", "bucket_index"], ascending=[False, True]).iloc[0]
+            edge = float(selected["_edge"])
+            q = float(selected["market_q_raw"])
+            if edge < 0.02 - tol or q > 0.97 + tol:
+                continue
+            winner = resolved_winner(group)
+            bucket = str(selected["bucket_title"])
+            records.append({
+                "market_date": market_date,
+                "dataset_layer": str(selected["dataset_layer"]),
+                "checkpoint": f"T-{horizon}",
+                "horizon_minutes": horizon,
+                "selected_bucket": bucket,
+                "selected_bucket_index": int(selected["bucket_index"]),
+                "selected_q": q,
+                "model_p": float(selected["model_p"]),
+                "model_edge": edge,
+                "resolved_winner": winner,
+                "won": bucket == winner,
+            })
+            break
+    return pd.DataFrame(records).sort_values("market_date").reset_index(drop=True)
+
+
+def reproduce_favorite_regime(frame: pd.DataFrame, candidate: pd.DataFrame, tol: float = TOL) -> pd.DataFrame:
+    rows: list[dict] = []
+    for rec in candidate.to_dict("records"):
+        group = _ordered(frame[(frame["market_date"].astype(str) == str(rec["market_date"])) & (frame["horizon_minutes"] == int(rec["horizon_minutes"]))])
+        q = group["market_q_raw"].astype(float).to_numpy()
+        maximum = float(q.max())
+        favorites = group.loc[np.abs(q - maximum) <= tol, "bucket_title"].astype(str).tolist()
+        if len(favorites) == 1 and str(rec["selected_bucket"]) == favorites[0]:
+            rows.append(dict(rec))
+    return pd.DataFrame(rows).sort_values("market_date").reset_index(drop=True)
+
+
+def _distance_category(selected: int, favorite: int) -> str:
+    distance = abs(selected - favorite)
+    if selected in {0, 10}:
+        return "extreme tail bucket"
+    if distance == 1:
+        return "adjacent lower" if selected < favorite else "adjacent upper"
+    if distance == 2:
+        return "distance 2"
+    if distance == 3:
+        return "distance 3"
+    return "distance 4+"
+
+
+def snapshot_long_rows(group: pd.DataFrame, market_date: str, universe: str, block: int) -> tuple[list[dict], SnapshotSelection | None, str | None]:
+    frame = _ordered(group)
+    try:
+        selection = select_nonfavorite_snapshot(frame)
+        reason = None
+    except (NOUniqueFavorite, TiedNoFadeScore) as exc:
+        selection = None
+        reason = str(exc)
+    q = frame["market_q_raw"].astype(float).to_numpy()
+    p = frame["model_p"].astype(float).to_numpy()
+    ranks = [1 + int(np.sum(q > value + TOL)) for value in q]
+    discrepancies = p - q
+    candidate_positions = [] if selection is None else [i for i in range(11) if int(frame.loc[i, "bucket_index"]) != selection.favorite_index]
+    nonfav_order = sorted(candidate_positions, key=lambda i: (float(discrepancies[i]), int(frame.loc[i, "bucket_index"])))
+    nonfav_ranks = {pos: rank + 1 for rank, pos in enumerate(nonfav_order)}
+    winner = resolved_winner(frame)
+    rows = []
+    for pos, row in frame.iterrows():
+        idx = int(row["bucket_index"])
+        values = proxy_values(float(row["model_p"]), float(row["market_q_raw"]))
+        is_favorite = selection is not None and idx == selection.favorite_index
+        is_selected = selection is not None and idx == selection.selected_index
+        rows.append({
+            "market_date": market_date, "universe": universe,
+            "checkpoint": f"T-{int(row['horizon_minutes'])}", "bucket": str(row["bucket_title"]),
+            "bucket_order": idx, "market_q_yes_raw": float(row["market_q_raw"]),
+            "model_p_yes": float(row["model_p"]), "yes_discrepancy": float(discrepancies[pos]),
+            "market_rank": ranks[pos], "is_unique_market_favorite": bool(is_favorite),
+            "is_excluded_favorite": bool(is_favorite),
+            "is_nonfavorite_candidate": bool(selection is not None and not is_favorite),
+            "nonfavorite_rank_by_discrepancy": nonfav_ranks.get(pos),
+            "is_selected_no_candidate": bool(is_selected), **values,
+            "actual_no_best_ask": None, "actual_no_vwap5": None, "actual_no_depth": None,
+            "actual_no_spread": None, "actual_price_timestamp": None,
+            "actual_price_age_seconds": None, "actual_data_available": False,
+            "resolved_winner": winner, "no_won": no_won(str(row["bucket_title"]), winner),
+            "selection_reason": "MINIMUM_YES_DISCREPANCY" if is_selected else None,
+            "rejection_reason": reason,
+            "source_row_id": f"{market_date}|{int(row['horizon_minutes'])}|{idx}",
+            "fixed_date_block": block,
+        })
+    return rows, selection, reason
+
+
+def _selected_row(group: pd.DataFrame, selection: SnapshotSelection) -> pd.Series:
+    return group.loc[group["bucket_index"].astype(int) == selection.selected_index].iloc[0]
+
+
+def evaluate_date_variant(
+    market_date: str,
+    universe: str,
+    variant: str,
+    groups: Mapping[int, pd.DataFrame],
+    blocks: Mapping[str, int],
+) -> tuple[dict, int]:
+    final: dict | None = None
+    evaluated = 0
+    for horizon in (60, 30):
+        evaluated += 1
+        group = _ordered(groups[horizon])
+        checkpoint = f"T-{horizon}"
+        try:
+            selection = select_nonfavorite_snapshot(group)
+        except (NOUniqueFavorite, TiedNoFadeScore) as exc:
+            final = {"market_date": market_date, "universe": universe, "variant": variant,
+                     "checkpoint": checkpoint, "signal_status": "REJECTED", "rejection_reason": str(exc),
+                     "fixed_date_block": blocks[market_date], "month": market_date[:7]}
+            continue
+        favorite_row = group.loc[group["bucket_index"].astype(int) == selection.favorite_index].iloc[0]
+        selected = _selected_row(group, selection)
+        values = proxy_values(selection.selected_p, selection.selected_q)
+        winner = resolved_winner(group)
+        won = no_won(str(selected["bucket_title"]), winner)
+        payout = 1.0 if won else 0.0
+        gate = values["stressed_no_edge_proxy"] >= 0.02 - TOL if variant == "P1" else values["raw_no_edge_proxy"] >= 0.02 - TOL
+        cost_ok = values["stressed_no_cost_proxy"] < 1.0 - TOL
+        if not cost_ok:
+            reason = "REJECTED_NONPOSITIVE_WIN_PAYOUT_AFTER_STRESS"
+        elif not gate:
+            reason = "STRESSED_EDGE_BELOW_002" if variant == "P1" else "RAW_EDGE_BELOW_002"
+        else:
+            reason = None
+        lower = float(selected["lower_bound"]) if pd.notna(selected["lower_bound"]) else None
+        upper = float(selected["upper_bound"]) if pd.notna(selected["upper_bound"]) else None
+        distance = abs(selection.selected_index - selection.favorite_index)
+        rec = {
+            "market_date": market_date, "universe": universe, "variant": variant,
+            "checkpoint": checkpoint, "favorite_bucket": str(favorite_row["bucket_title"]),
+            "favorite_q_yes": selection.favorite_q, "favorite_bucket_index": selection.favorite_index,
+            "selected_no_bucket": str(selected["bucket_title"]), "selected_bucket_index": selection.selected_index,
+            "selected_q_yes": selection.selected_q, "selected_p_yes": selection.selected_p,
+            "yes_discrepancy": selection.yes_discrepancy, **values,
+            "execution_stress": STRESS, "actual_no_best_ask": None, "actual_no_vwap5": None,
+            "actual_no_depth": None, "price_provenance": "COMPLEMENT_PROXY",
+            "execution_status": "PROXY_ONLY", "signal_status": "ACCEPTED" if gate and cost_ok else "REJECTED",
+            "rejection_reason": reason, "resolved_winner": winner, "no_won": won,
+            "payout": payout, "pnl_1": payout - values["stressed_no_cost_proxy"],
+            "pnl_5": 5.0 * (payout - values["stressed_no_cost_proxy"]),
+            "cost_5": 5.0 * values["stressed_no_cost_proxy"],
+            "month": market_date[:7], "fixed_date_block": blocks[market_date],
+            "distance_from_favorite_in_buckets": distance, "is_adjacent_to_favorite": distance == 1,
+            "distance_category": _distance_category(selection.selected_index, selection.favorite_index),
+            "spot": float(selected["spot"]), "terminal_close": float(selected["terminal_close"]),
+            "selected_lower_bound": lower, "selected_upper_bound": upper,
+            "market_id": str(selected["market_id"]),
+        }
+        final = rec
+        if rec["signal_status"] == "ACCEPTED":
+            return rec, evaluated
+    assert final is not None
+    return final, evaluated
+
+
+def build_candidate_long_and_decisions(
+    frame: pd.DataFrame,
+    universe_dates: Mapping[str, list[str]],
+    blocks: Mapping[str, int],
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, int]]:
+    late = frame[frame["horizon_minutes"].isin([60, 30])]
+    groups = {(str(d), int(h)): g.copy() for (d, h), g in late.groupby(["market_date", "horizon_minutes"], sort=False)}
+    long_rows: list[dict] = []
+    for universe, dates in universe_dates.items():
+        for market_date in dates:
+            for horizon in (60, 30):
+                rows, _, _ = snapshot_long_rows(groups[(market_date, horizon)], market_date, universe, blocks[market_date])
+                long_rows.extend(rows)
+    decisions: list[dict] = []
+    evaluated_counts: dict[str, int] = {}
+    for universe, dates in universe_dates.items():
+        for variant in ("P1", "P2"):
+            count = 0
+            for market_date in dates:
+                rec, evaluated = evaluate_date_variant(
+                    market_date, universe, variant,
+                    {60: groups[(market_date, 60)], 30: groups[(market_date, 30)]}, blocks,
+                )
+                count += evaluated
+                decisions.append(rec)
+            evaluated_counts[f"{universe}|{variant}"] = count
+    return pd.DataFrame(long_rows), pd.DataFrame(decisions), evaluated_counts

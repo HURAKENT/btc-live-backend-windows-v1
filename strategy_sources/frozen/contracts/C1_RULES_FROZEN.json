@@ -1,0 +1,19 @@
+{
+  "base_shares": 5,
+  "both_checkpoints_required": true,
+  "candidate": "OLD_T60_FAVORITE",
+  "candidate_id": "C1_PRIMARY_EDGE_05_MODEL_DROP_02",
+  "canonical_name": "FAVORITE_SWITCH_FADE",
+  "checkpoint": "T30_ENTRY_BOTH_REQUIRED",
+  "edge_threshold": 0.05,
+  "favorite_changed_required": true,
+  "historical_price_definition": "ACTUAL_QNO_FROM_FROZEN_NO_PRICE_HISTORY",
+  "immutable": true,
+  "max_trades_per_date": 1,
+  "model_pyes_drop_min": 0.02,
+  "price_caps": [],
+  "t30_direct_no_edge_min": 0.05,
+  "threshold_variants": [],
+  "tie_break": "NO_SIGNAL_ON_FAVORITE_TIE",
+  "unique_favorite_required_both": true
+}

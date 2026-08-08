@@ -1,0 +1,18 @@
+{
+  "base_shares": 5,
+  "bucket_universe": "ALL_11_BUCKETS",
+  "candidate_id": "A2_PRIMARY_EDGE_05",
+  "canonical_name": "DIRECT_ACTUAL_NO_EDGE_INCLUDING_FAVORITE",
+  "checkpoint": "T60_PRIMARY_T30_FALLBACK_ONLY_IF_NO_T60_SIGNAL",
+  "direct_no_edge_definition": "PNO_MINUS_ACTUAL_QNO",
+  "edge_threshold": 0.05,
+  "favorite_allowed": true,
+  "historical_price_definition": "ACTUAL_QNO_FROM_FROZEN_NO_PRICE_HISTORY",
+  "immutable": true,
+  "max_trades_per_date": 1,
+  "p_no_definition": "1_MINUS_PYES",
+  "price_caps": [],
+  "selector": "MAX_DIRECT_NO_EDGE",
+  "threshold_variants": [],
+  "tie_break": "LOWEST_BUCKET_INDEX_WITHIN_1E-12"
+}

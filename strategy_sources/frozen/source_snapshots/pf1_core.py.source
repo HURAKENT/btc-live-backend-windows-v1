@@ -1,0 +1,200 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
+from typing import Iterable
+from zoneinfo import ZoneInfo
+
+NY = ZoneInfo("America/New_York")
+
+
+def canonical_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def payload_hash(value: object) -> str:
+    return hashlib.sha256(canonical_bytes(value)).hexdigest()
+
+
+def contract_hash(value: dict, field: str = "config_sha256") -> str:
+    clean = dict(value)
+    clean.pop(field, None)
+    return payload_hash(clean)
+
+
+def settlement_utc(market_date: str) -> datetime:
+    local = datetime.combine(date.fromisoformat(market_date), time(12, 0), tzinfo=NY)
+    return local.astimezone(timezone.utc)
+
+
+def checkpoint_target(market_date: str, minutes: int) -> datetime:
+    return settlement_utc(market_date) - timedelta(minutes=minutes)
+
+
+def winner_index(price: float, bounds: list[tuple[float | None, float | None]]) -> int:
+    matched = [i for i, (lo, hi) in enumerate(bounds) if (lo is None or price >= lo) and (hi is None or price < hi)]
+    if len(matched) != 1:
+        raise ValueError(f"non-exclusive settlement mapping: {price} -> {matched}")
+    return matched[0]
+
+
+@dataclass(frozen=True)
+class VwapResult:
+    value: float | None
+    filled: float
+    available_depth: float
+
+
+def ask_vwap(asks: Iterable[tuple[float, float]], shares: float) -> VwapResult:
+    levels = sorted((float(p), float(s)) for p, s in asks if float(s) > 0)
+    available = sum(size for _, size in levels)
+    remaining, cost, filled = float(shares), 0.0, 0.0
+    for price, size in levels:
+        take = min(remaining, size)
+        cost += take * price
+        filled += take
+        remaining -= take
+        if remaining <= 1e-12:
+            return VwapResult(cost / shares, filled, available)
+    return VwapResult(None, filled, available)
+
+
+def taker_fee_per_share(asks: Iterable[tuple[float, float]], shares: float, fee_schedule: dict | None) -> float | None:
+    """Actual fill-weighted taker fee using the frozen public market schedule.
+
+    Polymarket rounds the total USDC fee to five decimals.  A missing schedule
+    on a fee-enabled market is deliberately unresolved rather than guessed.
+    """
+    if not fee_schedule:
+        return None
+    rate = fee_schedule.get("rate")
+    exponent = fee_schedule.get("exponent", 1)
+    if rate is None:
+        return None
+    remaining, fee = float(shares), 0.0
+    for price, size in sorted((float(p), float(s)) for p, s in asks if float(s) > 0):
+        take=min(remaining,size)
+        fee += take * float(rate) * (price * (1.0-price)) ** float(exponent)
+        remaining -= take
+        if remaining <= 1e-12:
+            return round(fee,5)/float(shares)
+    return None
+
+
+def book_metrics(book: dict, shares=(5, 10, 25)) -> dict:
+    bids = sorted([(float(x["price"]), float(x["size"])) for x in book.get("bids", [])], reverse=True)
+    asks = sorted([(float(x["price"]), float(x["size"])) for x in book.get("asks", [])])
+    best_bid = bids[0] if bids else (None, None)
+    best_ask = asks[0] if asks else (None, None)
+    result = {
+        "best_bid": best_bid[0], "bid_size": best_bid[1],
+        "best_ask": best_ask[0], "ask_size": best_ask[1],
+        "spread": best_ask[0] - best_bid[0] if best_bid[0] is not None and best_ask[0] is not None else None,
+        "ask_depth_top": sum(size for _, size in asks),
+        "crossed": bool(best_bid[0] is not None and best_ask[0] is not None and best_bid[0] > best_ask[0]),
+    }
+    for size in shares:
+        result[f"vwap_{size}"] = ask_vwap(asks, size).value
+    result["ask_levels"] = asks
+    return result
+
+
+def validate_snapshot(rows: list[dict], target: datetime, decision: datetime, max_delay=60, max_skew=5, max_age=60) -> tuple[bool, str]:
+    if len(rows) != 11 or len({r["bucket_index"] for r in rows}) != 11:
+        return False, "CHECKPOINT_MISSING_OR_INCOMPLETE"
+    delay = (decision - target).total_seconds()
+    if delay < 0 or delay > max_delay:
+        return False, "CHECKPOINT_MISSING_OR_INCOMPLETE"
+    received = [pd_timestamp(r["local_received_timestamp"]) for r in rows]
+    if (max(received) - min(received)).total_seconds() > max_skew:
+        return False, "CHECKPOINT_MISSING_OR_INCOMPLETE"
+    for row in rows:
+        if row.get("crossed") or row.get("best_ask") is None:
+            return False, "CHECKPOINT_MISSING_OR_INCOMPLETE"
+        if float(row["price_age_seconds"]) > max_age:
+            return False, "CHECKPOINT_MISSING_OR_INCOMPLETE"
+        if row.get("vwap_5") is None:
+            return False, "EXECUTION_REJECTED_MISSING_DEPTH"
+    return True, "SNAPSHOT_VALID"
+
+
+def price_age_bin(seconds: float | None) -> str | None:
+    if seconds is None or not math.isfinite(float(seconds)) or float(seconds) < 0:
+        return None
+    value=float(seconds)
+    if value <= 5: return "0-5"
+    if value <= 15: return "6-15"
+    if value <= 30: return "16-30"
+    if value <= 60: return "31-60"
+    return "OVER_60_INVALID"
+
+
+def pd_timestamp(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def select_single(probabilities: list[float], vwap5: list[float | None]) -> tuple[int | None, list[float]]:
+    edges = [float(p) - float(q) if q is not None else float("-inf") for p, q in zip(probabilities, vwap5)]
+    if not any(math.isfinite(x) for x in edges):
+        return None, edges
+    best = max(range(len(edges)), key=lambda i: (edges[i], -i))
+    return best, edges
+
+
+def checkpoint_decision(probabilities: list[float], vwap5: list[float | None], snapshot_valid: bool,
+                        already_positioned: bool, threshold=.02, q_cap=.95,
+                        snapshot_code="SNAPSHOT_VALID") -> dict:
+    candidate = max(range(len(probabilities)), key=lambda i:(float(probabilities[i]),-i)) if len(probabilities)==11 else None
+    base={"model_candidate_exists":candidate is not None,"model_candidate_index":candidate,
+          "model_candidate_status":"MODEL_CANDIDATE_EXISTS" if candidate is not None else "MODEL_CANDIDATE_NOT_CALCULABLE",
+          "pf1_signal":False,"pf1_signal_status":"PF1_SIGNAL_NOT_CALCULABLE",
+          "executable_paper_trade":False,"execution_status":"EXECUTION_NOT_CREATED"}
+    if already_positioned:
+        return {**base,"selected_index":None,"execution_eligible":False,"position_opened":False,
+                "decision_code":"SKIPPED_ALREADY_POSITIONED","edges":[float("-inf")]*len(probabilities)}
+    selected, edges = select_single(probabilities, vwap5)
+    if selected is None or not snapshot_valid:
+        code=snapshot_code if snapshot_code in {"EXECUTION_REJECTED_MISSING_DEPTH","CHECKPOINT_MISSING_OR_INCOMPLETE"} else "CHECKPOINT_MISSING_OR_INCOMPLETE"
+        status="PF1_SIGNAL_NOT_CALCULABLE" if candidate is not None else "PF1_SIGNAL_NO_MODEL_CANDIDATE"
+        return {**base,"selected_index":candidate,"pf1_signal_status":status,"execution_status":code,
+                "execution_eligible":False,"position_opened":False,"decision_code":code,"edges":edges}
+    edge, q = edges[selected], vwap5[selected]
+    threshold_pass = edge + 1e-12 >= threshold
+    if not threshold_pass:
+        code = "NO_SIGNAL_EDGE_BELOW_THRESHOLD"
+    elif q is None:
+        code = "EXECUTION_REJECTED_MISSING_DEPTH"
+    elif q > q_cap + 1e-12:
+        code = "NO_SIGNAL_Q_ABOVE_CAP"
+    else:
+        code = "PAPER_POSITION_OPENED"
+    opened = code == "PAPER_POSITION_OPENED"
+    pf1_signal=opened
+    return {**base,"selected_index":selected,"raw_edge":edge,"selected_q":q,
+            "pf1_signal":pf1_signal,"pf1_signal_status":"PF1_SIGNAL" if pf1_signal else "PF1_SIGNAL_GATES_NOT_PASSED",
+            "executable_paper_trade":opened,"execution_status":"EXECUTABLE_PAPER_TRADE" if opened else code,
+            "execution_eligible":opened,
+            "position_opened": opened, "decision_code": code, "edges": edges,
+            "p_exact_one_flag": probabilities[selected] == 1.0}
+
+
+def paper_pnl(payout_per_share: float, entry_vwap5: float, fee_per_share: float, shares: int = 5) -> float:
+    if shares != 5:
+        raise ValueError("LSMV-PF1 primary size is exactly five shares")
+    return shares * (payout_per_share - entry_vwap5 - fee_per_share)
+
+
+def assert_no_future_candles(candles: list[list], decision_ms: int) -> None:
+    if any(int(row[6]) > decision_ms for row in candles):
+        raise ValueError("FUTURE_BINANCE_CANDLE")
+
+
+def expected_absent(is_confirmed_absent: bool) -> str:
+    return "EXPECTED_ABSENT" if is_confirmed_absent else "MARKET_AVAILABLE"

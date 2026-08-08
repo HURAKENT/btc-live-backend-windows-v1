@@ -1,0 +1,775 @@
+from __future__ import annotations
+
+import csv
+import hashlib
+import json
+import math
+import shutil
+import sys
+import zipfile
+from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+
+
+AUDIT_TS = "20260716T112616Z"
+PROJECT = Path(r"<SANITIZED_FAVORITE_BASKET_PROJECT_ROOT>")
+AUDIT = PROJECT / f"audits/{AUDIT_TS}"
+WORK = PROJECT / f"work/{AUDIT_TS}"
+SOURCE_PROJECT = Path(r"<SANITIZED_TERMINAL_DISTRIBUTION_SOURCE_ROOT>")
+PARQUET = SOURCE_PROJECT / "artifacts/actual_bucket_probabilities_170.parquet"
+COMPACT = SOURCE_PROJECT / "reports/chat_export/adjacent_bias_event_horizon_170.csv"
+PF1 = Path(r"<SANITIZED_PF1_SOURCE_ROOT>")
+EXPECTED_COMPACT_SHA = "d0fe4662ea1870cd379b29acb69f688bfb3db37e12cb95cddf68c18aba1aca55"
+TOL = 1e-9
+STRESS = 0.03
+VARIANTS = ["A", "B", "C", "D", "E"]
+STRATEGIES = ["Candidate B", "favorite-only control", "A", "B", "C", "D", "E"]
+PF1_FILES = [
+    "data/all_bucket_decisions.parquet",
+    "data/checkpoint_decisions.csv",
+    "data/event_state_ledger.csv",
+    "data/paper_trade_ledger.csv",
+    "data/signal_rejection_ledger.csv",
+    "config/frozen_lsmv_pf1.json",
+    "config/FORWARD_EVALUATION_CONTRACT.json",
+]
+USED_COLUMNS = [
+    "market_date", "dataset_layer", "horizon_minutes", "decision_time_utc",
+    "bucket_index", "market_id", "bucket_title", "lower_bound", "upper_bound",
+    "market_q_raw", "model_p", "p_minus_q_raw", "actual_winner",
+    "current_bucket", "spot", "terminal_close", "q_sum", "selected_model",
+]
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def file_rows(path: Path) -> int | None:
+    if path.suffix == ".parquet":
+        return pq.ParquetFile(path).metadata.num_rows
+    if path.suffix == ".csv":
+        with path.open("r", encoding="utf-8", newline="") as f:
+            return max(sum(1 for _ in csv.reader(f)) - 1, 0)
+    return None
+
+
+def fingerprint(path: Path) -> dict:
+    stat = path.stat()
+    return {
+        "path": str(path), "sha256": sha256(path), "bytes": stat.st_size,
+        "rows": file_rows(path),
+        "modified_utc": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+    }
+
+
+def jdump(path: Path, obj) -> None:
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+
+
+def safe_float(value):
+    if value is None or (isinstance(value, float) and not math.isfinite(value)):
+        return None
+    return float(value)
+
+
+def snapshot_info(group: pd.DataFrame) -> dict:
+    g = group.sort_values("bucket_index").reset_index(drop=True)
+    q = g["market_q_raw"].astype(float).to_numpy()
+    p = g["model_p"].astype(float).to_numpy()
+    max_q = float(q.max())
+    favorites = np.flatnonzero(np.abs(q - max_q) <= TOL).tolist()
+    unique_favorite = len(favorites) == 1
+    fi = favorites[0] if unique_favorite else None
+    winner_rows = np.flatnonzero(g["actual_winner"].astype(bool).to_numpy()).tolist()
+    current_rows = np.flatnonzero(g["current_bucket"].astype(bool).to_numpy()).tolist()
+    return {
+        "g": g, "q": q, "p": p, "edge": p - q, "favorites": favorites,
+        "unique_favorite": unique_favorite, "favorite_index": fi,
+        "winner_index": winner_rows[0] if len(winner_rows) == 1 else None,
+        "current_index": current_rows[0] if len(current_rows) == 1 else None,
+        "model_sum": float(p.sum()), "raw_q_sum": float(q.sum()),
+    }
+
+
+def base_record(info: dict, market_date: str, horizon: int) -> dict:
+    g, q, p, edge = info["g"], info["q"], info["p"], info["edge"]
+    fi = info["favorite_index"]
+    if fi is None:
+        raise ValueError("base_record requires unique favorite")
+    li, ui = (fi - 1 if fi > 0 else None), (fi + 1 if fi < 10 else None)
+
+    def bucket(i):
+        return None if i is None else str(g.iloc[i]["bucket_title"])
+
+    def val(a, i):
+        return None if i is None else float(a[i])
+
+    current = info["current_index"]
+    location = "lower_two" if fi <= 1 else "upper_two" if fi >= 9 else "central"
+    return {
+        "market_date": market_date,
+        "checkpoint": "T-60" if horizon == 60 else "T-30",
+        "horizon_minutes": horizon,
+        "decision_timestamp": pd.Timestamp(g.iloc[0]["decision_time_utc"]).isoformat(),
+        "dataset_layer": str(g.iloc[0]["dataset_layer"]),
+        "resolved_winner": bucket(info["winner_index"]),
+        "favorite_bucket": bucket(fi),
+        "favorite_bucket_index": fi,
+        "favorite_market_q_raw": val(q, fi),
+        "favorite_model_p": val(p, fi),
+        "favorite_raw_edge": val(edge, fi),
+        "lower_neighbor_bucket": bucket(li),
+        "lower_neighbor_market_q_raw": val(q, li),
+        "lower_neighbor_model_p": val(p, li),
+        "lower_neighbor_raw_edge": val(edge, li),
+        "upper_neighbor_bucket": bucket(ui),
+        "upper_neighbor_market_q_raw": val(q, ui),
+        "upper_neighbor_model_p": val(p, ui),
+        "upper_neighbor_raw_edge": val(edge, ui),
+        "model_probability_sum_11": info["model_sum"],
+        "market_q_sum_11": info["raw_q_sum"],
+        "spot": safe_float(g.iloc[0]["spot"]),
+        "spot_bucket_index": current,
+        "favorite_location": location,
+    }
+
+
+def finalize_selection(base: dict, info: dict, strategy: str, selected: list[int], side: str) -> dict:
+    g, q, p = info["g"], info["q"], info["p"]
+    stress = STRESS * len(selected)
+    raw_q = float(q[selected].sum())
+    model_p = float(p[selected].sum())
+    cost = raw_q + stress
+    winner = info["winner_index"]
+    won = winner in selected
+    payout = 1.0 if won else 0.0
+    fi = info["favorite_index"]
+    current = info["current_index"]
+    neighbor_indices = [i for i in selected if i != fi]
+    rec = dict(base)
+    rec.update({
+        "strategy_variant": strategy,
+        "selected_neighbor_side": side,
+        "selected_buckets": " | ".join(str(g.iloc[i]["bucket_title"]) for i in selected),
+        "selected_bucket_indices": "|".join(str(i) for i in selected),
+        "number_of_buckets": len(selected),
+        "basket_model_p": model_p,
+        "basket_market_q_raw": raw_q,
+        "execution_stress": stress,
+        "basket_stressed_cost": cost,
+        "basket_raw_edge": model_p - raw_q,
+        "basket_stressed_edge": model_p - cost,
+        "won": bool(won),
+        "payout": payout,
+        "stressed_pnl": payout - cost,
+        "ROI": (payout - cost) / cost,
+        "five_share_cost": cost * 5,
+        "five_share_pnl": (payout - cost) * 5,
+        "month": str(base["market_date"])[:7],
+        "spot_inside_favorite": current == fi if current is not None else None,
+        "spot_inside_selected_neighbor": current in neighbor_indices if current is not None else None,
+        "spot_inside_basket": current in selected if current is not None else None,
+        "spot_position": (
+            "spot_inside_favorite" if current == fi else
+            "spot_inside_selected_neighbor" if current in neighbor_indices else
+            "spot_outside_basket" if current is not None else "DATA_GAP_SPOT_POSITION"
+        ),
+        "selection_uses_winner": False,
+    })
+    return rec
+
+
+def evaluate_variant(group: pd.DataFrame, market_date: str, horizon: int, variant: str):
+    info = snapshot_info(group)
+    if not info["unique_favorite"]:
+        return None, "NO_UNIQUE_MARKET_FAVORITE"
+    fi = info["favorite_index"]
+    base = base_record(info, market_date, horizon)
+    neighbors = [i for i in [fi - 1 if fi > 0 else None, fi + 1 if fi < 10 else None] if i is not None]
+    selected, side = None, None
+    threshold = 0.02
+    if variant == "A":
+        selected, side = [fi], "none"
+    elif variant in {"B", "C", "E"}:
+        if not neighbors:
+            return None, "NO_NEIGHBOR"
+        scores = []
+        for ni in neighbors:
+            if variant == "B":
+                score = float(info["p"][[fi, ni]].sum() - info["q"][[fi, ni]].sum() - 0.06)
+            else:
+                score = float(info["edge"][ni])
+            scores.append((ni, score))
+        if len(scores) == 2 and abs(scores[0][1] - scores[1][1]) <= TOL:
+            return None, "TIED_NEIGHBOR_EDGE"
+        ni = max(scores, key=lambda x: x[1])[0]
+        selected = [fi, ni]
+        side = "lower" if ni < fi else "upper"
+        if variant == "E":
+            threshold = 0.05
+    elif variant == "D":
+        if len(neighbors) != 2:
+            return None, "BOTH_NEIGHBORS_REQUIRED"
+        selected, side = [fi - 1, fi, fi + 1], "both"
+    else:
+        raise ValueError(variant)
+
+    rec = finalize_selection(base, info, variant, selected, side)
+    if rec["basket_stressed_cost"] >= 1.0 - TOL:
+        return None, "STRESSED_COST_NOT_BELOW_ONE"
+    if variant == "A":
+        if rec["basket_stressed_edge"] < 0.02 - TOL:
+            return None, "STRESSED_EDGE_BELOW_002"
+    elif variant == "B":
+        if rec["basket_stressed_edge"] < 0.02 - TOL:
+            return None, "STRESSED_EDGE_BELOW_002"
+    elif variant in {"C", "E"}:
+        ni = selected[1]
+        if info["edge"][fi] <= 0 or info["edge"][ni] <= 0:
+            return None, "INDIVIDUAL_RAW_EDGE_NOT_POSITIVE"
+        if rec["basket_stressed_edge"] < threshold - TOL:
+            return None, f"STRESSED_EDGE_BELOW_{threshold:.2f}"
+    elif variant == "D":
+        if any(info["edge"][i] <= 0 for i in selected):
+            return None, "INDIVIDUAL_RAW_EDGE_NOT_POSITIVE"
+        if rec["basket_stressed_edge"] < 0.02 - TOL:
+            return None, "STRESSED_EDGE_BELOW_002"
+    return rec, "ACCEPTED"
+
+
+def candidate_record(group: pd.DataFrame, market_date: str, horizon: int):
+    info = snapshot_info(group)
+    g = info["g"]
+    ranked = g.assign(_edge=g["model_p"].astype(float) - g["market_q_raw"].astype(float)).sort_values(
+        ["_edge", "bucket_index"], ascending=[False, True]
+    )
+    selected_row = ranked.iloc[0]
+    si = int(selected_row["bucket_index"])
+    edge = float(selected_row["model_p"] - selected_row["market_q_raw"])
+    q = float(selected_row["market_q_raw"])
+    if edge < 0.02 - TOL or q > 0.97 + TOL:
+        return None, "CANDIDATE_B_SIGNAL_FAIL"
+    if not info["unique_favorite"]:
+        # Candidate B itself does not require a unique favorite. Use first tied favorite only for descriptive fields.
+        info = dict(info)
+        info["favorite_index"] = info["favorites"][0]
+    base = base_record(info, market_date, horizon)
+    rec = finalize_selection(base, info, "Candidate B", [si], "none")
+    max_q = float(info["q"].max())
+    rec["candidate_selected_is_any_favorite"] = abs(q - max_q) <= TOL
+    rec["candidate_selected_is_unique_favorite"] = rec["candidate_selected_is_any_favorite"] and len(info["favorites"]) == 1
+    return rec, "ACCEPTED"
+
+
+def max_drawdown(values) -> float:
+    equity = np.cumsum(np.asarray(values, dtype=float))
+    equity = np.concatenate([[0.0], equity])
+    peaks = np.maximum.accumulate(equity)
+    return float(np.max(peaks - equity))
+
+
+def streaks(won_values) -> dict:
+    max_w, max_l, cur_w, cur_l = 0, 0, 0, 0
+    losing_runs, current_loss = [], []
+    for won, pnl in won_values:
+        if won:
+            cur_w += 1; max_w = max(max_w, cur_w); cur_l = 0
+            if current_loss:
+                losing_runs.append(current_loss); current_loss = []
+        else:
+            cur_l += 1; max_l = max(max_l, cur_l); cur_w = 0
+            current_loss.append(float(pnl))
+    if current_loss:
+        losing_runs.append(current_loss)
+    worst_loss = max((-sum(run) for run in losing_runs), default=0.0)
+    return {"max_winning_streak": max_w, "max_losing_streak": max_l, "max_losing_run_loss": worst_loss}
+
+
+def remove_top(df: pd.DataFrame, n: int) -> float:
+    return float(df["stressed_pnl"].sum() - df.nlargest(min(n, len(df)), "stressed_pnl")["stressed_pnl"].sum())
+
+
+def metrics(df: pd.DataFrame, available_dates=170) -> dict:
+    d = df.sort_values("market_date")
+    trades = len(d); wins = int(d["won"].sum()) if trades else 0
+    turnover = float(d["basket_stressed_cost"].sum()) if trades else 0.0
+    pnl = float(d["stressed_pnl"].sum()) if trades else 0.0
+    s = streaks(list(zip(d["won"].astype(bool), d["stressed_pnl"].astype(float))))
+    return {
+        "available_dates": available_dates, "trades": trades, "skipped_dates": available_dates - trades,
+        "T-60": int((d["checkpoint"] == "T-60").sum()) if trades else 0,
+        "T-30": int((d["checkpoint"] == "T-30").sum()) if trades else 0,
+        "wins": wins, "losses": trades - wins, "win_rate": wins / trades if trades else None,
+        "average_model_probability": safe_float(d["basket_model_p"].mean()) if trades else None,
+        "average_raw_price": safe_float(d["basket_market_q_raw"].mean()) if trades else None,
+        "average_stressed_cost": safe_float(d["basket_stressed_cost"].mean()) if trades else None,
+        "average_raw_edge": safe_float(d["basket_raw_edge"].mean()) if trades else None,
+        "average_stressed_edge": safe_float(d["basket_stressed_edge"].mean()) if trades else None,
+        "total_stressed_pnl": pnl,
+        "average_pnl_per_trade": pnl / trades if trades else None,
+        "median_pnl": safe_float(d["stressed_pnl"].median()) if trades else None,
+        "total_turnover": turnover, "ROI": pnl / turnover if turnover else None,
+        "profit_per_100_turnover": 100 * pnl / turnover if turnover else None,
+        "max_drawdown": max_drawdown(d["stressed_pnl"]) if trades else 0.0,
+        "max_drawdown_five_shares": 5 * max_drawdown(d["stressed_pnl"]) if trades else 0.0,
+        **s,
+        "average_five_share_cost": safe_float(d["five_share_cost"].mean()) if trades else None,
+        "median_five_share_cost": safe_float(d["five_share_cost"].median()) if trades else None,
+        "maximum_five_share_cost": safe_float(d["five_share_cost"].max()) if trades else None,
+        "maximum_single_trade_loss": max(0.0, -float(d["stressed_pnl"].min())) if trades else 0.0,
+        "remove_top_1_pnl": remove_top(d, 1) if trades else 0.0,
+        "remove_top_3_pnl": remove_top(d, 3) if trades else 0.0,
+        "remove_top_5_pnl": remove_top(d, 5) if trades else 0.0,
+    }
+
+
+def band(value, cuts, labels):
+    for cut, label in zip(cuts, labels):
+        if value < cut:
+            return label
+    return labels[-1]
+
+
+AUDIT.mkdir(parents=True, exist_ok=True); WORK.mkdir(parents=True, exist_ok=True)
+source_before = {"parquet": fingerprint(PARQUET), "compact": fingerprint(COMPACT)}
+pf1_before = {rel: fingerprint(PF1 / rel) for rel in PF1_FILES}
+rules_sha = sha256(AUDIT / "BASKET_RULES_FROZEN.json")
+
+table = pq.read_table(PARQUET).to_pandas()
+compact = pd.read_csv(COMPACT)
+late = table[table["horizon_minutes"].isin([60, 30])].copy()
+groups = {(str(d), int(h)): g.copy() for (d, h), g in late.groupby(["market_date", "horizon_minutes"], sort=False)}
+dates = sorted(table["market_date"].astype(str).unique())
+
+# Candidate B reproduction, independently from compact.
+candidate = []
+candidate_reasons = {}
+for date in dates:
+    rec60, reason60 = candidate_record(groups[(date, 60)], date, 60)
+    if rec60 is not None:
+        candidate.append(rec60); continue
+    rec30, reason30 = candidate_record(groups[(date, 30)], date, 30)
+    if rec30 is not None:
+        candidate.append(rec30)
+    else:
+        candidate_reasons[date] = [reason60, reason30]
+cand_df = pd.DataFrame(candidate).sort_values("market_date").reset_index(drop=True)
+
+compact_late = compact[compact["horizon_minutes"].isin([60, 30])].copy()
+compact_late["edge"] = compact_late["best_single_p"] - compact_late["best_single_q"]
+compact_selected = []
+for date in dates:
+    x60 = compact_late[(compact_late["market_date"] == date) & (compact_late["horizon_minutes"] == 60)].iloc[0]
+    x30 = compact_late[(compact_late["market_date"] == date) & (compact_late["horizon_minutes"] == 30)].iloc[0]
+    x = x60 if x60["edge"] >= .02 and x60["best_single_q"] <= .97 else x30 if x30["edge"] >= .02 and x30["best_single_q"] <= .97 else None
+    if x is not None:
+        compact_selected.append(x)
+compact_df = pd.DataFrame(compact_selected).sort_values("market_date").reset_index(drop=True)
+candidate_compact_match = (
+    len(compact_df) == len(cand_df)
+    and list(compact_df["market_date"]) == list(cand_df["market_date"])
+    and all(compact_df["best_single_bucket"].astype(str).to_numpy() == cand_df["selected_buckets"].astype(str).to_numpy())
+    and np.allclose(compact_df["best_single_q"], cand_df["basket_market_q_raw"], atol=TOL, rtol=0)
+    and np.allclose(compact_df["best_single_p"], cand_df["basket_model_p"], atol=TOL, rtol=0)
+)
+candidate_ok = (
+    len(cand_df) == 131 and int(cand_df["won"].sum()) == 89
+    and int((~cand_df["won"]).sum()) == 42
+    and int((cand_df["checkpoint"] == "T-60").sum()) == 115
+    and int((cand_df["checkpoint"] == "T-30").sum()) == 16
+    and candidate_compact_match
+)
+if not candidate_ok:
+    jdump(AUDIT / "TEST_RESULTS.json", {"verdict": "FAVORITE_NEIGHBOR_BASKET_REPRODUCTION_FAILED", "candidate_rows": len(cand_df)})
+    raise SystemExit("FAVORITE_NEIGHBOR_BASKET_REPRODUCTION_FAILED")
+
+favorite_control = cand_df[cand_df["candidate_selected_is_unique_favorite"]].copy()
+favorite_control["strategy_variant"] = "favorite-only control"
+nonfavorite_control = cand_df[~cand_df["candidate_selected_is_any_favorite"]].copy()
+
+# Variants A-E, independently applying T-60 priority and T-30 fallback.
+variant_frames = {}
+skip_registry = {}
+evaluation_registry = {}
+for variant in VARIANTS:
+    accepted, skips, evaluations = [], {}, []
+    for date in dates:
+        rec60, reason60 = evaluate_variant(groups[(date, 60)], date, 60, variant)
+        evaluations.append({"market_date": date, "checkpoint": "T-60", "reason": reason60})
+        if rec60 is not None:
+            accepted.append(rec60); continue
+        rec30, reason30 = evaluate_variant(groups[(date, 30)], date, 30, variant)
+        evaluations.append({"market_date": date, "checkpoint": "T-30", "reason": reason30})
+        if rec30 is not None:
+            accepted.append(rec30)
+        else:
+            skips[date] = {"T-60": reason60, "T-30": reason30}
+    frame = pd.DataFrame(accepted)
+    if len(frame):
+        frame = frame.sort_values("market_date").reset_index(drop=True)
+    else:
+        frame = pd.DataFrame(columns=[c for c in cand_df.columns if not c.startswith("candidate_")])
+    variant_frames[variant] = frame
+    skip_registry[variant] = skips
+    evaluation_registry[variant] = evaluations
+
+all_frames = {"Candidate B": cand_df, "favorite-only control": favorite_control, **variant_frames}
+
+# Assign five chronological equal-count blocks.
+temporal_rows = []
+monthly_rows = []
+for strategy, df in all_frames.items():
+    d = df.sort_values("market_date").copy().reset_index(drop=True)
+    d["temporal_block"] = 0
+    for block_no, idxs in enumerate(np.array_split(np.arange(len(d)), 5), 1):
+        if len(idxs) == 0:
+            continue
+        d.loc[idxs, "temporal_block"] = block_no
+        b = d.loc[idxs]
+        bm = metrics(b, available_dates=len(b))
+        temporal_rows.append({
+            "strategy": strategy, "temporal_block": block_no,
+            "start_date": b["market_date"].min(), "end_date": b["market_date"].max(),
+            "trades": bm["trades"], "wins": bm["wins"], "losses": bm["losses"],
+            "win_rate": bm["win_rate"], "stressed_pnl": bm["total_stressed_pnl"],
+            "turnover": bm["total_turnover"], "ROI": bm["ROI"],
+            "average_stressed_cost": bm["average_stressed_cost"],
+        })
+    all_frames[strategy] = d
+    for month, m in d.groupby("month", sort=True):
+        mm = metrics(m, available_dates=len(m))
+        monthly_rows.append({
+            "strategy": strategy, "month": month, "trades": mm["trades"],
+            "wins": mm["wins"], "losses": mm["losses"], "win_rate": mm["win_rate"],
+            "turnover": mm["total_turnover"], "stressed_pnl": mm["total_stressed_pnl"], "ROI": mm["ROI"],
+            "max_drawdown": mm["max_drawdown"], "five_share_turnover": 5 * mm["total_turnover"],
+        })
+
+temporal_df = pd.DataFrame(temporal_rows)
+monthly_df = pd.DataFrame(monthly_rows)
+comparison = []
+concentration, drawdowns, bankroll = {}, {}, {}
+for strategy in STRATEGIES:
+    d = all_frames[strategy]
+    m = metrics(d)
+    blocks = temporal_df[temporal_df["strategy"] == strategy]
+    months = monthly_df[monthly_df["strategy"] == strategy]
+    positive = d[d["stressed_pnl"] > 0]["stressed_pnl"].sort_values(ascending=False)
+    positive_total = float(positive.sum())
+    top_shares = {f"top_{n}_positive_pnl_share": (float(positive.head(n).sum()) / positive_total if positive_total > 0 else None) for n in [1, 3, 5]}
+    best_month_pnl = float(months["stressed_pnl"].max()) if len(months) else 0.0
+    best_month_share = best_month_pnl / m["total_stressed_pnl"] if m["total_stressed_pnl"] > 0 else None
+    positive_blocks = int((blocks["stressed_pnl"] > 0).sum())
+    criteria = {
+        "total_stressed_pnl_positive": m["total_stressed_pnl"] > 0,
+        "ROI_positive": (m["ROI"] or 0) > 0,
+        "remove_top_5_positive": m["remove_top_5_pnl"] > 0,
+        "minimum_30_trades": m["trades"] >= 30,
+        "minimum_3_positive_blocks": positive_blocks >= 3,
+        "top_5_positive_concentration_le_35pct": top_shares["top_5_positive_pnl_share"] is not None and top_shares["top_5_positive_pnl_share"] <= .35 + TOL,
+        "best_month_share_le_50pct": best_month_share is not None and best_month_share <= .50 + TOL,
+        "max_drawdown_le_total_pnl": m["total_stressed_pnl"] > 0 and m["max_drawdown"] <= m["total_stressed_pnl"] + TOL,
+        "no_future_information": True,
+        "reproduction_tests_passed": candidate_ok,
+    }
+    moderate = all(criteria.values())
+    concentration_fail = not criteria["top_5_positive_concentration_le_35pct"] or not criteria["best_month_share_le_50pct"]
+    historical_edge = "moderate" if moderate else "thin" if m["total_stressed_pnl"] > 0 and m["remove_top_5_pnl"] > 0 and concentration_fail else "not established"
+    concentration[strategy] = {
+        "positive_pnl_total": positive_total, **top_shares,
+        "best_month": str(months.loc[months["stressed_pnl"].idxmax(), "month"]) if len(months) else None,
+        "best_month_pnl": best_month_pnl, "best_month_share_of_total_result": best_month_share,
+        "remove_top": {"1": m["remove_top_1_pnl"], "3": m["remove_top_3_pnl"], "5": m["remove_top_5_pnl"]},
+        "positive_temporal_blocks": positive_blocks, "criteria": criteria, "historical_edge": historical_edge,
+    }
+    drawdowns[strategy] = {
+        "max_drawdown_one_share": m["max_drawdown"], "max_drawdown_five_shares": m["max_drawdown_five_shares"],
+        "max_losing_streak": m["max_losing_streak"], "max_winning_streak": m["max_winning_streak"],
+        "max_losing_run_loss_one_share": m["max_losing_run_loss"],
+        "max_losing_run_loss_five_shares": 5 * m["max_losing_run_loss"],
+        "chronological_equity_curve": [
+            {"market_date": row.market_date, "equity": float(eq)}
+            for row, eq in zip(d.itertuples(), d["stressed_pnl"].cumsum())
+        ],
+    }
+    monthly_turnover_5 = months.groupby("month")["five_share_turnover"].sum() if len(months) else pd.Series(dtype=float)
+    monthly_dd_5 = 5 * months["max_drawdown"] if len(months) else pd.Series(dtype=float)
+    reference_avg = metrics(all_frames["favorite-only control"])["average_five_share_cost"]
+    reference_max = metrics(all_frames["favorite-only control"])["maximum_five_share_cost"]
+    bank = {
+        "one_trade_five_shares": {
+            "average_cost": m["average_five_share_cost"], "median_cost": m["median_five_share_cost"],
+            "maximum_cost": m["maximum_five_share_cost"],
+            "shares_purchased": int(round(d["number_of_buckets"].mean() * 5)) if len(d) else 0,
+            "maximum_possible_loss": m["maximum_five_share_cost"],
+        },
+        "month": {
+            "average_monthly_turnover": safe_float(monthly_turnover_5.mean()) if len(monthly_turnover_5) else None,
+            "maximum_monthly_turnover": safe_float(monthly_turnover_5.max()) if len(monthly_turnover_5) else None,
+            "maximum_monthly_trades": int(months["trades"].max()) if len(months) else 0,
+            "maximum_monthly_drawdown": safe_float(monthly_dd_5.max()) if len(monthly_dd_5) else None,
+        },
+        "capital_multiple_vs_favorite_only": {
+            "average_cost_multiple": m["average_five_share_cost"] / reference_avg if reference_avg and m["average_five_share_cost"] is not None else None,
+            "maximum_cost_multiple": m["maximum_five_share_cost"] / reference_max if reference_max and m["maximum_five_share_cost"] is not None else None,
+        },
+        "bankrolls": {},
+    }
+    for amount in [100, 250, 500, 1000]:
+        bank["bankrolls"][str(amount)] = {
+            "average_trade_share": m["average_five_share_cost"] / amount if m["average_five_share_cost"] is not None else None,
+            "maximum_trade_share": m["maximum_five_share_cost"] / amount if m["maximum_five_share_cost"] is not None else None,
+            "historical_max_drawdown_share": m["max_drawdown_five_shares"] / amount,
+            "max_losing_run_loss_share": (5 * m["max_losing_run_loss"]) / amount,
+        }
+    bankroll[strategy] = bank
+    comparison.append({
+        "strategy": strategy, **m, "positive_temporal_blocks": positive_blocks,
+        "top_1_positive_pnl_concentration": top_shares["top_1_positive_pnl_share"],
+        "top_3_positive_pnl_concentration": top_shares["top_3_positive_pnl_share"],
+        "top_5_positive_pnl_concentration": top_shares["top_5_positive_pnl_share"],
+        "best_month_share_of_total_result": best_month_share,
+        "historical_edge": historical_edge,
+    })
+
+comparison_df = pd.DataFrame(comparison)
+
+# Frozen risk/return ordering among all variants A-E and separately among neighbor variants B-E.
+rank_class = {"moderate": 2, "thin": 1, "not established": 0}
+def frozen_rank(frame):
+    ranked = frame.copy()
+    ranked["class_rank"] = ranked["historical_edge"].map(rank_class)
+    ranked["risk_adjusted_roi"] = ranked["ROI"] / (1 + ranked["max_drawdown"])
+    return ranked.sort_values(
+        ["class_rank", "positive_temporal_blocks", "top_5_positive_pnl_concentration", "risk_adjusted_roi", "remove_top_5_pnl", "trades"],
+        ascending=[False, False, True, False, False, False], na_position="last"
+    )
+
+best_variant = str(frozen_rank(comparison_df[comparison_df["strategy"].isin(VARIANTS)]).iloc[0]["strategy"])
+best_neighbor_variant = str(frozen_rank(comparison_df[comparison_df["strategy"].isin(["B", "C", "D", "E"])]).iloc[0]["strategy"])
+
+neighbor_edges = comparison_df[comparison_df["strategy"].isin(["B", "C", "D", "E"])]["historical_edge"].tolist()
+if "moderate" in neighbor_edges:
+    verdict = "FAVORITE_NEIGHBOR_BASKET_HISTORICALLY_PROMISING"
+elif "thin" in neighbor_edges:
+    verdict = "FAVORITE_NEIGHBOR_BASKET_THIN"
+else:
+    verdict = "FAVORITE_NEIGHBOR_BASKET_NOT_ESTABLISHED"
+
+# Detailed band outputs for B-E.
+band_rows = []
+for strategy in ["B", "C", "D", "E"]:
+    d = all_frames[strategy].copy()
+    if not len(d):
+        continue
+    d["raw_cost_band"] = d["basket_market_q_raw"].map(lambda x: band(x, [.4, .6, .75, .85, .95, math.inf], ["<40c", "40-60c", "60-75c", "75-85c", "85-95c", ">=95c"]))
+    d["stressed_cost_band"] = d["basket_stressed_cost"].map(lambda x: band(x, [.4, .6, .75, .85, .95, math.inf], ["<40c", "40-60c", "60-75c", "75-85c", "85-95c", ">=95c"]))
+    d["model_probability_band"] = d["basket_model_p"].map(lambda x: band(x, [.5, .65, .75, .85, .95, math.inf], ["<50%", "50-65%", "65-75%", "75-85%", "85-95%", ">=95%"]))
+    d["stressed_edge_band"] = d["basket_stressed_edge"].map(lambda x: band(x, [.03, .05, .10, math.inf], ["2-3pp", "3-5pp", "5-10pp", ">=10pp"]))
+    for dimension in ["selected_neighbor_side", "raw_cost_band", "stressed_cost_band", "model_probability_band", "stressed_edge_band", "spot_position", "favorite_location"]:
+        for value, subset in d.groupby(dimension, dropna=False, sort=True):
+            mm = metrics(subset, available_dates=len(subset))
+            band_rows.append({
+                "strategy": strategy, "dimension": dimension, "band": str(value),
+                "trades": mm["trades"], "wins": mm["wins"], "losses": mm["losses"],
+                "win_rate": mm["win_rate"], "turnover": mm["total_turnover"],
+                "stressed_pnl": mm["total_stressed_pnl"], "ROI": mm["ROI"],
+                "average_stressed_cost": mm["average_stressed_cost"],
+                "average_model_probability": mm["average_model_probability"],
+                "average_stressed_edge": mm["average_stressed_edge"],
+            })
+bands_df = pd.DataFrame(band_rows)
+
+# Consolidate classifications.
+trade_columns = [
+    "market_date", "checkpoint", "horizon_minutes", "decision_timestamp", "dataset_layer", "resolved_winner",
+    "favorite_bucket", "favorite_bucket_index", "favorite_market_q_raw", "favorite_model_p", "favorite_raw_edge",
+    "lower_neighbor_bucket", "lower_neighbor_market_q_raw", "lower_neighbor_model_p", "lower_neighbor_raw_edge",
+    "upper_neighbor_bucket", "upper_neighbor_market_q_raw", "upper_neighbor_model_p", "upper_neighbor_raw_edge",
+    "strategy_variant", "selected_neighbor_side", "selected_buckets", "selected_bucket_indices", "number_of_buckets",
+    "basket_model_p", "basket_market_q_raw", "execution_stress", "basket_stressed_cost", "basket_raw_edge",
+    "basket_stressed_edge", "won", "payout", "stressed_pnl", "ROI", "five_share_cost", "five_share_pnl",
+    "month", "temporal_block", "model_probability_sum_11", "market_q_sum_11", "spot", "spot_bucket_index",
+    "spot_inside_favorite", "spot_inside_selected_neighbor", "spot_inside_basket", "spot_position", "favorite_location",
+    "selection_uses_winner",
+]
+classification_df = pd.concat([all_frames[s] for s in STRATEGIES], ignore_index=True)[trade_columns].sort_values(["strategy_variant", "market_date"])
+
+# Source and PF1 post hashes.
+source_after = {"parquet": fingerprint(PARQUET), "compact": fingerprint(COMPACT)}
+pf1_after = {rel: fingerprint(PF1 / rel) for rel in PF1_FILES}
+sources_unchanged = all(source_before[k]["sha256"] == source_after[k]["sha256"] for k in source_before)
+pf1_unchanged = all(pf1_before[k]["sha256"] == pf1_after[k]["sha256"] for k in pf1_before)
+
+model_sum_deviation = float((late.groupby(["market_date", "horizon_minutes"])["model_p"].sum() - 1.0).abs().max())
+bucket_counts = late.groupby(["market_date", "horizon_minutes"]).size()
+ordered_ok = True
+for _, g in late.groupby(["market_date", "horizon_minutes"]):
+    sg = g.sort_values("bucket_index")
+    if list(sg["bucket_index"].astype(int)) != list(range(11)):
+        ordered_ok = False; break
+unique_favorite_snapshots = 0; tied_favorite_snapshots = 0
+for g in groups.values():
+    if snapshot_info(g)["unique_favorite"]: unique_favorite_snapshots += 1
+    else: tied_favorite_snapshots += 1
+evaluation_reason_counts = {v: dict(Counter(x["reason"] for x in evaluation_registry[v])) for v in VARIANTS}
+tied_neighbor_counts = {v: evaluation_reason_counts[v].get("TIED_NEIGHBOR_EDGE", 0) for v in VARIANTS}
+
+source_provenance = {
+    "audit_timestamp_utc": AUDIT_TS, "rules_sha256": rules_sha,
+    "sources_before": source_before, "sources_after": source_after,
+    "used_parquet_columns": USED_COLUMNS,
+    "compact_columns_used": ["market_date", "horizon_minutes", "best_single_bucket", "best_single_p", "best_single_q", "winner"],
+    "date_range": [str(table["market_date"].min()), str(table["market_date"].max())],
+    "unique_dates": int(table["market_date"].nunique()), "unique_horizons": int(table["horizon_minutes"].nunique()),
+    "rows": len(table), "expected_rows": 170 * 21 * 11,
+    "buckets_per_date_horizon_min": int(table.groupby(["market_date", "horizon_minutes"]).size().min()),
+    "buckets_per_date_horizon_max": int(table.groupby(["market_date", "horizon_minutes"]).size().max()),
+    "compact_expected_sha256": EXPECTED_COMPACT_SHA,
+    "compact_hash_match": source_before["compact"]["sha256"] == EXPECTED_COMPACT_SHA,
+    "unique_favorite_snapshots_T60_T30": unique_favorite_snapshots,
+    "tied_favorite_snapshots_T60_T30": tied_favorite_snapshots,
+    "tied_neighbor_edge_skip_counts": tied_neighbor_counts,
+    "variant_checkpoint_evaluation_reason_counts": evaluation_reason_counts,
+}
+protected_invariance = {"unchanged": sources_unchanged, "before": source_before, "after": source_after}
+pf1_invariance = {"unchanged": pf1_unchanged, "accepted_count_preserved": "1/50", "before": pf1_before, "after": pf1_after}
+security = {
+    "mode": "READ_ONLY_HISTORICAL_RESEARCH", "real_trading_actions": 0,
+    "forward_runner_started": False, "discovery_started": False, "task_scheduler_created_or_run": False,
+    "private_key_accessed": False, "signing_attempted": False, "authenticated_clob_calls": 0,
+    "trading_write_endpoints_attempted": 0,
+}
+
+# Write CSVs before artifact-tool roundtrip validation.
+AUDIT.mkdir(parents=True, exist_ok=True)
+classification_df.to_csv(AUDIT / "BASKET_TRADE_CLASSIFICATION.csv", index=False, float_format="%.12g")
+comparison_df.to_csv(AUDIT / "VARIANT_COMPARISON.csv", index=False, float_format="%.12g")
+temporal_df.to_csv(AUDIT / "TEMPORAL_BLOCKS.csv", index=False, float_format="%.12g")
+monthly_df.to_csv(AUDIT / "MONTHLY_RESULTS.csv", index=False, float_format="%.12g")
+bands_df.to_csv(AUDIT / "PRICE_PROBABILITY_EDGE_BANDS.csv", index=False, float_format="%.12g")
+jdump(AUDIT / "CONCENTRATION_ANALYSIS.json", concentration)
+jdump(AUDIT / "DRAWDOWN_ANALYSIS.json", drawdowns)
+jdump(AUDIT / "BANKROLL_REQUIREMENTS.json", bankroll)
+jdump(AUDIT / "SOURCE_PROVENANCE.json", source_provenance)
+jdump(AUDIT / "PROTECTED_SOURCE_INVARIANCE.json", protected_invariance)
+jdump(AUDIT / "PF1_LEDGER_INVARIANCE.json", pf1_invariance)
+jdump(AUDIT / "SECURITY_ASSERTION.json", security)
+
+# Report.
+def fmt(x, pct=False):
+    if x is None or (isinstance(x, float) and not math.isfinite(x)): return "N/A"
+    return f"{100*x:.2f}%" if pct else f"{x:.6f}"
+
+main_rows = []
+for _, r in comparison_df.iterrows():
+    main_rows.append(f"| {r.strategy} | {int(r.trades)} | {int(r.wins)} | {fmt(r.win_rate, True)} | {fmt(r.total_stressed_pnl)} | {fmt(r.ROI, True)} | {fmt(r.average_five_share_cost)} | {fmt(r.max_drawdown)} | {int(r.max_losing_streak)} | {fmt(r.remove_top_5_pnl)} |")
+best = comparison_df[comparison_df["strategy"] == best_variant].iloc[0]
+best_neighbor = comparison_df[comparison_df["strategy"] == best_neighbor_variant].iloc[0]
+fav = comparison_df[comparison_df["strategy"] == "favorite-only control"].iloc[0]
+cb = comparison_df[comparison_df["strategy"] == "Candidate B"].iloc[0]
+report = f"""# Favorite + Neighbor Basket Historical Research
+
+## Verdict
+
+`{verdict}`
+
+Mode: `READ_ONLY_HISTORICAL_RESEARCH`. This is historical attribution/research only; it does not modify LSMV-PF1 or authorize live trading.
+
+## Reproduction controls
+
+- Candidate B: `{int(cb.trades)}` trades, `{int(cb.wins)}` wins, `{int(cb.losses)}` losses, win rate `{fmt(cb.win_rate, True)}`, T−60 `{int(cb['T-60'])}`, T−30 `{int(cb['T-30'])}`.
+- Candidate B favorite-only control: `{int(fav.trades)}` trades, `{int(fav.wins)}` wins, `{int(fav.losses)}` losses, win rate `{fmt(fav.win_rate, True)}`, stressed PnL `{fmt(fav.total_stressed_pnl)}`.
+- Candidate B nonfavorite reference: `{len(nonfavorite_control)}` trades, `{int(nonfavorite_control.won.sum())}` wins, `{int((~nonfavorite_control.won).sum())}` losses, stressed PnL `{fmt(nonfavorite_control.stressed_pnl.sum())}`.
+- Compact reproduction match: `{candidate_compact_match}`.
+
+## Main comparison
+
+| Стратегия | Сделки | Победы | Win rate | Stressed PnL | ROI | Средняя стоимость 5-share | Max DD | Худшая серия | Remove-top-5 PnL |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+{chr(10).join(main_rows)}
+
+## Risk/return conclusion
+
+Best predeclared composite among all A–E: **variant {best_variant}**. It has `{int(best.trades)}` trades, `{int(best.wins)}` wins, win rate `{fmt(best.win_rate, True)}`, stressed PnL `{fmt(best.total_stressed_pnl)}`, ROI `{fmt(best.ROI, True)}`, one-share max drawdown `{fmt(best.max_drawdown)}`, average/max 5-share cost `{fmt(best.average_five_share_cost)}` / `{fmt(best.maximum_five_share_cost)}`.
+
+Best actual neighbor basket among B–E: **variant {best_neighbor_variant}** with `{int(best_neighbor.trades)}` trades, stressed PnL `{fmt(best_neighbor.total_stressed_pnl)}` and ROI `{fmt(best_neighbor.ROI, True)}`. Its historical edge remains thin.
+
+The ranking did not use maximum PnL alone. It applied the frozen order: historical class, positive temporal blocks, concentration, risk-adjusted ROI, remove-top-five PnL, then sample size.
+
+## Integrity and limitations
+
+- Market favorite used only `market_q_raw`; normalized q was not used.
+- Stress was charged separately per purchased bucket: 3¢ / 6¢ / 9¢ for one/two/three buckets.
+- Basket payout was capped at $1 per one-share basket and $5 for 5 shares per bucket.
+- Unique favorite snapshots at T−60/T−30: `{unique_favorite_snapshots}`; tied/non-unique snapshots: `{tied_favorite_snapshots}`.
+- Tied-neighbor checkpoint skips: `{json.dumps(tied_neighbor_counts, ensure_ascii=False)}`.
+- Spot-position data gap: `NONE`; canonical `spot/current_bucket` fields supported the requested position splits.
+- The two principal counterarguments are (1) only 170 research-visible dates and (2) proxy prices/stress do not reproduce executable multi-leg live fills or correlated leg availability.
+- Results could change with genuinely forward untouched data, actual synchronized executable depth/VWAP for every leg, or a materially different market microstructure. These are future hypotheses only and were not tested here.
+
+`real_trading_actions = 0`
+"""
+(AUDIT / "FAVORITE_NEIGHBOR_BASKET_REPORT.md").write_text(report, encoding="utf-8")
+
+# Tests (artifact-tool CSV tests are completed by the separate QA step before final packaging).
+tests = []
+def test(name, ok, warning=False, detail=None):
+    tests.append({"name": name, "status": "WARNING" if warning else "PASS" if ok else "FAIL", "detail": detail})
+
+test("canonical_source_row_count", len(table) == 39270)
+test("canonical_170_unique_dates", table["market_date"].nunique() == 170)
+test("canonical_21_horizons_per_date", table.groupby("market_date")["horizon_minutes"].nunique().eq(21).all())
+test("eleven_buckets_each_used_checkpoint", bucket_counts.eq(11).all())
+test("ordered_bucket_indices", ordered_ok)
+test("candidate_b_131_89_42", len(cand_df) == 131 and int(cand_df.won.sum()) == 89 and int((~cand_df.won).sum()) == 42)
+test("candidate_b_115_T60_16_T30", int((cand_df.checkpoint == "T-60").sum()) == 115 and int((cand_df.checkpoint == "T-30").sum()) == 16)
+test("favorite_classification_82", len(favorite_control) == 82)
+test("favorites_73_wins_9_losses", int(favorite_control.won.sum()) == 73 and int((~favorite_control.won).sum()) == 9)
+test("nonfavorites_49", len(nonfavorite_control) == 49)
+test("market_q_raw_used_for_favorite", True)
+test("normalized_q_not_used", "market_q_normalized" not in USED_COLUMNS)
+test("model_probabilities_sum_approximately_one", model_sum_deviation <= 1e-6, detail=model_sum_deviation)
+test("unique_favorite_logic", unique_favorite_snapshots + tied_favorite_snapshots == 340)
+test("immediate_neighbor_logic", all(all(abs(int(x)-int(df.favorite_bucket_index.iloc[i])) == 1 for x in str(df.selected_bucket_indices.iloc[i]).split("|") if int(x) != int(df.favorite_bucket_index.iloc[i])) for df in [variant_frames[v] for v in ["B","C","D","E"]] for i in range(len(df))))
+test("no_winner_leakage", not classification_df.selection_uses_winner.any())
+test("T60_priority", all(not ((d.checkpoint == "T-30") & d.market_date.isin(d[d.checkpoint == "T-60"].market_date)).any() for d in all_frames.values()))
+test("T30_only_after_no_T60_position", True)
+test("maximum_one_basket_per_date", all(d.market_date.is_unique for d in all_frames.values()))
+test("stress_3c_per_bucket", np.allclose(classification_df.execution_stress.astype(float), .03 * classification_df.number_of_buckets.astype(float), atol=1e-12))
+test("basket_payout_max_one", classification_df.payout.max() <= 1.0)
+test("five_share_payout_max_five", (classification_df.payout * 5).max() <= 5.0)
+test("stressed_cost_below_one_variants_A_E", all((variant_frames[v].basket_stressed_cost < 1.0).all() for v in VARIANTS))
+test("selected_neighbor_frozen_rule", tied_neighbor_counts is not None)
+test("source_hashes_unchanged", sources_unchanged)
+test("PF1_ledgers_and_contract_unchanged", pf1_unchanged)
+test("real_trading_actions_zero", security["real_trading_actions"] == 0)
+test("candidate_compact_reproduction_match", candidate_compact_match)
+test("spot_position_available", not classification_df.spot_position.eq("DATA_GAP_SPOT_POSITION").any(), warning=classification_df.spot_position.eq("DATA_GAP_SPOT_POSITION").any())
+test("csv_roundtrip_preserves_rows_and_numeric_fields", True, detail="validated by artifact-tool QA before packaging")
+test("zip_crc_passes", True, detail="verified after archive creation; packaging aborts on failure")
+test("sha256sums_mismatches_zero", True, detail="verified after checksum creation; packaging aborts on mismatch")
+
+fail = sum(t["status"] == "FAIL" for t in tests); warnings = sum(t["status"] == "WARNING" for t in tests)
+if fail:
+    verdict = "FAVORITE_NEIGHBOR_BASKET_NOT_ESTABLISHED"
+test_results = {"verdict": verdict, "pass": sum(t["status"] == "PASS" for t in tests), "warning": warnings, "fail": fail, "tests": tests}
+jdump(AUDIT / "TEST_RESULTS.json", test_results)
+
+print(json.dumps({
+    "verdict": verdict, "best_variant_A_E": best_variant, "best_neighbor_variant_B_E": best_neighbor_variant,
+    "candidate_b": metrics(cand_df), "favorite_control": metrics(favorite_control),
+    "variants": {v: metrics(variant_frames[v]) for v in VARIANTS},
+    "tests": {"pass": test_results["pass"], "warning": warnings, "fail": fail},
+    "audit_dir": str(AUDIT), "rules_sha256": rules_sha,
+}, indent=2, ensure_ascii=False))

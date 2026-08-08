@@ -1,0 +1,292 @@
+from __future__ import annotations
+
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Iterable
+
+from .calibration import build_walk_forward_calibration, fit_monotone_lambdas, split_five_blocks, zone_for_horizon
+from .contract import load_json, write_json
+from .selectors import (
+    evaluate_no_fade_p1_trade,
+    evaluate_pf1_trade,
+    select_no_fade_p1_bucket,
+    select_pf1_bucket,
+)
+
+
+class ExperimentError(RuntimeError):
+    pass
+
+
+def _require_pyarrow():
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ImportError as exc:
+        raise ExperimentError("PYARROW_REQUIRED") from exc
+    return pa, pq
+
+
+def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:
+    pa, pq = _require_pyarrow()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        raise ExperimentError(f"EMPTY_PARQUET_NOT_ALLOWED:{path.name}")
+    pq.write_table(pa.Table.from_pylist(rows), path, compression="zstd", use_dictionary=True)
+
+
+def read_parquet(path: Path) -> list[dict[str, Any]]:
+    _, pq = _require_pyarrow()
+    return pq.read_table(path).to_pylist()
+
+
+def load_source_rows(config: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, set[str]]]:
+    _, pq = _require_pyarrow()
+    matrix_path = Path(config["sources"]["checkpoint_matrix"]["path"])
+    matrix = pq.read_table(matrix_path).to_pylist()
+    grouped: dict[tuple[str, int], list[dict[str, Any]]] = defaultdict(list)
+    for source in matrix:
+        grouped[(str(source["market_date"]), int(source["horizon_minutes"]))].append(source)
+    output: list[dict[str, Any]] = []
+    for key in sorted(grouped):
+        group = grouped[key]
+        if len(group) != 11:
+            raise ExperimentError(f"Q_NORM_GROUP_NOT_11:{key}:{len(group)}")
+        q_sum = sum(float(row["q_yes"]) for row in group)
+        if not q_sum > 0.0:
+            raise ExperimentError(f"Q_NORM_SUM_NONPOSITIVE:{key}:{q_sum}")
+        for source in group:
+            row = dict(source)
+            row["q_norm_yes"] = float(row["q_yes"]) / q_sum
+            output.append(row)
+    reproduction = load_json(Path(config["sources"]["v1_reproduction_report"]["path"]))
+    universes = {
+        "U1": set(str(value) for value in reproduction["universes"]["U1"]),
+        "U2": set(str(value) for value in reproduction["universes"]["U2"]),
+    }
+    return output, universes
+
+
+def group_rows(rows: Iterable[dict[str, Any]]) -> dict[tuple[str, int], list[dict[str, Any]]]:
+    grouped: dict[tuple[str, int], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        grouped[(str(row["market_date"]), int(row["horizon_minutes"]))].append(row)
+    for key, group in grouped.items():
+        if len(group) != 11:
+            raise ExperimentError(f"GROUP_NOT_11_BUCKETS:{key}:{len(group)}")
+    return grouped
+
+
+def _lambda_map(ledger: list[dict[str, Any]]) -> dict[tuple[int, str], float]:
+    output: dict[tuple[int, str], float] = {}
+    for row in ledger:
+        output[(int(row["evaluation_block"]), str(row["zone"]))] = float(row["lambda_value"])
+    return output
+
+
+def _fold_meta(ledger: list[dict[str, Any]]) -> dict[int, dict[str, str]]:
+    output: dict[int, dict[str, str]] = {}
+    for row in ledger:
+        block = int(row["evaluation_block"])
+        output.setdefault(block, {
+            "train_end_date": str(row["train_end_date"]),
+            "evaluation_start_date": str(row["evaluation_start_date"]),
+            "evaluation_end_date": str(row["evaluation_end_date"]),
+        })
+    return output
+
+
+def _decorate(record: dict[str, Any], fold_meta: dict[str, str]) -> dict[str, Any]:
+    output = dict(record)
+    output.update(fold_meta)
+    return output
+
+
+def evaluate_date_horizon(
+    group: list[dict[str, Any]],
+    strategy: str,
+    universe: str,
+    evaluation_block: int,
+    calibrated_lambda: float,
+    fold_meta: dict[str, str],
+    shares: int,
+    stress: float,
+    min_edge: float,
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    if strategy == "PF1":
+        selected = select_pf1_bucket(group)
+        row = next(item for item in group if int(item["bucket_index"]) == selected)
+        for regime, lam in (("BASELINE", 1.0), ("CALIBRATED_MONOTONE", calibrated_lambda)):
+            record = evaluate_pf1_trade(row, regime, lam, evaluation_block, shares, stress, min_edge)
+            records.append(_decorate(record, fold_meta))
+        return records
+    if strategy == "NO_FADE_P1":
+        selected = select_no_fade_p1_bucket(group)
+        if selected is None:
+            # Create deterministic rejected records using bucket 0 only as a carrier; selected_bucket is overwritten.
+            carrier = sorted(group, key=lambda row: int(row["bucket_index"]))[0]
+            for regime, lam in (("BASELINE", 1.0), ("CALIBRATED_MONOTONE", calibrated_lambda)):
+                record = evaluate_no_fade_p1_trade(carrier, universe, regime, lam, evaluation_block, shares, stress, min_edge)
+                record.update({
+                    "selected_bucket": None,
+                    "accepted": False,
+                    "reason": "NO_UNIQUE_SELECTOR",
+                    "turnover": 0.0,
+                    "pnl": 0.0,
+                })
+                records.append(_decorate(record, fold_meta))
+            return records
+        row = next(item for item in group if int(item["bucket_index"]) == selected)
+        for regime, lam in (("BASELINE", 1.0), ("CALIBRATED_MONOTONE", calibrated_lambda)):
+            record = evaluate_no_fade_p1_trade(row, universe, regime, lam, evaluation_block, shares, stress, min_edge)
+            records.append(_decorate(record, fold_meta))
+        return records
+    raise ExperimentError(f"UNKNOWN_STRATEGY:{strategy}")
+
+
+def _candidate_horizons(strategy: str, contract: dict[str, Any]) -> list[int]:
+    if strategy == "PF1":
+        return list(contract["candidate_horizons"]["PF1"]) + list(contract["control_horizons"])
+    if strategy == "NO_FADE_P1":
+        return list(contract["candidate_horizons"]["NO_FADE_P1"]) + list(contract["control_horizons"])
+    raise ExperimentError(f"UNKNOWN_STRATEGY:{strategy}")
+
+
+def _run_dates(
+    rows: list[dict[str, Any]],
+    universes: dict[str, set[str]],
+    contract: dict[str, Any],
+    blocks: list[list[str]],
+    ledger: list[dict[str, Any]],
+    selected_dates_by_block: dict[int, list[str]] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    grouped = group_rows(rows)
+    lambdas = _lambda_map(ledger)
+    meta = _fold_meta(ledger)
+    decisions: list[dict[str, Any]] = []
+    for block_number in (2, 3, 4, 5):
+        dates = blocks[block_number - 1]
+        if selected_dates_by_block is not None:
+            dates = selected_dates_by_block.get(block_number, [])
+        for date in dates:
+            for horizon in _candidate_horizons("PF1", contract):
+                zone = zone_for_horizon(horizon)
+                decisions.extend(evaluate_date_horizon(
+                    grouped[(date, horizon)], "PF1", "ALL", block_number,
+                    lambdas[(block_number, zone)], meta[block_number],
+                    int(contract["shares"]), float(contract["base_stress"]), float(contract["minimum_edge"]),
+                ))
+            for universe in ("U1", "U2"):
+                if date not in universes[universe]:
+                    continue
+                for horizon in _candidate_horizons("NO_FADE_P1", contract):
+                    zone = zone_for_horizon(horizon)
+                    decisions.extend(evaluate_date_horizon(
+                        grouped[(date, horizon)], "NO_FADE_P1", universe, block_number,
+                        lambdas[(block_number, zone)], meta[block_number],
+                        int(contract["shares"]), float(contract["base_stress"]), float(contract["minimum_edge"]),
+                    ))
+    trades = [dict(row) for row in decisions if bool(row["accepted"])]
+    return decisions, trades
+
+
+def run_calibration_audit(rows: list[dict[str, Any]], output_root: Path) -> dict[str, Any]:
+    dates = sorted({str(row["market_date"]) for row in rows})
+    blocks = split_five_blocks(dates)
+    training = [row for row in rows if str(row["market_date"]) in set(blocks[0])]
+    first = fit_monotone_lambdas(training)
+    modified = [dict(row, pnl=999999.0) for row in training]
+    second = fit_monotone_lambdas(modified)
+    monotone = 0 <= first["EARLY"] <= first["MID"] <= first["LATE"] <= 1
+    pnl_invariant = all(first[key] == second[key] for key in ("EARLY", "MID", "LATE", "objective"))
+    if not monotone or not pnl_invariant:
+        raise ExperimentError("CALIBRATION_UNIT_AUDIT_FAILED")
+    report = {
+        "status": "CALIBRATION_UNIT_AUDIT_PASS",
+        "block1_dates": len(blocks[0]),
+        "block1_rows": len(training),
+        "lambdas": {key: first[key] for key in ("EARLY", "MID", "LATE")},
+        "monotone": monotone,
+        "pnl_invariant": pnl_invariant,
+        "network_requests": 0,
+    }
+    path = Path(output_root) / "CALIBRATION_UNIT_AUDIT.json"
+    write_json(path, report)
+    return {"pass": True, "output_paths": [str(path)], **report}
+
+
+def run_three_date_smoke(
+    rows: list[dict[str, Any]], universes: dict[str, set[str]], contract: dict[str, Any], output_root: Path,
+) -> dict[str, Any]:
+    dates = sorted({str(row["market_date"]) for row in rows})
+    blocks = split_five_blocks(dates)
+    ledger = build_walk_forward_calibration(rows, blocks)
+    selected = {
+        2: [blocks[1][0]],
+        3: [blocks[2][len(blocks[2]) // 2]],
+        5: [blocks[4][-1]],
+    }
+    decisions, trades = _run_dates(rows, universes, contract, blocks, ledger, selected)
+    expected_dates = sorted(date for values in selected.values() for date in values)
+    if sorted(set(row["market_date"] for row in decisions)) != expected_dates:
+        raise ExperimentError("SMOKE_DATE_COVERAGE_FAILED")
+    pairs: dict[tuple[str, str, str, int], set[Any]] = defaultdict(set)
+    for row in decisions:
+        key = (row["strategy"], row["universe"], row["market_date"], int(row["horizon_minutes"]))
+        pairs[key].add(row["selected_bucket"])
+    if any(len(values) != 1 for values in pairs.values()):
+        raise ExperimentError("SMOKE_SELECTOR_CHANGED_BY_REGIME")
+    root = Path(output_root) / "smoke"
+    decisions_path = root / "SMOKE_DECISIONS.parquet"
+    trades_path = root / "SMOKE_TRADES.parquet"
+    write_parquet(decisions_path, decisions)
+    if trades:
+        write_parquet(trades_path, trades)
+    else:
+        raise ExperimentError("SMOKE_HAS_NO_TRADES")
+    report = {
+        "status": "THREE_DATE_SMOKE_PASS",
+        "dates": expected_dates,
+        "decision_rows": len(decisions),
+        "trade_rows": len(trades),
+        "selector_invariant": True,
+        "network_requests": 0,
+    }
+    report_path = root / "SMOKE_AUDIT.json"
+    write_json(report_path, report)
+    return {"pass": True, "output_paths": [str(decisions_path), str(trades_path), str(report_path)], **report}
+
+
+def run_oos_experiment(
+    rows: list[dict[str, Any]], universes: dict[str, set[str]], contract: dict[str, Any], output_root: Path,
+) -> dict[str, Any]:
+    dates = sorted({str(row["market_date"]) for row in rows})
+    blocks = split_five_blocks(dates)
+    ledger = build_walk_forward_calibration(rows, blocks)
+    decisions, trades = _run_dates(rows, universes, contract, blocks, ledger)
+    if set(int(row["evaluation_block"]) for row in decisions) != {2, 3, 4, 5}:
+        raise ExperimentError("OOS_BLOCK_COVERAGE_FAILED")
+    output_root = Path(output_root)
+    calibration_path = output_root / "CALIBRATION_LEDGER.parquet"
+    decisions_path = output_root / "OOS_DECISION_RECORDS.parquet"
+    trades_path = output_root / "OOS_TRADE_LEDGERS.parquet"
+    write_parquet(calibration_path, ledger)
+    write_parquet(decisions_path, decisions)
+    write_parquet(trades_path, trades)
+    report = {
+        "status": "FIVE_BLOCK_OOS_RUN_PASS",
+        "oos_dates": sum(len(block) for block in blocks[1:]),
+        "calibration_rows": len(ledger),
+        "decision_rows": len(decisions),
+        "trade_rows": len(trades),
+        "blocks": {str(index + 1): block for index, block in enumerate(blocks)},
+        "network_requests": 0,
+    }
+    report_path = output_root / "OOS_RUN_REPORT.json"
+    write_json(report_path, report)
+    return {
+        "pass": True,
+        "output_paths": [str(calibration_path), str(decisions_path), str(trades_path), str(report_path)],
+        **report,
+    }

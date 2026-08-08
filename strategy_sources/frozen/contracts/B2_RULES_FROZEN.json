@@ -1,0 +1,20 @@
+{
+  "base_shares": 5,
+  "candidate_id": "B2_PRIMARY_EDGE_05",
+  "canonical_name": "TAIL_PREMIUM_FADE",
+  "checkpoint": "T60_PRIMARY_T30_FALLBACK_ONLY_IF_NO_T60_SIGNAL",
+  "edge_threshold": 0.05,
+  "historical_price_definition": "ACTUAL_QNO_FROM_FROZEN_NO_PRICE_HISTORY",
+  "immutable": true,
+  "max_trades_per_date": 1,
+  "price_caps": [],
+  "selector": "MAX_DIRECT_NO_EDGE_WITHIN_TAIL_SET",
+  "tail_buckets": [
+    0,
+    1,
+    9,
+    10
+  ],
+  "threshold_variants": [],
+  "tie_break": "LOWEST_BUCKET_INDEX_WITHIN_1E-12"
+}
