@@ -1,439 +1,3864 @@
 {
-  "schema_version": "BTC_STRATEGY_47_STATUS_MATRIX_V2",
-  "source_commit": "dde6707e719897d253e233815be2ddd5d46789c9",
-  "source_registry_sha256": "88c54943cf84e4d123f979639cf30668f35a5dd6bc6792f8f50ab4c986ee3c2f",
+  "paper_execution_authorized": false,
+  "schema_version": "BTC_STRATEGY_47_STATUS_MATRIX_V3",
+  "source_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
   "status_counts": {
+    "DISABLED_MISSING_EXECUTION_DATA": 26,
+    "DISABLED_RESEARCH_ONLY": 13,
     "EVALUATOR_IMPLEMENTED": 47,
+    "PAPER_EVALUATION_ENABLED": 8,
     "PARITY_PASS": 47,
-    "PENDING_C5_CLASSIFICATION": 47,
     "SOURCE_VERIFIED": 47,
     "SPEC_FROZEN": 47
   },
   "strategies": [
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 0,
+      "actual_pnl_micros": 8425000,
+      "actual_roi": "0.39049826187717265353418308227114716106604866743917",
+      "actual_trade_count": 6,
+      "actual_trade_identity_sha256": "abf5e4e4ef9edd3dcdca2259a43b3a69bbe3d4a0c3e823e0a35f7d2e6fddfe06",
+      "actual_turnover_micros": 21575000,
+      "actual_wins": 6,
+      "evaluator_key": "NO_CONFIRMATION_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 0,
+      "expected_pnl_micros": 8425000,
+      "expected_roi": "0.39049826187717265353418308227114716106604866743917",
+      "expected_trade_count": 6,
+      "expected_trade_identity_sha256": "abf5e4e4ef9edd3dcdca2259a43b3a69bbe3d4a0c3e823e0a35f7d2e6fddfe06",
+      "expected_turnover_micros": 21575000,
+      "expected_wins": 6,
+      "fixture_decision_count": 136,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_CONFIRMATION",
+        "relative_path": "parity/CONFIRMATION_TRADE_LEDGER.csv",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "74e0c479e81558f38c5f152a0ec62c923fe6eda080dda75167f8015a8da51440"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_FULL",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "37e9c5e35655191fb8894ed091a29a985d5a852dcf46e34585deb4ed791a7267"
+      },
+      "parity_population": "V1_CONFIRMATION_BASKET",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "dcd6d0bcdaf2c344d21bf3a3925b75ad775cd0b1d55a95d824db6ba3dba6f388"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 1,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_C1",
+          "relative_path": "contracts/C1_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "dc76a06624869b552c317a78d88b0d9118f66c313a1162d947f43c0eee90e01a"
+        },
+        {
+          "artifact_id": "SRC_NO_CONFIRMATION",
+          "relative_path": "source_snapshots/no_confirmation_frozen_concepts.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "45be74ea8825e504fda85d3d3b365275c92ceec37831080f422f370704b661c2"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "339254b9a8e4333cf43e98166b25c6c6e93a89b2cfe12b990a56cf7e319dd42b",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "c4f06be9470af0f882a88442ef47a8f89d31b002eb6d360070514047e259c634",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_C1"
+      "strategy_id": "NO_C1",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 11,
+      "actual_pnl_micros": 40622500,
+      "actual_roi": "0.28136309327977004727190871153746255476095652023342",
+      "actual_trade_count": 48,
+      "actual_trade_identity_sha256": "33fa53dbbe9794a04c2823bfbbb12a6d7ede063fed9d6ba3970743b420452684",
+      "actual_turnover_micros": 144377500,
+      "actual_wins": 37,
+      "evaluator_key": "NO_CONFIRMATION_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 11,
+      "expected_pnl_micros": 40622500,
+      "expected_roi": "0.28136309327977004727190871153746255476095652023342",
+      "expected_trade_count": 48,
+      "expected_trade_identity_sha256": "33fa53dbbe9794a04c2823bfbbb12a6d7ede063fed9d6ba3970743b420452684",
+      "expected_turnover_micros": 144377500,
+      "expected_wins": 37,
+      "fixture_decision_count": 136,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_CONFIRMATION",
+        "relative_path": "parity/CONFIRMATION_TRADE_LEDGER.csv",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "74e0c479e81558f38c5f152a0ec62c923fe6eda080dda75167f8015a8da51440"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_FULL",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "37e9c5e35655191fb8894ed091a29a985d5a852dcf46e34585deb4ed791a7267"
+      },
+      "parity_population": "V1_CONFIRMATION_BASKET",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "dcd6d0bcdaf2c344d21bf3a3925b75ad775cd0b1d55a95d824db6ba3dba6f388"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 2,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_A2",
+          "relative_path": "contracts/A2_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "f522091255f4718872d9951aa2a466887354870c72b0f2e118f94451d6d5111d"
+        },
+        {
+          "artifact_id": "SRC_NO_CONFIRMATION",
+          "relative_path": "source_snapshots/no_confirmation_frozen_concepts.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "45be74ea8825e504fda85d3d3b365275c92ceec37831080f422f370704b661c2"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "aba5e3795ebd018bdc14cf7501ac3b6bcfb8b0ffe21c8ce94eb236f35ae436b0",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "12138884c493238ce5218aea2a12923f2f23c187d40132ec2aaa285876b6dff1",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_A2"
+      "strategy_id": "NO_A2",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 1,
+      "actual_pnl_micros": 8525000,
+      "actual_roi": "0.2337217272104180945853324195",
+      "actual_trade_count": 10,
+      "actual_trade_identity_sha256": "1ea13650188cd067d26060212fd5dc936e28540ac436bf72fb87263e47fb999b",
+      "actual_turnover_micros": 36475000,
+      "actual_wins": 9,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 8525000,
+      "expected_roi": "0.2337217272104180945853324195",
+      "expected_trade_count": 10,
+      "expected_trade_identity_sha256": "1ea13650188cd067d26060212fd5dc936e28540ac436bf72fb87263e47fb999b",
+      "expected_turnover_micros": 36475000,
+      "expected_wins": 9,
+      "fixture_decision_count": 69,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 3,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U2_T18"
+      "strategy_id": "NO_FADE_P1_U2_T18",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 2,
+      "actual_pnl_micros": 19237500,
+      "actual_roi": "0.15296690189841964019481164894145711161912334757976",
+      "actual_trade_count": 31,
+      "actual_trade_identity_sha256": "74977c19f987df85a1da7d7a7a8b8a4b7f9a70dd8ddb6d02d8568c66aa3857f0",
+      "actual_turnover_micros": 125762500,
+      "actual_wins": 29,
+      "evaluator_key": "NO_CONFIRMATION_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 2,
+      "expected_pnl_micros": 19237500,
+      "expected_roi": "0.15296690189841964019481164894145711161912334757976",
+      "expected_trade_count": 31,
+      "expected_trade_identity_sha256": "74977c19f987df85a1da7d7a7a8b8a4b7f9a70dd8ddb6d02d8568c66aa3857f0",
+      "expected_turnover_micros": 125762500,
+      "expected_wins": 29,
+      "fixture_decision_count": 136,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_CONFIRMATION",
+        "relative_path": "parity/CONFIRMATION_TRADE_LEDGER.csv",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "74e0c479e81558f38c5f152a0ec62c923fe6eda080dda75167f8015a8da51440"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_FULL",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "37e9c5e35655191fb8894ed091a29a985d5a852dcf46e34585deb4ed791a7267"
+      },
+      "parity_population": "V1_CONFIRMATION_BASKET",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "dcd6d0bcdaf2c344d21bf3a3925b75ad775cd0b1d55a95d824db6ba3dba6f388"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 4,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_A0",
+          "relative_path": "contracts/A0_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "a510e45a5dfa4399bf05d8a418d28c055383cc0dfb8062e725c86ef105215e70"
+        },
+        {
+          "artifact_id": "SRC_NO_CONFIRMATION",
+          "relative_path": "source_snapshots/no_confirmation_frozen_concepts.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "45be74ea8825e504fda85d3d3b365275c92ceec37831080f422f370704b661c2"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "0312c0e947923d8f55f5ab1f7c753586ad08e270642954fd191a1f980ce05b6b",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "97ed4d20153c25bd259e4fbc4298eef99c84421d4df032ead633a37860bcee62",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_A0"
+      "strategy_id": "NO_A0",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 2,
+      "actual_pnl_micros": 9750000,
+      "actual_roi": "0.14942528735632183908045977011494252873563218390805",
+      "actual_trade_count": 17,
+      "actual_trade_identity_sha256": "17ee32cf093fe45d409a1f6ea5ba04d10194f46ef6d92c41257ca6deebd3479f",
+      "actual_turnover_micros": 65250000,
+      "actual_wins": 15,
+      "evaluator_key": "FAVORITE_NEIGHBOR_BASKET_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 2,
+      "expected_pnl_micros": 9750000,
+      "expected_roi": "0.14942528735632183908045977011494252873563218390805",
+      "expected_trade_count": 17,
+      "expected_trade_identity_sha256": "17ee32cf093fe45d409a1f6ea5ba04d10194f46ef6d92c41257ca6deebd3479f",
+      "expected_turnover_micros": 65250000,
+      "expected_wins": 15,
+      "fixture_decision_count": 170,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_BASKET",
+        "relative_path": "parity/BASKET_TRADE_CLASSIFICATION.csv",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "6d6d71d03002a5c3e62566b5ddd4cc20d18204affff6debaa6c461c3618d5361"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_FULL",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "37e9c5e35655191fb8894ed091a29a985d5a852dcf46e34585deb4ed791a7267"
+      },
+      "parity_population": "V1_CONFIRMATION_BASKET",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "dcd6d0bcdaf2c344d21bf3a3925b75ad775cd0b1d55a95d824db6ba3dba6f388"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 5,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_BASKET",
+          "relative_path": "contracts/BASKET_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "d942e94f11fe4318de048f22e4864006f7bd1d64e06a00520c971160c8c800ef"
+        },
+        {
+          "artifact_id": "SRC_FAVORITE_BASKET",
+          "relative_path": "source_snapshots/favorite_basket_run_research.py.source",
+          "role": "SANITIZED_EXECUTABLE_RULE_SOURCE",
+          "sha256": "1cf1f4c24f81ba87d1bf583af080d777f88726f68cd78fcf8daa9651f887da30"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "9a800c4674434ba0caea3fa91cbedb7be2e253a645926633a5c403c75b26e71b",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "16d1e3d92edde000489838fca0dcc58425fd8547911ae1a30ea3c20e63284851",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_FAVORITE_NEIGHBOR_BASKET"
+      "strategy_id": "YES_FAVORITE_NEIGHBOR_BASKET",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 1,
+      "actual_pnl_micros": 7987500,
+      "actual_roi": "0.1401008550756413067309800482",
+      "actual_trade_count": 14,
+      "actual_trade_identity_sha256": "2d4e8ec39faec877258f8e605c9832cf5739735b5dbd190c781e625ae6f31ce0",
+      "actual_turnover_micros": 57012500,
+      "actual_wins": 13,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 7987500,
+      "expected_roi": "0.1401008550756413067309800482",
+      "expected_trade_count": 14,
+      "expected_trade_identity_sha256": "2d4e8ec39faec877258f8e605c9832cf5739735b5dbd190c781e625ae6f31ce0",
+      "expected_turnover_micros": 57012500,
+      "expected_wins": 13,
+      "fixture_decision_count": 175,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 6,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_T60_U1_EQUALS_U2"
+      "strategy_id": "NO_FADE_P1_T60_U1_EQUALS_U2",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 2,
+      "actual_pnl_micros": 13412500,
+      "actual_roi": "0.1150423501661841964189986062",
+      "actual_trade_count": 28,
+      "actual_trade_identity_sha256": "549d00fa5fa378f26d516d9cdac5decb01f70ec0bd0a4bc0ead5aff9bdb20d75",
+      "actual_turnover_micros": 116587500,
+      "actual_wins": 26,
+      "evaluator_key": "STRICT_A_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 2,
+      "expected_pnl_micros": 13412500,
+      "expected_roi": "0.1150423501661841964189986062",
+      "expected_trade_count": 28,
+      "expected_trade_identity_sha256": "549d00fa5fa378f26d516d9cdac5decb01f70ec0bd0a4bc0ead5aff9bdb20d75",
+      "expected_turnover_micros": 116587500,
+      "expected_wins": 26,
+      "fixture_decision_count": 170,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 7,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_STRICT_A",
+          "relative_path": "contracts/STRICT_A_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "5b95a37b9dbb88a6b0ef9e47439660ab12ac58dcb63697815396f569803bd5cb"
+        },
+        {
+          "artifact_id": "CONTRACT_STRICT_A_MODEL",
+          "relative_path": "contracts/STRICT_A_MODEL_FROZEN.json",
+          "role": "IMMUTABLE_MODEL_CONTRACT",
+          "sha256": "1ad4eb3a69a933e0afd25c8af861f758e39aa22d086af6105e1d4dfa7115b2ee"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_STRICT_A_SELECTOR",
+          "relative_path": "source_snapshots/strict_a_selector.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "cb34c5b4df8cdc13629576bf9d326d4ff7debab55a43de8d822756352b973e1c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "0c7e68687c44f961b1fa32516a44bf6ac4e6324bdf1c233f988d1c3cf5d2261e",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "f8c643a666aa4e359dcc8fb5fb6eae834fc652da964e81b305dbc12eaa42b145",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_STRICT_A_T60"
+      "strategy_id": "YES_STRICT_A_T60",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 4,
+      "actual_pnl_micros": 21705000,
+      "actual_roi": "0.104203173383902638085407715",
+      "actual_trade_count": 50,
+      "actual_trade_identity_sha256": "692a7066dd6923986fae2f54c5f7e508c1d7c4c462ab12f347d2642aa2bca5e0",
+      "actual_turnover_micros": 208295000,
+      "actual_wins": 46,
+      "evaluator_key": "STRICT_A_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 4,
+      "expected_pnl_micros": 21705000,
+      "expected_roi": "0.104203173383902638085407715",
+      "expected_trade_count": 50,
+      "expected_trade_identity_sha256": "692a7066dd6923986fae2f54c5f7e508c1d7c4c462ab12f347d2642aa2bca5e0",
+      "expected_turnover_micros": 208295000,
+      "expected_wins": 46,
+      "fixture_decision_count": 340,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 8,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_STRICT_A",
+          "relative_path": "contracts/STRICT_A_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "5b95a37b9dbb88a6b0ef9e47439660ab12ac58dcb63697815396f569803bd5cb"
+        },
+        {
+          "artifact_id": "CONTRACT_STRICT_A_MODEL",
+          "relative_path": "contracts/STRICT_A_MODEL_FROZEN.json",
+          "role": "IMMUTABLE_MODEL_CONTRACT",
+          "sha256": "1ad4eb3a69a933e0afd25c8af861f758e39aa22d086af6105e1d4dfa7115b2ee"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_STRICT_A_SELECTOR",
+          "relative_path": "source_snapshots/strict_a_selector.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "cb34c5b4df8cdc13629576bf9d326d4ff7debab55a43de8d822756352b973e1c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "0c7e68687c44f961b1fa32516a44bf6ac4e6324bdf1c233f988d1c3cf5d2261e",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "f8c643a666aa4e359dcc8fb5fb6eae834fc652da964e81b305dbc12eaa42b145",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_STRICT_A_OPERATIONAL"
+      "strategy_id": "YES_STRICT_A_OPERATIONAL",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 42,
+      "actual_pnl_micros": 41190000,
+      "actual_roi": "0.102003417448800178301676531",
+      "actual_trade_count": 131,
+      "actual_trade_identity_sha256": "44f9c57bf3e123338aabb8c8909234941446e5da85f21f5e5ed33ee585695ecb",
+      "actual_turnover_micros": 403810000,
+      "actual_wins": 89,
+      "evaluator_key": "PF1_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 42,
+      "expected_pnl_micros": 41190000,
+      "expected_roi": "0.102003417448800178301676531",
+      "expected_trade_count": 131,
+      "expected_trade_identity_sha256": "44f9c57bf3e123338aabb8c8909234941446e5da85f21f5e5ed33ee585695ecb",
+      "expected_turnover_micros": 403810000,
+      "expected_wins": 89,
+      "fixture_decision_count": 340,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 9,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_PF1",
+          "relative_path": "contracts/PF1_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "a86aec5cbd499bc6459a30eacb89e82fe966e1e6687b639a1d5b59f1a8438ce8"
+        },
+        {
+          "artifact_id": "CONTRACT_PF1_FORWARD",
+          "relative_path": "contracts/PF1_FORWARD_EVALUATION_CONTRACT.json",
+          "role": "IMMUTABLE_EVALUATION_CONTRACT",
+          "sha256": "c6535fe8b2d4327582c1bcbbbf2c7fe67f52e009033721362b8a8e4fb4cc011f"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_PF1_CORE",
+          "relative_path": "source_snapshots/pf1_core.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "71fd5851c9dbefae3c2bdc5c3cbc2558728479c13518ad58a9e35ab878983ea4"
+        },
+        {
+          "artifact_id": "SRC_PF1_MODEL",
+          "relative_path": "source_snapshots/pf1_model.py.source",
+          "role": "EXECUTABLE_MODEL_SOURCE",
+          "sha256": "087e219574833767bfd470b2f3fafe873fdc5c72c11b6f4770de3255c50e6bd4"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "df1c0f899786f298caf34c53e2d0187009ebe29b2bf9deb50b3af73f846e7245",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "a2d764e2859a8c70e628525f114b7f7ef1d84c4f5aeea1687f30316f1953deb7",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_OPERATIONAL"
+      "strategy_id": "YES_PF1_OPERATIONAL",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 2,
+      "actual_pnl_micros": 13302500,
+      "actual_roi": "0.1010079917993887507355872359",
+      "actual_trade_count": 31,
+      "actual_trade_identity_sha256": "0e41eb59614e0034e11aff9c1606186ae1086cd26b6fcde45ba54a104c8609a7",
+      "actual_turnover_micros": 131697500,
+      "actual_wins": 29,
+      "evaluator_key": "STRICT_A_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 2,
+      "expected_pnl_micros": 13302500,
+      "expected_roi": "0.1010079917993887507355872359",
+      "expected_trade_count": 31,
+      "expected_trade_identity_sha256": "0e41eb59614e0034e11aff9c1606186ae1086cd26b6fcde45ba54a104c8609a7",
+      "expected_turnover_micros": 131697500,
+      "expected_wins": 29,
+      "fixture_decision_count": 170,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 10,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_STRICT_A",
+          "relative_path": "contracts/STRICT_A_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "5b95a37b9dbb88a6b0ef9e47439660ab12ac58dcb63697815396f569803bd5cb"
+        },
+        {
+          "artifact_id": "CONTRACT_STRICT_A_MODEL",
+          "relative_path": "contracts/STRICT_A_MODEL_FROZEN.json",
+          "role": "IMMUTABLE_MODEL_CONTRACT",
+          "sha256": "1ad4eb3a69a933e0afd25c8af861f758e39aa22d086af6105e1d4dfa7115b2ee"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_STRICT_A_SELECTOR",
+          "relative_path": "source_snapshots/strict_a_selector.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "cb34c5b4df8cdc13629576bf9d326d4ff7debab55a43de8d822756352b973e1c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "0c7e68687c44f961b1fa32516a44bf6ac4e6324bdf1c233f988d1c3cf5d2261e",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "f8c643a666aa4e359dcc8fb5fb6eae834fc652da964e81b305dbc12eaa42b145",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_STRICT_A_T30"
+      "strategy_id": "YES_STRICT_A_T30",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 29,
+      "actual_pnl_micros": 28485000,
+      "actual_roi": "0.09941887859274383540128789069",
+      "actual_trade_count": 92,
+      "actual_trade_identity_sha256": "91ca07184535eabd516cdf77edfafc99a15bced3560d645121271ab83666683c",
+      "actual_turnover_micros": 286515000,
+      "actual_wins": 63,
+      "evaluator_key": "PF1_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 29,
+      "expected_pnl_micros": 28485000,
+      "expected_roi": "0.09941887859274383540128789069",
+      "expected_trade_count": 92,
+      "expected_trade_identity_sha256": "91ca07184535eabd516cdf77edfafc99a15bced3560d645121271ab83666683c",
+      "expected_turnover_micros": 286515000,
+      "expected_wins": 63,
+      "fixture_decision_count": 136,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 11,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_PF1",
+          "relative_path": "contracts/PF1_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "a86aec5cbd499bc6459a30eacb89e82fe966e1e6687b639a1d5b59f1a8438ce8"
+        },
+        {
+          "artifact_id": "CONTRACT_PF1_FORWARD",
+          "relative_path": "contracts/PF1_FORWARD_EVALUATION_CONTRACT.json",
+          "role": "IMMUTABLE_EVALUATION_CONTRACT",
+          "sha256": "c6535fe8b2d4327582c1bcbbbf2c7fe67f52e009033721362b8a8e4fb4cc011f"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_PF1_CORE",
+          "relative_path": "source_snapshots/pf1_core.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "71fd5851c9dbefae3c2bdc5c3cbc2558728479c13518ad58a9e35ab878983ea4"
+        },
+        {
+          "artifact_id": "SRC_PF1_MODEL",
+          "relative_path": "source_snapshots/pf1_model.py.source",
+          "role": "EXECUTABLE_MODEL_SOURCE",
+          "sha256": "087e219574833767bfd470b2f3fafe873fdc5c72c11b6f4770de3255c50e6bd4"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "df1c0f899786f298caf34c53e2d0187009ebe29b2bf9deb50b3af73f846e7245",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "a2d764e2859a8c70e628525f114b7f7ef1d84c4f5aeea1687f30316f1953deb7",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_T60"
+      "strategy_id": "YES_PF1_T60",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 5,
+      "actual_pnl_micros": 18797500,
+      "actual_roi": "0.09342577751270486201712205365",
+      "actual_trade_count": 49,
+      "actual_trade_identity_sha256": "961edfa92c35f0288fe86cc4d010bcb0e07c04295736e9548bed08741e3433ad",
+      "actual_turnover_micros": 201202500,
+      "actual_wins": 44,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 5,
+      "expected_pnl_micros": 18797500,
+      "expected_roi": "0.09342577751270486201712205365",
+      "expected_trade_count": 49,
+      "expected_trade_identity_sha256": "961edfa92c35f0288fe86cc4d010bcb0e07c04295736e9548bed08741e3433ad",
+      "expected_turnover_micros": 201202500,
+      "expected_wins": 44,
+      "fixture_decision_count": 82,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 12,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U2_T60"
+      "strategy_id": "NO_FADE_P2_U2_T60",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 5,
+      "actual_pnl_micros": 18922500,
+      "actual_roi": "0.08964716750956402269308666248",
+      "actual_trade_count": 51,
+      "actual_trade_identity_sha256": "f60f7bfa0596dcca9433040f3bf860d40e7773129e9790ee3ff10d8ed046eefd",
+      "actual_turnover_micros": 211077500,
+      "actual_wins": 46,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 5,
+      "expected_pnl_micros": 18922500,
+      "expected_roi": "0.08964716750956402269308666248",
+      "expected_trade_count": 51,
+      "expected_trade_identity_sha256": "f60f7bfa0596dcca9433040f3bf860d40e7773129e9790ee3ff10d8ed046eefd",
+      "expected_turnover_micros": 211077500,
+      "expected_wins": 46,
+      "fixture_decision_count": 131,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 13,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U1_T60"
+      "strategy_id": "NO_FADE_P2_U1_T60",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 57,
+      "actual_pnl_micros": 23540000,
+      "actual_roi": "0.0836353300646628295317274213",
+      "actual_trade_count": 118,
+      "actual_trade_identity_sha256": "8beac9d5a1e455861067fb5b4dc36962284b0e3153c87edbd5b1ff0731fad087",
+      "actual_turnover_micros": 281460000,
+      "actual_wins": 61,
+      "evaluator_key": "PF1_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 57,
+      "expected_pnl_micros": 23540000,
+      "expected_roi": "0.0836353300646628295317274213",
+      "expected_trade_count": 118,
+      "expected_trade_identity_sha256": "8beac9d5a1e455861067fb5b4dc36962284b0e3153c87edbd5b1ff0731fad087",
+      "expected_turnover_micros": 281460000,
+      "expected_wins": 61,
+      "fixture_decision_count": 136,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 14,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_PF1",
+          "relative_path": "contracts/PF1_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "a86aec5cbd499bc6459a30eacb89e82fe966e1e6687b639a1d5b59f1a8438ce8"
+        },
+        {
+          "artifact_id": "CONTRACT_PF1_FORWARD",
+          "relative_path": "contracts/PF1_FORWARD_EVALUATION_CONTRACT.json",
+          "role": "IMMUTABLE_EVALUATION_CONTRACT",
+          "sha256": "c6535fe8b2d4327582c1bcbbbf2c7fe67f52e009033721362b8a8e4fb4cc011f"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_PF1_CORE",
+          "relative_path": "source_snapshots/pf1_core.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "71fd5851c9dbefae3c2bdc5c3cbc2558728479c13518ad58a9e35ab878983ea4"
+        },
+        {
+          "artifact_id": "SRC_PF1_MODEL",
+          "relative_path": "source_snapshots/pf1_model.py.source",
+          "role": "EXECUTABLE_MODEL_SOURCE",
+          "sha256": "087e219574833767bfd470b2f3fafe873fdc5c72c11b6f4770de3255c50e6bd4"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "df1c0f899786f298caf34c53e2d0187009ebe29b2bf9deb50b3af73f846e7245",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "a2d764e2859a8c70e628525f114b7f7ef1d84c4f5aeea1687f30316f1953deb7",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_T6H"
+      "strategy_id": "YES_PF1_T6H",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 3,
+      "actual_pnl_micros": 10537500,
+      "actual_roi": "0.08139422612725692768176112774",
+      "actual_trade_count": 31,
+      "actual_trade_identity_sha256": "278c2e25dffcb9b2ee6b3a174b23e2773a79e3292739dde38547672ae2419fc2",
+      "actual_turnover_micros": 129462500,
+      "actual_wins": 28,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 3,
+      "expected_pnl_micros": 10537500,
+      "expected_roi": "0.08139422612725692768176112774",
+      "expected_trade_count": 31,
+      "expected_trade_identity_sha256": "278c2e25dffcb9b2ee6b3a174b23e2773a79e3292739dde38547672ae2419fc2",
+      "expected_turnover_micros": 129462500,
+      "expected_wins": 28,
+      "fixture_decision_count": 164,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 15,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U2_OPERATIONAL"
+      "strategy_id": "NO_FADE_P1_U2_OPERATIONAL",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 3,
+      "actual_pnl_micros": 12597500,
+      "actual_roi": "0.07756961869429349917642893428",
+      "actual_trade_count": 38,
+      "actual_trade_identity_sha256": "9d3dda344f063efac80e24b5adffe416fa37042875c657871136722335350b4d",
+      "actual_turnover_micros": 162402500,
+      "actual_wins": 35,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 3,
+      "expected_pnl_micros": 12597500,
+      "expected_roi": "0.07756961869429349917642893428",
+      "expected_trade_count": 38,
+      "expected_trade_identity_sha256": "9d3dda344f063efac80e24b5adffe416fa37042875c657871136722335350b4d",
+      "expected_turnover_micros": 162402500,
+      "expected_wins": 35,
+      "fixture_decision_count": 82,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 16,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U2_T12"
+      "strategy_id": "NO_FADE_P2_U2_T12",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 4,
+      "actual_pnl_micros": 11525000,
+      "actual_roi": "0.07509366346310474018569799642",
+      "actual_trade_count": 37,
+      "actual_trade_identity_sha256": "a552b461ae8c495ab111eadfd386a487ca47204a35ece21d8be894acb32152fc",
+      "actual_turnover_micros": 153475000,
+      "actual_wins": 33,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 4,
+      "expected_pnl_micros": 11525000,
+      "expected_roi": "0.07509366346310474018569799642",
+      "expected_trade_count": 37,
+      "expected_trade_identity_sha256": "a552b461ae8c495ab111eadfd386a487ca47204a35ece21d8be894acb32152fc",
+      "expected_turnover_micros": 153475000,
+      "expected_wins": 33,
+      "fixture_decision_count": 262,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 17,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U1_OPERATIONAL"
+      "strategy_id": "NO_FADE_P1_U1_OPERATIONAL",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 2,
+      "actual_pnl_micros": 5030000,
+      "actual_roi": "0.05296409392439717805622828262",
+      "actual_trade_count": 22,
+      "actual_trade_identity_sha256": "e4f4eb3ee3635c9d21b53be6ca6b7ffe6fda834c3a5c86464e9578951f348424",
+      "actual_turnover_micros": 94970000,
+      "actual_wins": 20,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 2,
+      "expected_pnl_micros": 5030000,
+      "expected_roi": "0.05296409392439717805622828262",
+      "expected_trade_count": 22,
+      "expected_trade_identity_sha256": "e4f4eb3ee3635c9d21b53be6ca6b7ffe6fda834c3a5c86464e9578951f348424",
+      "expected_turnover_micros": 94970000,
+      "expected_wins": 20,
+      "fixture_decision_count": 106,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 18,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U1_EARLY_LATEST_ONLY"
+      "strategy_id": "NO_FADE_P1_U1_EARLY_LATEST_ONLY",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 3,
+      "actual_pnl_micros": 5382500,
+      "actual_roi": "0.07213455288638724159882065199",
+      "actual_trade_count": 19,
+      "actual_trade_identity_sha256": "59f5e6a9fac5a47c21f40fb7da472424ff46ec0a743250dc24bb4223a8a86cca",
+      "actual_turnover_micros": 74617500,
+      "actual_wins": 16,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 3,
+      "expected_pnl_micros": 5382500,
+      "expected_roi": "0.07213455288638724159882065199",
+      "expected_trade_count": 19,
+      "expected_trade_identity_sha256": "59f5e6a9fac5a47c21f40fb7da472424ff46ec0a743250dc24bb4223a8a86cca",
+      "expected_turnover_micros": 74617500,
+      "expected_wins": 16,
+      "fixture_decision_count": 106,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 19,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U1_T18"
+      "strategy_id": "NO_FADE_P1_U1_T18",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 7,
+      "actual_pnl_micros": 19942500,
+      "actual_roi": "0.06995956956052726204362277786",
+      "actual_trade_count": 68,
+      "actual_trade_identity_sha256": "97e29ccd79e18a1296fa1436896a2eb6b696a2fdf82ef2770c392c0dfff3d928",
+      "actual_turnover_micros": 285057500,
+      "actual_wins": 61,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 7,
+      "expected_pnl_micros": 19942500,
+      "expected_roi": "0.06995956956052726204362277786",
+      "expected_trade_count": 68,
+      "expected_trade_identity_sha256": "97e29ccd79e18a1296fa1436896a2eb6b696a2fdf82ef2770c392c0dfff3d928",
+      "expected_turnover_micros": 285057500,
+      "expected_wins": 61,
+      "fixture_decision_count": 164,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 20,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL"
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 5,
+      "actual_pnl_micros": 10412500,
+      "actual_roi": "0.0613989828259747917741578831",
+      "actual_trade_count": 41,
+      "actual_trade_identity_sha256": "681cda53373f94ea0bea5353ec63a82d5f44ace2e83862be32d17c4562ea47f8",
+      "actual_turnover_micros": 169587500,
+      "actual_wins": 36,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 5,
+      "expected_pnl_micros": 10412500,
+      "expected_roi": "0.0613989828259747917741578831",
+      "expected_trade_count": 41,
+      "expected_trade_identity_sha256": "681cda53373f94ea0bea5353ec63a82d5f44ace2e83862be32d17c4562ea47f8",
+      "expected_turnover_micros": 169587500,
+      "expected_wins": 36,
+      "fixture_decision_count": 212,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 21,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U1_EARLY_COMBINED"
+      "strategy_id": "NO_FADE_P1_U1_EARLY_COMBINED",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 1,
+      "actual_pnl_micros": 3112500,
+      "actual_roi": "0.05998554565165020476993495543",
+      "actual_trade_count": 12,
+      "actual_trade_identity_sha256": "a5a1772d4bb84ff04611e89ad806a6a6980c884c8c873e22673681bd545e3a80",
+      "actual_turnover_micros": 51887500,
+      "actual_wins": 11,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 3112500,
+      "expected_roi": "0.05998554565165020476993495543",
+      "expected_trade_count": 12,
+      "expected_trade_identity_sha256": "a5a1772d4bb84ff04611e89ad806a6a6980c884c8c873e22673681bd545e3a80",
+      "expected_turnover_micros": 51887500,
+      "expected_wins": 11,
+      "fixture_decision_count": 69,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 22,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U2_T12"
+      "strategy_id": "NO_FADE_P1_U2_T12",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 9,
+      "actual_pnl_micros": 20522500,
+      "actual_roi": "0.05957573426421174097001981261",
+      "actual_trade_count": 82,
+      "actual_trade_identity_sha256": "75f1287cdc86361eb6309afdeff5a478007fad8339aea754fce36329a048e3b4",
+      "actual_turnover_micros": 344477500,
+      "actual_wins": 73,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 9,
+      "expected_pnl_micros": 20522500,
+      "expected_roi": "0.05957573426421174097001981261",
+      "expected_trade_count": 82,
+      "expected_trade_identity_sha256": "75f1287cdc86361eb6309afdeff5a478007fad8339aea754fce36329a048e3b4",
+      "expected_turnover_micros": 344477500,
+      "expected_wins": 73,
+      "fixture_decision_count": 262,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 23,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL"
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 2,
+      "actual_pnl_micros": 5030000,
+      "actual_roi": "0.05296409392439717805622828262",
+      "actual_trade_count": 22,
+      "actual_trade_identity_sha256": "05a4fa14bd43c1457142e19b9494741acbb85132683a2b8b0ef6c3651090edd2",
+      "actual_turnover_micros": 94970000,
+      "actual_wins": 20,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 2,
+      "expected_pnl_micros": 5030000,
+      "expected_roi": "0.05296409392439717805622828262",
+      "expected_trade_count": 22,
+      "expected_trade_identity_sha256": "05a4fa14bd43c1457142e19b9494741acbb85132683a2b8b0ef6c3651090edd2",
+      "expected_turnover_micros": 94970000,
+      "expected_wins": 20,
+      "fixture_decision_count": 106,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 24,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U1_T12"
+      "strategy_id": "NO_FADE_P1_U1_T12",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 9,
+      "actual_pnl_micros": 18340000,
+      "actual_roi": "0.052904863555068366699359603069289794034500663474298",
+      "actual_trade_count": 82,
+      "actual_trade_identity_sha256": "d2aa956f7995dcf529cd661400673e67317e68a8d8f2094c405e8431ba9b8b2c",
+      "actual_turnover_micros": 346660000,
+      "actual_wins": 73,
+      "evaluator_key": "FAVORITE_ONLY_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 9,
+      "expected_pnl_micros": 18340000,
+      "expected_roi": "0.052904863555068366699359603069289794034500663474298",
+      "expected_trade_count": 82,
+      "expected_trade_identity_sha256": "d2aa956f7995dcf529cd661400673e67317e68a8d8f2094c405e8431ba9b8b2c",
+      "expected_turnover_micros": 346660000,
+      "expected_wins": 73,
+      "fixture_decision_count": 170,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_BASKET",
+        "relative_path": "parity/BASKET_TRADE_CLASSIFICATION.csv",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "6d6d71d03002a5c3e62566b5ddd4cc20d18204affff6debaa6c461c3618d5361"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_FULL",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "37e9c5e35655191fb8894ed091a29a985d5a852dcf46e34585deb4ed791a7267"
+      },
+      "parity_population": "V1_CONFIRMATION_BASKET",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "dcd6d0bcdaf2c344d21bf3a3925b75ad775cd0b1d55a95d824db6ba3dba6f388"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 25,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_BASKET",
+          "relative_path": "contracts/BASKET_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "d942e94f11fe4318de048f22e4864006f7bd1d64e06a00520c971160c8c800ef"
+        },
+        {
+          "artifact_id": "SRC_FAVORITE_BASKET",
+          "relative_path": "source_snapshots/favorite_basket_run_research.py.source",
+          "role": "SANITIZED_EXECUTABLE_RULE_SOURCE",
+          "sha256": "1cf1f4c24f81ba87d1bf583af080d777f88726f68cd78fcf8daa9651f887da30"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "9a800c4674434ba0caea3fa91cbedb7be2e253a645926633a5c403c75b26e71b",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "460c1d2414f495bdb23145aea2f34fe471ceef78ccf5c0fc1aaf9d75d330b444",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_FAVORITE_ONLY"
+      "strategy_id": "YES_FAVORITE_ONLY",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 3,
+      "actual_pnl_micros": 5382500,
+      "actual_roi": "0.07213455288638724159882065199",
+      "actual_trade_count": 19,
+      "actual_trade_identity_sha256": "b8b9791e109fff8e4fe3a5d3559b452bf902201fc1beb9bbcf83060ffaa51195",
+      "actual_turnover_micros": 74617500,
+      "actual_wins": 16,
+      "evaluator_key": "NO_FADE_P1_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 3,
+      "expected_pnl_micros": 5382500,
+      "expected_roi": "0.07213455288638724159882065199",
+      "expected_trade_count": 19,
+      "expected_trade_identity_sha256": "b8b9791e109fff8e4fe3a5d3559b452bf902201fc1beb9bbcf83060ffaa51195",
+      "expected_turnover_micros": 74617500,
+      "expected_wins": 16,
+      "fixture_decision_count": 106,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 26,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "6f70337c97288106391f89e283b9d22508b708c73e14668fa148640f4a1bd42c",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "8de5e7bbba7abfba17ee3026fceb6db5daab1f6b19b3ae3a4dcbff1c56e9407e",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY"
+      "strategy_id": "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 3,
+      "actual_pnl_micros": 8610000,
+      "actual_roi": "0.04881229094619876410227337151",
+      "actual_trade_count": 40,
+      "actual_trade_identity_sha256": "f364eb88693c5dceea6a11e6d4d7433e0e19c4d3838514145b9df570c1ae5756",
+      "actual_turnover_micros": 176390000,
+      "actual_wins": 37,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 3,
+      "expected_pnl_micros": 8610000,
+      "expected_roi": "0.04881229094619876410227337151",
+      "expected_trade_count": 40,
+      "expected_trade_identity_sha256": "f364eb88693c5dceea6a11e6d4d7433e0e19c4d3838514145b9df570c1ae5756",
+      "expected_turnover_micros": 176390000,
+      "expected_wins": 37,
+      "fixture_decision_count": 82,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 27,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U2_T30"
+      "strategy_id": "NO_FADE_P2_U2_T30",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 20,
+      "actual_pnl_micros": 11217500,
+      "actual_roi": "0.04798263343064600643760760536",
+      "actual_trade_count": 69,
+      "actual_trade_identity_sha256": "d90b9c25563b8af74a8dd10770d1b1cab3fa16dbd0b57f1721cad472006bd155",
+      "actual_turnover_micros": 233782500,
+      "actual_wins": 49,
+      "evaluator_key": "PF1_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 20,
+      "expected_pnl_micros": 11217500,
+      "expected_roi": "0.04798263343064600643760760536",
+      "expected_trade_count": 69,
+      "expected_trade_identity_sha256": "d90b9c25563b8af74a8dd10770d1b1cab3fa16dbd0b57f1721cad472006bd155",
+      "expected_turnover_micros": 233782500,
+      "expected_wins": 49,
+      "fixture_decision_count": 136,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_CONFIDENCE",
+        "relative_path": "parity/EARLY_CONFIDENCE_OOS_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "4765ae6fa759b79aa07d0e2f861558ad204f118732f58bb4ea010620cc9ba950"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433"
+      },
+      "parity_population": "V1_EARLY_CONFIDENCE",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+        "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 28,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_PF1",
+          "relative_path": "contracts/PF1_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "a86aec5cbd499bc6459a30eacb89e82fe966e1e6687b639a1d5b59f1a8438ce8"
+        },
+        {
+          "artifact_id": "CONTRACT_PF1_FORWARD",
+          "relative_path": "contracts/PF1_FORWARD_EVALUATION_CONTRACT.json",
+          "role": "IMMUTABLE_EVALUATION_CONTRACT",
+          "sha256": "c6535fe8b2d4327582c1bcbbbf2c7fe67f52e009033721362b8a8e4fb4cc011f"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_PF1_CORE",
+          "relative_path": "source_snapshots/pf1_core.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "71fd5851c9dbefae3c2bdc5c3cbc2558728479c13518ad58a9e35ab878983ea4"
+        },
+        {
+          "artifact_id": "SRC_PF1_MODEL",
+          "relative_path": "source_snapshots/pf1_model.py.source",
+          "role": "EXECUTABLE_MODEL_SOURCE",
+          "sha256": "087e219574833767bfd470b2f3fafe873fdc5c72c11b6f4770de3255c50e6bd4"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "df1c0f899786f298caf34c53e2d0187009ebe29b2bf9deb50b3af73f846e7245",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "a2d764e2859a8c70e628525f114b7f7ef1d84c4f5aeea1687f30316f1953deb7",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_T30"
+      "strategy_id": "YES_PF1_T30",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 5,
+      "actual_pnl_micros": 9435000,
+      "actual_roi": "0.04092121527551883416823889142",
+      "actual_trade_count": 53,
+      "actual_trade_identity_sha256": "36fe1994f8f8d70d1774242a44b3a86f35195fa1498670b75ae578d5960b62f7",
+      "actual_turnover_micros": 230565000,
+      "actual_wins": 48,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 5,
+      "expected_pnl_micros": 9435000,
+      "expected_roi": "0.04092121527551883416823889142",
+      "expected_trade_count": 53,
+      "expected_trade_identity_sha256": "36fe1994f8f8d70d1774242a44b3a86f35195fa1498670b75ae578d5960b62f7",
+      "expected_turnover_micros": 230565000,
+      "expected_wins": 48,
+      "fixture_decision_count": 131,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 29,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U1_T30"
+      "strategy_id": "NO_FADE_P2_U1_T30",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 7,
+      "actual_pnl_micros": 11632500,
+      "actual_roi": "0.04033915056308356524226897969",
+      "actual_trade_count": 67,
+      "actual_trade_identity_sha256": "11950560ea0d24e355d99fe4d0935939fe849325ed0bd8566bd2beaa7256bd68",
+      "actual_turnover_micros": 288367500,
+      "actual_wins": 60,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 7,
+      "expected_pnl_micros": 11632500,
+      "expected_roi": "0.04033915056308356524226897969",
+      "expected_trade_count": 67,
+      "expected_trade_identity_sha256": "11950560ea0d24e355d99fe4d0935939fe849325ed0bd8566bd2beaa7256bd68",
+      "expected_turnover_micros": 288367500,
+      "expected_wins": 60,
+      "fixture_decision_count": 131,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 30,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U1_T12"
+      "strategy_id": "NO_FADE_P2_U1_T12",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 0,
+      "actual_pnl_micros": 350000,
+      "actual_roi": "0.036269430051813471502590673575129533678756476683938",
+      "actual_trade_count": 2,
+      "actual_trade_identity_sha256": "c2def6092503722b31ff3adb98032a3c4d57a45843a9b9bbb59a5226e89d5518",
+      "actual_turnover_micros": 9650000,
+      "actual_wins": 2,
+      "evaluator_key": "NO_CONFIRMATION_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 0,
+      "expected_pnl_micros": 350000,
+      "expected_roi": "0.036269430051813471502590673575129533678756476683938",
+      "expected_trade_count": 2,
+      "expected_trade_identity_sha256": "c2def6092503722b31ff3adb98032a3c4d57a45843a9b9bbb59a5226e89d5518",
+      "expected_turnover_micros": 9650000,
+      "expected_wins": 2,
+      "fixture_decision_count": 136,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_CONFIRMATION",
+        "relative_path": "parity/CONFIRMATION_TRADE_LEDGER.csv",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "74e0c479e81558f38c5f152a0ec62c923fe6eda080dda75167f8015a8da51440"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_FULL",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "37e9c5e35655191fb8894ed091a29a985d5a852dcf46e34585deb4ed791a7267"
+      },
+      "parity_population": "V1_CONFIRMATION_BASKET",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+        "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "dcd6d0bcdaf2c344d21bf3a3925b75ad775cd0b1d55a95d824db6ba3dba6f388"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 31,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_B2",
+          "relative_path": "contracts/B2_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "ec54c0ed7237e3e6b4aef49689b32814a31e143b0e63be12c5a90dd2d89b5062"
+        },
+        {
+          "artifact_id": "SRC_NO_CONFIRMATION",
+          "relative_path": "source_snapshots/no_confirmation_frozen_concepts.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "45be74ea8825e504fda85d3d3b365275c92ceec37831080f422f370704b661c2"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "1ab483c3bbc5daf4b4c9f4158b1e9e4eb9431638b37e54c38d50e9be7ec49cb9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b00f416c96c58848637bb0f4d2a6441bd9fbdf9896dc504dc0324cca3f49c937",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_B2"
+      "strategy_id": "NO_B2",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 4,
+      "actual_pnl_micros": 6387500,
+      "actual_roi": "0.03478793655116073252093403227",
+      "actual_trade_count": 42,
+      "actual_trade_identity_sha256": "53fadd75decab5163c081f9ea49285c5aba6081fa8b84ad89c91c796f534dd54",
+      "actual_turnover_micros": 183612500,
+      "actual_wins": 38,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 4,
+      "expected_pnl_micros": 6387500,
+      "expected_roi": "0.03478793655116073252093403227",
+      "expected_trade_count": 42,
+      "expected_trade_identity_sha256": "53fadd75decab5163c081f9ea49285c5aba6081fa8b84ad89c91c796f534dd54",
+      "expected_turnover_micros": 183612500,
+      "expected_wins": 38,
+      "fixture_decision_count": 82,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 32,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U2_T4H"
+      "strategy_id": "NO_FADE_P2_U2_T4H",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V1_PARITY_PASS_EXECUTABLE_CHECKPOINT_SCHEMA",
+      "activation_status": "PAPER_EVALUATION_ENABLED",
+      "actual_losses": 86,
+      "actual_pnl_micros": 1877500,
+      "actual_roi": "0.005552721277051956021855984148",
+      "actual_trade_count": 154,
+      "actual_trade_identity_sha256": "f430d8deccec31c7738c08f6b98487f6bac2ed9fca09e242f9fa3e4b283f5e53",
+      "actual_turnover_micros": 338122500,
+      "actual_wins": 68,
+      "evaluator_key": "PF1_COMPOSED_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
-      "paper_eligible": false,
+      "expected_losses": 86,
+      "expected_pnl_micros": 1877500,
+      "expected_roi": "0.005552721277051956021855984148",
+      "expected_trade_count": 154,
+      "expected_trade_identity_sha256": "f430d8deccec31c7738c08f6b98487f6bac2ed9fca09e242f9fa3e4b283f5e53",
+      "expected_turnover_micros": 338122500,
+      "expected_wins": 68,
+      "fixture_decision_count": 170,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+      "paper_eligible": true,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 33,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_PF1",
+          "relative_path": "contracts/PF1_STRATEGY_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "a86aec5cbd499bc6459a30eacb89e82fe966e1e6687b639a1d5b59f1a8438ce8"
+        },
+        {
+          "artifact_id": "CONTRACT_PF1_FORWARD",
+          "relative_path": "contracts/PF1_FORWARD_EVALUATION_CONTRACT.json",
+          "role": "IMMUTABLE_EVALUATION_CONTRACT",
+          "sha256": "c6535fe8b2d4327582c1bcbbbf2c7fe67f52e009033721362b8a8e4fb4cc011f"
+        },
+        {
+          "artifact_id": "SRC_EARLY_CONFIDENCE_SELECTORS",
+          "relative_path": "source_snapshots/early_confidence_selectors.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "353173414762fc758c46086b01164edb58e187a6f04c6c6e1bdbbaff8ec24430"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_PF1_CORE",
+          "relative_path": "source_snapshots/pf1_core.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "71fd5851c9dbefae3c2bdc5c3cbc2558728479c13518ad58a9e35ab878983ea4"
+        },
+        {
+          "artifact_id": "SRC_PF1_MODEL",
+          "relative_path": "source_snapshots/pf1_model.py.source",
+          "role": "EXECUTABLE_MODEL_SOURCE",
+          "sha256": "087e219574833767bfd470b2f3fafe873fdc5c72c11b6f4770de3255c50e6bd4"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "df1c0f899786f298caf34c53e2d0187009ebe29b2bf9deb50b3af73f846e7245",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "a2d764e2859a8c70e628525f114b7f7ef1d84c4f5aeea1687f30316f1953deb7",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_T8H"
+      "strategy_id": "YES_PF1_T8H",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "HISTORICAL_INPUT_HAS_NO_LIVE_DEPTH_FEE_CONTRACT",
+      "activation_status": "DISABLED_MISSING_EXECUTION_DATA",
+      "actual_losses": 9,
+      "actual_pnl_micros": 682500,
+      "actual_roi": "0.003111926772829345583457772408",
+      "actual_trade_count": 53,
+      "actual_trade_identity_sha256": "474c76b879358122e15982796d8bca0a59421d71cdcfa8b1fedd8fbba88847dd",
+      "actual_turnover_micros": 219317500,
+      "actual_wins": 44,
+      "evaluator_key": "NO_FADE_P2_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 9,
+      "expected_pnl_micros": 682500,
+      "expected_roi": "0.003111926772829345583457772408",
+      "expected_trade_count": 53,
+      "expected_trade_identity_sha256": "474c76b879358122e15982796d8bca0a59421d71cdcfa8b1fedd8fbba88847dd",
+      "expected_turnover_micros": 219317500,
+      "expected_wins": 44,
+      "fixture_decision_count": 131,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_EARLY_HORIZON",
+        "relative_path": "parity/EARLY_HORIZON_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "1deb95da4f127bd70e06119baa635216b876088bf2b0b8c7641d215ea48d4aa1"
+      },
+      "input_schema_version": "BTC_STRATEGY_HISTORICAL_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": null,
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+        "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730"
+      },
+      "parity_population": "V1_EARLY_HORIZON",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 34,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_NO_FADE",
+          "relative_path": "contracts/NO_FADE_RULES_FROZEN.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "4cdc8b80c033c8b95092589c605cbe3564b9929375e2a54bdad45e8a943d4822"
+        },
+        {
+          "artifact_id": "SRC_EARLY_HORIZON",
+          "relative_path": "source_snapshots/early_horizon_strategies.py.source",
+          "role": "EXECUTABLE_HISTORICAL_SOURCE",
+          "sha256": "cad37155b4d9ba9b4dd779c49d0572623e74f8be26ca18e31c50018689d3aed0"
+        },
+        {
+          "artifact_id": "SRC_NO_FADE_REFERENCE",
+          "relative_path": "source_snapshots/no_fade_reproduction_engine.py.source",
+          "role": "INDEPENDENT_EXECUTABLE_REFERENCE",
+          "sha256": "936c72d8015cf2db3cac96bcfa2b1f04346f7e0f9826a02a7bac4fa7b5421c4c"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "a3e856637e0084970e8c5458fd712a3d374675a1a0e47985f4f63b021da89fbf",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "b4e4dc551f86809073df0d9adb2501a81b580b259edc3a505403afefb8373c83",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U1_T2H"
+      "strategy_id": "NO_FADE_P2_U1_T2H",
+      "version": "V1"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 2,
+      "actual_pnl_micros": 10167500,
+      "actual_roi": "0.156827208576",
+      "actual_trade_count": 17,
+      "actual_trade_identity_sha256": "ef784864494621726b4db6942b97fa4c6a377a5e20b569f04fec56faf8210fc7",
+      "actual_turnover_micros": 64832500,
+      "actual_wins": 15,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 2,
+      "expected_pnl_micros": 10167500,
+      "expected_roi": "0.156827208576",
+      "expected_trade_count": 17,
+      "expected_trade_identity_sha256": "ef784864494621726b4db6942b97fa4c6a377a5e20b569f04fec56faf8210fc7",
+      "expected_turnover_micros": 64832500,
+      "expected_wins": 15,
+      "fixture_decision_count": 24,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "NO_A0",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 35,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_A0_V2_VOL"
+      "strategy_id": "NO_A0_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 5,
+      "actual_pnl_micros": 21202500,
+      "actual_roi": "0.546491397642",
+      "actual_trade_count": 17,
+      "actual_trade_identity_sha256": "1ec16f9a00f18d43133e846c2f732a90d513f4827f791916b1efb871ddc4b30f",
+      "actual_turnover_micros": 38797500,
+      "actual_wins": 12,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 5,
+      "expected_pnl_micros": 21202500,
+      "expected_roi": "0.546491397642",
+      "expected_trade_count": 17,
+      "expected_trade_identity_sha256": "1ec16f9a00f18d43133e846c2f732a90d513f4827f791916b1efb871ddc4b30f",
+      "expected_turnover_micros": 38797500,
+      "expected_wins": 12,
+      "fixture_decision_count": 37,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "NO_A2",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 36,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_A2_V2_VOL"
+      "strategy_id": "NO_A2_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 1,
+      "actual_pnl_micros": 4247500,
+      "actual_roi": "0.104226734556",
+      "actual_trade_count": 10,
+      "actual_trade_identity_sha256": "c584272fafb187768c050ad3a293476efc3f119799e05ba43e90c9118458f96d",
+      "actual_turnover_micros": 40752500,
+      "actual_wins": 9,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 4247500,
+      "expected_roi": "0.104226734556",
+      "expected_trade_count": 10,
+      "expected_trade_identity_sha256": "c584272fafb187768c050ad3a293476efc3f119799e05ba43e90c9118458f96d",
+      "expected_turnover_micros": 40752500,
+      "expected_wins": 9,
+      "fixture_decision_count": 19,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "NO_FADE_P1_U1_T18",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 37,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P1_U1_T18_V2_VOL"
+      "strategy_id": "NO_FADE_P1_U1_T18_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 3,
+      "actual_pnl_micros": 8355000,
+      "actual_roi": "0.102333272093",
+      "actual_trade_count": 21,
+      "actual_trade_identity_sha256": "2c21e872381f0efa50891998bbc67d9ef197fd7a5b5354954eb77d4d5d68b18e",
+      "actual_turnover_micros": 81645000,
+      "actual_wins": 18,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 3,
+      "expected_pnl_micros": 8355000,
+      "expected_roi": "0.102333272093",
+      "expected_trade_count": 21,
+      "expected_trade_identity_sha256": "2c21e872381f0efa50891998bbc67d9ef197fd7a5b5354954eb77d4d5d68b18e",
+      "expected_turnover_micros": 81645000,
+      "expected_wins": 18,
+      "fixture_decision_count": 68,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "NO_FADE_P2_U1_OPERATIONAL",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 38,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL_V2_VOL"
+      "strategy_id": "NO_FADE_P2_U1_OPERATIONAL_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 1,
+      "actual_pnl_micros": 11747500,
+      "actual_roi": "0.243458888141",
+      "actual_trade_count": 13,
+      "actual_trade_identity_sha256": "dd5206738dbe314bab01ebba627ebe8210073c7752c1effb67e2f99bb7aad737",
+      "actual_turnover_micros": 48252500,
+      "actual_wins": 12,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 11747500,
+      "expected_roi": "0.243458888141",
+      "expected_trade_count": 13,
+      "expected_trade_identity_sha256": "dd5206738dbe314bab01ebba627ebe8210073c7752c1effb67e2f99bb7aad737",
+      "expected_turnover_micros": 48252500,
+      "expected_wins": 12,
+      "fixture_decision_count": 45,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "NO_FADE_P2_U1_T60",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 39,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U1_T60_V2_VOL"
+      "strategy_id": "NO_FADE_P2_U1_T60_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 2,
+      "actual_pnl_micros": 9932500,
+      "actual_roi": "0.141756163699",
+      "actual_trade_count": 18,
+      "actual_trade_identity_sha256": "b104a4e27f12ab7534b8836616b8cf6794c7de79e1746bfdce636dac65a900bc",
+      "actual_turnover_micros": 70067500,
+      "actual_wins": 16,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 2,
+      "expected_pnl_micros": 9932500,
+      "expected_roi": "0.141756163699",
+      "expected_trade_count": 18,
+      "expected_trade_identity_sha256": "b104a4e27f12ab7534b8836616b8cf6794c7de79e1746bfdce636dac65a900bc",
+      "expected_turnover_micros": 70067500,
+      "expected_wins": 16,
+      "fixture_decision_count": 58,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "NO_FADE_P2_U2_OPERATIONAL",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 40,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL_V2_VOL"
+      "strategy_id": "NO_FADE_P2_U2_OPERATIONAL_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 1,
+      "actual_pnl_micros": 11747500,
+      "actual_roi": "0.243458888141",
+      "actual_trade_count": 13,
+      "actual_trade_identity_sha256": "87b49d503fea2d15b36cf6674e18e79257145de37c00fd5cd6c4a380e64ba752",
+      "actual_turnover_micros": 48252500,
+      "actual_wins": 12,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 11747500,
+      "expected_roi": "0.243458888141",
+      "expected_trade_count": 13,
+      "expected_trade_identity_sha256": "87b49d503fea2d15b36cf6674e18e79257145de37c00fd5cd6c4a380e64ba752",
+      "expected_turnover_micros": 48252500,
+      "expected_wins": 12,
+      "fixture_decision_count": 44,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "NO_FADE_P2_U2_T60",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 41,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "NO_FADE_P2_U2_T60_V2_VOL"
+      "strategy_id": "NO_FADE_P2_U2_T60_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 0,
+      "actual_pnl_micros": 12342500,
+      "actual_roi": "0.289339506535",
+      "actual_trade_count": 11,
+      "actual_trade_identity_sha256": "2dff52a333030f0fb7b4c7072d695d6024b4766681489f9cfa505ea79ed2dd46",
+      "actual_turnover_micros": 42657500,
+      "actual_wins": 11,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 0,
+      "expected_pnl_micros": 12342500,
+      "expected_roi": "0.289339506535",
+      "expected_trade_count": 11,
+      "expected_trade_identity_sha256": "2dff52a333030f0fb7b4c7072d695d6024b4766681489f9cfa505ea79ed2dd46",
+      "expected_turnover_micros": 42657500,
+      "expected_wins": 11,
+      "fixture_decision_count": 69,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "YES_FAVORITE_ONLY",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 42,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_FAVORITE_ONLY_V2_VOL"
+      "strategy_id": "YES_FAVORITE_ONLY_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 12,
+      "actual_pnl_micros": 18777500,
+      "actual_roi": "0.306709134714",
+      "actual_trade_count": 28,
+      "actual_trade_identity_sha256": "2f266812c45c4810d50155626a79a1428d8c04387ce4d21037840a97f613e826",
+      "actual_turnover_micros": 61222500,
+      "actual_wins": 16,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 12,
+      "expected_pnl_micros": 18777500,
+      "expected_roi": "0.306709134714",
+      "expected_trade_count": 28,
+      "expected_trade_identity_sha256": "2f266812c45c4810d50155626a79a1428d8c04387ce4d21037840a97f613e826",
+      "expected_turnover_micros": 61222500,
+      "expected_wins": 16,
+      "fixture_decision_count": 106,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "YES_PF1_OPERATIONAL",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 43,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_OPERATIONAL_V2_VOL"
+      "strategy_id": "YES_PF1_OPERATIONAL_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 11,
+      "actual_pnl_micros": 4852500,
+      "actual_roi": "0.096764544593",
+      "actual_trade_count": 22,
+      "actual_trade_identity_sha256": "66d3a5e8b1a936978488923f895be71f7e33cd8e108cccbe04f5fb726e1d7f93",
+      "actual_turnover_micros": 50147500,
+      "actual_wins": 11,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 11,
+      "expected_pnl_micros": 4852500,
+      "expected_roi": "0.096764544593",
+      "expected_trade_count": 22,
+      "expected_trade_identity_sha256": "66d3a5e8b1a936978488923f895be71f7e33cd8e108cccbe04f5fb726e1d7f93",
+      "expected_turnover_micros": 50147500,
+      "expected_wins": 11,
+      "fixture_decision_count": 69,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "YES_PF1_T30",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 44,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_T30_V2_VOL"
+      "strategy_id": "YES_PF1_T30_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 11,
+      "actual_pnl_micros": 16625000,
+      "actual_roi": "0.311475409836",
+      "actual_trade_count": 25,
+      "actual_trade_identity_sha256": "0ce0c52e436b0ecd0465e539bff9e9a68096cabf618dc65c7bd300d8dc8f5142",
+      "actual_turnover_micros": 53375000,
+      "actual_wins": 14,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 11,
+      "expected_pnl_micros": 16625000,
+      "expected_roi": "0.311475409836",
+      "expected_trade_count": 25,
+      "expected_trade_identity_sha256": "0ce0c52e436b0ecd0465e539bff9e9a68096cabf618dc65c7bd300d8dc8f5142",
+      "expected_turnover_micros": 53375000,
+      "expected_wins": 14,
+      "fixture_decision_count": 92,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "YES_PF1_T60",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 45,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_PF1_T60_V2_VOL"
+      "strategy_id": "YES_PF1_T60_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 1,
+      "actual_pnl_micros": 11685000,
+      "actual_roi": "0.269767978760",
+      "actual_trade_count": 12,
+      "actual_trade_identity_sha256": "6130ad1f858eff901d0650a48839803d5f571eb6a2c820a67beb29bc95e6a5bd",
+      "actual_turnover_micros": 43315000,
+      "actual_wins": 11,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 11685000,
+      "expected_roi": "0.269767978760",
+      "expected_trade_count": 12,
+      "expected_trade_identity_sha256": "6130ad1f858eff901d0650a48839803d5f571eb6a2c820a67beb29bc95e6a5bd",
+      "expected_turnover_micros": 43315000,
+      "expected_wins": 11,
+      "fixture_decision_count": 39,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "YES_STRICT_A_OPERATIONAL",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 46,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_STRICT_A_OPERATIONAL_V2_VOL"
+      "strategy_id": "YES_STRICT_A_OPERATIONAL_V2_VOL",
+      "version": "V2"
     },
     {
-      "activation_status": "PENDING_C5_CLASSIFICATION",
+      "activation_reason_code": "V2_FROZEN_POLICY_NOT_ROBUST_RESEARCH_ONLY",
+      "activation_status": "DISABLED_RESEARCH_ONLY",
+      "actual_losses": 1,
+      "actual_pnl_micros": 9385000,
+      "actual_roi": "0.168749438101",
+      "actual_trade_count": 14,
+      "actual_trade_identity_sha256": "3948a92b7e1d4f57aa231d079b0e3f8427e39766101a3e5348bea629aebfda46",
+      "actual_turnover_micros": 55615000,
+      "actual_wins": 13,
+      "evaluator_key": "VOL_OVERLAY_A_V1",
       "evaluator_status": "EVALUATOR_IMPLEMENTED",
+      "expected_losses": 1,
+      "expected_pnl_micros": 9385000,
+      "expected_roi": "0.168749438101",
+      "expected_trade_count": 14,
+      "expected_trade_identity_sha256": "3948a92b7e1d4f57aa231d079b0e3f8427e39766101a3e5348bea629aebfda46",
+      "expected_turnover_micros": 55615000,
+      "expected_wins": 13,
+      "fixture_decision_count": 24,
+      "historical_reference_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY",
+        "relative_path": "parity/VOL_OVERLAY_TRADE_LEDGERS.parquet",
+        "role": "IMMUTABLE_TRADE_LEDGER",
+        "sha256": "62946da5501fa0cabd281e5ddd96f4954267fb1717dfc9dd5818a1b891c2d861"
+      },
+      "input_schema_version": "BTC_STRATEGY_VOL_OVERLAY_INPUT_V1",
+      "last_verified_at_utc": "2026-08-08T17:44:42Z",
+      "last_verified_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
       "paper_eligible": false,
+      "parent_strategy_id": "YES_STRICT_A_T60",
+      "parity_fixture_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_DECISIONS",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY.jsonl",
+        "role": "IMMUTABLE_DECISION_PARITY_FIXTURE",
+        "sha256": "22e5f3e3856bb22af242100267e100afc696c7caeb35d73e79fd26cd5d25de4f"
+      },
+      "parity_population": "V2_VOL_OVERLAY",
+      "parity_receipt_artifact": {
+        "artifact_id": "PARITY_VOL_OVERLAY_RECEIPT",
+        "relative_path": "parity/VOL_OVERLAY_DECISION_PARITY_RECEIPT.json",
+        "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+        "sha256": "0923a7117c8e696b03a9495a9a1ce4ea6c84ac5b46530d2f40a8bd6ea24e0566"
+      },
       "parity_status": "PARITY_PASS",
+      "parity_tolerances": {
+        "counts": 0,
+        "pnl_micros": 0,
+        "roi": "EXACT_DECIMAL_RATIO",
+        "trade_identity": "EXACT_SHA256"
+      },
+      "registry_index": 47,
+      "rule_source_artifacts": [
+        {
+          "artifact_id": "CONTRACT_VOL_OVERLAY",
+          "relative_path": "contracts/VOL_OVERLAY_V1_CONTRACT.json",
+          "role": "IMMUTABLE_RULE_CONTRACT",
+          "sha256": "04e3970d357b037b3d7d9b288caad6e0de8047ea66b652c05fab267f80b13915"
+        },
+        {
+          "artifact_id": "SRC_VOL_OVERLAY",
+          "relative_path": "source_snapshots/vol_overlay.py.source",
+          "role": "EXECUTABLE_RULE_SOURCE",
+          "sha256": "541868bbe8cd6d07522c3d590c0b2509845c2ce16da2e3ed35c5b2fd43540591"
+        },
+        {
+          "artifact_id": "SRC_VOL_PROBABILITY",
+          "relative_path": "source_snapshots/vol_probability.py.source",
+          "role": "EXECUTABLE_PROBABILITY_SOURCE",
+          "sha256": "08e1b08150eaa7994a9e583643b9f90b190cbde1eeb56666846adcff009c7172"
+        }
+      ],
+      "rule_source_fingerprint_sha256": "69e1462a5bc0a4e7d3576ec966b5e9ae0c98aaf10117724bb24c6d12152bf5e9",
       "rule_source_status": "SOURCE_VERIFIED",
+      "rule_spec_sha256": "1500977764c2c24a94e4890d6b0e8a81e44c0cbef0b4bb21e40af9c713557dbb",
       "rule_spec_status": "SPEC_FROZEN",
-      "strategy_id": "YES_STRICT_A_T60_V2_VOL"
+      "strategy_id": "YES_STRICT_A_T60_V2_VOL",
+      "version": "V2"
     }
   ],
   "strategy_count": 47,
-  "trading_approval": false
+  "trading_approval": false,
+  "verified_at_utc": "2026-08-08T17:44:42Z"
 }

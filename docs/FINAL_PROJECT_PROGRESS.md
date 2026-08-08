@@ -3,11 +3,11 @@
 ## Current state
 
 - Goal status: `ACTIVE`.
-- Current train: `C5_ACTIVATION_CLASSIFICATION`.
+- Current train: `C6_PERSISTENT_SCHEDULER_REPLAY`.
 - Verified baseline: `579289b550cff3793a74bbafba0d8e78670f0c2a`.
 - Integration branch: `codex/final-project-completion`.
 - Branch published: yes.
-- Last verified integration commit: `b435e0e` (`test: record accepted Phase 0 baseline`).
+- Last verified integration commit: `e9cc951` (`fix: stabilize C4 V2 converter evidence hash`).
 - Manual action required: no.
 - Trading approval: `false`.
 
@@ -25,7 +25,7 @@
 
 - [x] Phase 0 baseline offline gate and hypothesis reproduction.
 - [x] C4 executable rules and parity.
-- [ ] C5 activation classification.
+- [x] C5 activation classification.
 - [ ] C6 persistent scheduler/replay.
 - [ ] C7 paper execution.
 - [ ] C8 stable API.
@@ -70,6 +70,28 @@
 - Provider requests, backend runs and Task 14 runs for C4: `0`.
 - `trading_approval=false`.
 
+## C5 accepted activation gate
+
+- Gate: `C5_STRATEGY_47_ACTIVATION_PASS`; all `47/47` identities have an
+  explicit machine-readable activation status and reason, with zero unknown or
+  pending rows.
+- `8` V1 identities with the frozen executable-checkpoint input contract are
+  `PAPER_EVALUATION_ENABLED`; this permits evaluation only and does not
+  authorize an intent, fill, position or settlement.
+- `26` V1 identities backed only by historical input contracts are
+  `DISABLED_MISSING_EXECUTION_DATA`; C4 parity is preserved but never treated
+  as live depth/fee evidence.
+- All `13` V2 overlays remain `DISABLED_RESEARCH_ONLY` under the frozen policy.
+- Every row binds its exact rule sources/spec, full-decision fixture and
+  conversion receipt, plus expected/actual count, W/L, PnL, ROI and trade-set
+  hashes.
+- Acceptance report SHA-256:
+  `ca05d61430047e6dad6774ae6243abed6dab1d2532641bc66977f0b5d349de9e`.
+- Strategy status matrix SHA-256:
+  `1594ae25f3ce17d77eb200f088f7b6287a7745a95e6cc6d0e1babf03a1e40cd0`.
+- Provider requests and paper executions for C5: `0`;
+  `paper_execution_authorized=false`; `trading_approval=false`.
+
 ## Phase 0 accepted baseline
 
 - Gate: `BTC_DAILY_RANGE_WINDOWS_V1_PHASE0_PASS`.
@@ -93,6 +115,6 @@
 
 ## Locked next step
 
-Classify activation for every one of the 47 identities using the frozen C5
-policy. C4 implementation/parity status must not be used as automatic
-authorization for paper activation.
+Implement C6 persistent checkpoint scheduling and recovered replay with an
+exactly-once evaluation identity, explicit LIVE/RECOVERED origin, recurring
+future-market schedules and no duplicate signal after restart.

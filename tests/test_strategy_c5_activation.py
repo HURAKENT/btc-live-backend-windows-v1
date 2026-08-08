@@ -246,6 +246,43 @@ class StrategyC5ActivationTests(unittest.TestCase):
                 self.assertNotIn(b"NaN", raw)
                 json.loads(raw)
 
+    def test_committed_outputs_equal_fresh_c5_gate(self) -> None:
+        from src.strategy_c5_activation import (
+            acceptance_report_payload,
+            build_c5_status_matrix,
+            verify_c5_activation,
+        )
+
+        source_commit = "19818ad1bed7fce0a7b4d04da647b00f821349b5"
+        verified_at_utc = "2026-08-08T17:44:42Z"
+        report = verify_c5_activation(PROJECT_ROOT)
+        expected_report = acceptance_report_payload(
+            report,
+            source_commit=source_commit,
+            verified_at_utc=verified_at_utc,
+        )
+        expected_matrix = build_c5_status_matrix(
+            report,
+            source_commit=source_commit,
+            verified_at_utc=verified_at_utc,
+        )
+        self.assertEqual(
+            json.loads(
+                (PROJECT_ROOT / "reports/C5_STRATEGY_47_ACTIVATION_ACCEPTANCE.json").read_text(
+                    encoding="utf-8"
+                )
+            ),
+            expected_report,
+        )
+        self.assertEqual(
+            json.loads(
+                (PROJECT_ROOT / "reports/STRATEGY_47_STATUS_MATRIX.json").read_text(
+                    encoding="utf-8"
+                )
+            ),
+            expected_matrix,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

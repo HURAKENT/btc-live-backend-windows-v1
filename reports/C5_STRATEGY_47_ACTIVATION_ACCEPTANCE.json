@@ -1,0 +1,20 @@
+{
+  "acceptance_pass": true,
+  "activation_counts": {
+    "DISABLED_MISSING_EXECUTION_DATA": 26,
+    "DISABLED_RESEARCH_ONLY": 13,
+    "PAPER_EVALUATION_ENABLED": 8
+  },
+  "c4_acceptance_sha256": "641daca9fc68689f60baaf857a3a8711006802d9d1e28c8b5b09062f73180e5b",
+  "classified_count": 47,
+  "external_provider_requests": 0,
+  "paper_execution_authorized": false,
+  "rule_pack_sha256": "9d402e9a1e2e0dd2fdae3443e3641dfb777efdc29b88ae14b529689972e8d727",
+  "schema_version": "BTC_STRATEGY_C5_ACTIVATION_ACCEPTANCE_V1",
+  "source_commit": "19818ad1bed7fce0a7b4d04da647b00f821349b5",
+  "status": "C5_STRATEGY_47_ACTIVATION_PASS",
+  "strategy_count": 47,
+  "trading_approval": false,
+  "unknown_count": 0,
+  "verified_at_utc": "2026-08-08T17:44:42Z"
+}

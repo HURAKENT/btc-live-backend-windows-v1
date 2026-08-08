@@ -88,3 +88,15 @@ Decision: `EVALUATOR_IMPLEMENTED` and `PARITY_PASS` establish deterministic
 behavior, not permission to activate. Every identity remains
 `PENDING_C5_CLASSIFICATION` until C5 records a separate machine-readable
 decision. `trading_approval=false` remains invariant.
+
+## D-011 — Paper evaluation is not paper execution
+
+Date: 2026-08-08
+
+Decision: C5 enables paper evaluation only for the eight V1 identities whose
+trusted rule binding requires an executable checkpoint input. The remaining 26
+V1 identities have historical-only inputs and are disabled for missing
+execution data; all 13 V2 overlays remain research-only. An enabled evaluation
+cannot create a paper intent or fill until C7 separately proves depth, fee,
+five-share and restart-safe accounting contracts. C5 keeps
+`paper_execution_authorized=false` and `trading_approval=false`.

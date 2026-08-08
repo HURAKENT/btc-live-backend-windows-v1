@@ -115,7 +115,7 @@ class StrategyC4AcceptanceTests(unittest.TestCase):
                     json.loads(raw.decode("utf-8")),
                 )
 
-    def test_committed_outputs_equal_fresh_gate_result(self) -> None:
+    def test_committed_report_and_c5_matrix_preserve_fresh_c4_gate_result(self) -> None:
         from src.strategy_c4_acceptance import (
             acceptance_report_payload,
             build_strategy_status_matrix,
@@ -128,10 +128,26 @@ class StrategyC4AcceptanceTests(unittest.TestCase):
             json.loads((PROJECT_ROOT / "reports/C4_STRATEGY_47_ACCEPTANCE.json").read_text("utf-8")),
             json.loads(json.dumps(acceptance_report_payload(report, source_commit=source_commit))),
         )
-        self.assertEqual(
-            json.loads((PROJECT_ROOT / "reports/STRATEGY_47_STATUS_MATRIX.json").read_text("utf-8")),
-            build_strategy_status_matrix(report, source_commit=source_commit),
+        matrix = json.loads(
+            (PROJECT_ROOT / "reports/STRATEGY_47_STATUS_MATRIX.json").read_text(
+                "utf-8"
+            )
         )
+        self.assertEqual(matrix["schema_version"], "BTC_STRATEGY_47_STATUS_MATRIX_V3")
+        self.assertEqual(
+            [row["strategy_id"] for row in matrix["strategies"]],
+            list(report.strategy_ids),
+        )
+        self.assertTrue(
+            all(
+                row["rule_source_status"] == "SOURCE_VERIFIED"
+                and row["rule_spec_status"] == "SPEC_FROZEN"
+                and row["evaluator_status"] == "EVALUATOR_IMPLEMENTED"
+                and row["parity_status"] == "PARITY_PASS"
+                for row in matrix["strategies"]
+            )
+        )
+        self.assertFalse(matrix["trading_approval"])
 
 
 if __name__ == "__main__":
