@@ -265,9 +265,11 @@
         "selector_entrypoint": "choose_single",
         "shares": 5,
         "side": "NO",
+        "score_tie_policy": "NO_SIGNAL_ON_EXACT_SCORE_TIE",
+        "source_conflict_resolution": "FROZEN_CONTRACT_PRIORITY_OVER_EXECUTABLE_SOURCE",
         "stress_micros": 30000
       },
-      "spec_sha256": "136a03ff0306353906c9b503acef87c1b5a856ddf0b4be6d2a7ec7462826ff4a"
+      "spec_sha256": "97ed4d20153c25bd259e4fbc4298eef99c84421d4df032ead633a37860bcee62"
     },
     "NO_CONFIRMATION_A2_V1": {
       "artifact_ids": [

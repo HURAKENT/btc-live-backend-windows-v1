@@ -121,6 +121,7 @@ class StrategyRulePackContractTests(unittest.TestCase):
         pack = self._load()
         basket = pack.family_spec("FAVORITE_NEIGHBOR_BASKET_V1").semantic_contract
         no_fade = pack.family_spec("NO_FADE_P1_V1").semantic_contract
+        a0 = pack.family_spec("NO_CONFIRMATION_A0_V1").semantic_contract
         c1 = pack.family_spec("NO_CONFIRMATION_C1_V1").semantic_contract
 
         self.assertEqual(basket["selector"], "favorite_plus_best_immediate_neighbor")
@@ -132,6 +133,11 @@ class StrategyRulePackContractTests(unittest.TestCase):
         )
         self.assertEqual(no_fade["selector"], "argmin(model_p_minus_market_q_raw)")
         self.assertTrue(no_fade["exclude_unique_favorite"])
+        self.assertEqual(a0["score_tie_policy"], "NO_SIGNAL_ON_EXACT_SCORE_TIE")
+        self.assertEqual(
+            a0["source_conflict_resolution"],
+            "FROZEN_CONTRACT_PRIORITY_OVER_EXECUTABLE_SOURCE",
+        )
         self.assertEqual(c1["selector_entrypoint"], "choose_c1")
         self.assertTrue(c1["requires_old_and_new_favorite_identity"])
 
