@@ -1319,7 +1319,7 @@
     }
   ],
   "schema_version": "BTC_STRATEGY_RULE_MAP_47_V2",
-  "status": "C4_RULE_SOURCES_FROZEN_PARITY_PENDING",
+  "status": "C4_RULE_SOURCES_FROZEN_PARITY_PASS",
   "strategy_count": 47,
   "trading_approval": false,
   "v1_count": 34,
