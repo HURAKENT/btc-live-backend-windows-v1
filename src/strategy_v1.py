@@ -31,12 +31,147 @@ V1_SOURCE_SHA256: Mapping[str, str] = MappingProxyType(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class V1IdentityPolicy:
+    checkpoints: tuple[int, ...]
+    mode: str
+
+
+V1_IDENTITY_POLICIES: Mapping[str, V1IdentityPolicy] = MappingProxyType(
+    {
+        "NO_C1": V1IdentityPolicy((60, 30), "PAIR"),
+        "NO_A2": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P1_U2_T18": V1IdentityPolicy((1080,), "FIXED"),
+        "NO_A0": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "YES_FAVORITE_NEIGHBOR_BASKET": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P1_T60_U1_EQUALS_U2": V1IdentityPolicy((60,), "FIXED"),
+        "YES_STRICT_A_T60": V1IdentityPolicy((60,), "FIXED"),
+        "YES_STRICT_A_OPERATIONAL": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "YES_PF1_OPERATIONAL": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "YES_STRICT_A_T30": V1IdentityPolicy((30,), "FIXED"),
+        "YES_PF1_T60": V1IdentityPolicy((60,), "FIXED"),
+        "NO_FADE_P2_U2_T60": V1IdentityPolicy((60,), "FIXED"),
+        "NO_FADE_P2_U1_T60": V1IdentityPolicy((60,), "FIXED"),
+        "YES_PF1_T6H": V1IdentityPolicy((360,), "FIXED"),
+        "NO_FADE_P1_U2_OPERATIONAL": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P2_U2_T12": V1IdentityPolicy((720,), "FIXED"),
+        "NO_FADE_P1_U1_OPERATIONAL": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P1_U1_EARLY_LATEST_ONLY": V1IdentityPolicy(
+            (720,), "LATEST_ONLY"
+        ),
+        "NO_FADE_P1_U1_T18": V1IdentityPolicy((1080,), "FIXED"),
+        "NO_FADE_P2_U2_OPERATIONAL": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P1_U1_EARLY_COMBINED": V1IdentityPolicy(
+            (1080, 720), "INDEPENDENT"
+        ),
+        "NO_FADE_P1_U2_T12": V1IdentityPolicy((720,), "FIXED"),
+        "NO_FADE_P2_U1_OPERATIONAL": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P1_U1_T12": V1IdentityPolicy((720,), "FIXED"),
+        "YES_FAVORITE_ONLY": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P1_U1_EARLY_EARLIEST_ONLY": V1IdentityPolicy(
+            (1080,), "EARLIEST_ONLY"
+        ),
+        "NO_FADE_P2_U2_T30": V1IdentityPolicy((30,), "FIXED"),
+        "YES_PF1_T30": V1IdentityPolicy((30,), "FIXED"),
+        "NO_FADE_P2_U1_T30": V1IdentityPolicy((30,), "FIXED"),
+        "NO_FADE_P2_U1_T12": V1IdentityPolicy((720,), "FIXED"),
+        "NO_B2": V1IdentityPolicy((60, 30), "FALLBACK"),
+        "NO_FADE_P2_U2_T4H": V1IdentityPolicy((240,), "FIXED"),
+        "YES_PF1_T8H": V1IdentityPolicy((480,), "FIXED"),
+        "NO_FADE_P2_U1_T2H": V1IdentityPolicy((120,), "FIXED"),
+    }
+)
+
+
 def _probability(value: float | None, field: str, *, optional: bool) -> float | None:
     if value is None and optional:
         return None
     if type(value) is not float or not math.isfinite(value) or not 0.0 <= value <= 1.0:
         raise ValueError(f"INVALID_{field}")
     return value
+
+
+def _sha256(value: str, field: str) -> str:
+    if (
+        type(value) is not str
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise ValueError(f"INVALID_{field}")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class StrictPriceHistoryEvidence:
+    provenance: str
+    source_sha256: str
+    checkpoint_timestamp_ms: int
+    observation_timestamp_ms: int
+
+    def __post_init__(self) -> None:
+        if self.provenance != "CLOB_PRICE_HISTORY":
+            raise ValueError("INVALID_STRICT_PROVENANCE")
+        _sha256(self.source_sha256, "STRICT_SOURCE_SHA256")
+        if (
+            type(self.checkpoint_timestamp_ms) is not int
+            or type(self.observation_timestamp_ms) is not int
+            or self.checkpoint_timestamp_ms < 0
+            or self.observation_timestamp_ms < 0
+            or self.observation_timestamp_ms > self.checkpoint_timestamp_ms
+        ):
+            raise ValueError("INVALID_STRICT_OBSERVATION_TIME")
+
+
+@dataclass(frozen=True, slots=True)
+class Pf1SnapshotEvidence:
+    bucket_count: int
+    snapshot_complete: bool
+    synchronized: bool
+    fresh: bool
+    crossed_book_count: int
+    fee_provenance: str
+    snapshot_sha256: str
+    fee_schedule_sha256: str
+
+    def __post_init__(self) -> None:
+        if type(self.bucket_count) is not int or self.bucket_count < 0:
+            raise ValueError("INVALID_PF1_BUCKET_COUNT")
+        if any(
+            type(value) is not bool
+            for value in (self.snapshot_complete, self.synchronized, self.fresh)
+        ):
+            raise ValueError("INVALID_PF1_SNAPSHOT_FLAG")
+        if type(self.crossed_book_count) is not int or self.crossed_book_count < 0:
+            raise ValueError("INVALID_PF1_CROSSED_BOOK_COUNT")
+        if type(self.fee_provenance) is not str or not self.fee_provenance:
+            raise ValueError("INVALID_PF1_FEE_PROVENANCE")
+        _sha256(self.snapshot_sha256, "PF1_SNAPSHOT_SHA256")
+        _sha256(self.fee_schedule_sha256, "PF1_FEE_SCHEDULE_SHA256")
+
+
+@dataclass(frozen=True, slots=True)
+class NoExecutionEvidence:
+    bucket_index: int
+    actual_no_vwap5: float | None
+    available_depth_shares: float
+    confirmed_fee: float | None
+    depth_provenance_sha256: str
+    fee_provenance_sha256: str | None
+
+    def __post_init__(self) -> None:
+        if type(self.bucket_index) is not int or not 0 <= self.bucket_index <= 10:
+            raise ValueError("INVALID_NO_EXECUTION_BUCKET_INDEX")
+        _probability(self.actual_no_vwap5, "ACTUAL_NO_VWAP5", optional=True)
+        if (
+            type(self.available_depth_shares) is not float
+            or not math.isfinite(self.available_depth_shares)
+            or self.available_depth_shares < 0.0
+        ):
+            raise ValueError("INVALID_NO_DEPTH_SHARES")
+        _probability(self.confirmed_fee, "ACTUAL_NO_FEE", optional=True)
+        _sha256(self.depth_provenance_sha256, "NO_DEPTH_PROVENANCE_SHA256")
+        if self.fee_provenance_sha256 is not None:
+            _sha256(self.fee_provenance_sha256, "NO_FEE_PROVENANCE_SHA256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +213,57 @@ class V1Evaluation:
     execution_cost: float | None = None
     executable_edge: float | None = None
     model_drop: float | None = None
+    actual_no_vwap5: float | None = None
+    actual_no_fee: float | None = None
+    actual_no_depth_shares: float | None = None
+    actual_no_execution_cost: float | None = None
+    actual_no_executable_edge: float | None = None
+
+
+def validate_identity_checkpoint(identity_id: str, checkpoint_minutes: int) -> int:
+    if type(identity_id) is not str or identity_id not in V1_IDENTITY_POLICIES:
+        raise ValueError("UNKNOWN_V1_IDENTITY")
+    if (
+        type(checkpoint_minutes) is not int
+        or checkpoint_minutes not in V1_IDENTITY_POLICIES[identity_id].checkpoints
+    ):
+        raise ValueError("IDENTITY_CHECKPOINT_MISMATCH")
+    return checkpoint_minutes
+
+
+def apply_identity_checkpoint_policy(
+    identity_id: str, evaluations: tuple[V1Evaluation, ...]
+) -> tuple[V1Evaluation, ...]:
+    if type(identity_id) is not str or identity_id not in V1_IDENTITY_POLICIES:
+        raise ValueError("UNKNOWN_V1_IDENTITY")
+    if type(evaluations) is not tuple or any(
+        type(result) is not V1Evaluation for result in evaluations
+    ):
+        raise ValueError("INVALID_IDENTITY_EVALUATIONS")
+    by_checkpoint: dict[int, V1Evaluation] = {}
+    for result in evaluations:
+        validate_identity_checkpoint(identity_id, result.checkpoint_minutes)
+        if result.checkpoint_minutes in by_checkpoint:
+            raise ValueError("DUPLICATE_IDENTITY_CHECKPOINT")
+        by_checkpoint[result.checkpoint_minutes] = result
+    policy = V1_IDENTITY_POLICIES[identity_id]
+    ordered = tuple(
+        by_checkpoint[checkpoint]
+        for checkpoint in policy.checkpoints
+        if checkpoint in by_checkpoint
+    )
+    if not ordered:
+        raise ValueError("MISSING_IDENTITY_CHECKPOINT")
+    if policy.mode in {"FIXED", "PAIR", "INDEPENDENT"}:
+        return ordered
+    if policy.mode == "EARLIEST_ONLY":
+        return (ordered[0],)
+    if policy.mode == "LATEST_ONLY":
+        return (ordered[-1],)
+    if policy.mode == "FALLBACK":
+        accepted = next((result for result in ordered if result.accepted), None)
+        return (accepted if accepted is not None else ordered[-1],)
+    raise ValueError("INVALID_IDENTITY_POLICY")
 
 
 def _ordered(buckets: tuple[BucketInput, ...]) -> tuple[BucketInput, ...]:
@@ -117,6 +303,9 @@ def _rejected(
     execution_cost: float | None = None,
     executable_edge: float | None = None,
     model_drop: float | None = None,
+    no_execution: NoExecutionEvidence | None = None,
+    actual_no_execution_cost: float | None = None,
+    actual_no_executable_edge: float | None = None,
 ) -> V1Evaluation:
     return V1Evaluation(
         accepted=False,
@@ -132,23 +321,50 @@ def _rejected(
         execution_cost=execution_cost,
         executable_edge=executable_edge,
         model_drop=model_drop,
+        actual_no_vwap5=(
+            None if no_execution is None else no_execution.actual_no_vwap5
+        ),
+        actual_no_fee=(
+            None if no_execution is None else no_execution.confirmed_fee
+        ),
+        actual_no_depth_shares=(
+            None if no_execution is None else no_execution.available_depth_shares
+        ),
+        actual_no_execution_cost=actual_no_execution_cost,
+        actual_no_executable_edge=actual_no_executable_edge,
     )
 
 
 def evaluate_strict_a(
+    identity_id: str,
     checkpoint_minutes: int,
     buckets: tuple[BucketInput, ...],
     *,
     prior_position: bool = False,
+    price_history_evidence: StrictPriceHistoryEvidence | None = None,
 ) -> V1Evaluation:
-    checkpoint = _checkpoint(checkpoint_minutes, frozenset({30, 60}))
+    if identity_id not in {
+        "YES_STRICT_A_T60",
+        "YES_STRICT_A_OPERATIONAL",
+        "YES_STRICT_A_T30",
+    }:
+        raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
+    checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)
     if type(prior_position) is not bool:
         raise ValueError("INVALID_PRIOR_POSITION")
-    ordered = _ordered(buckets)
     if checkpoint == 30 and prior_position:
         return _rejected(
             "T30_BLOCKED_EXISTING_T60_POSITION", side="YES", checkpoint_minutes=30
         )
+    if price_history_evidence is None:
+        return _rejected(
+            "STRICT_PRICE_HISTORY_EVIDENCE_REQUIRED",
+            side="YES",
+            checkpoint_minutes=checkpoint,
+        )
+    if type(price_history_evidence) is not StrictPriceHistoryEvidence:
+        raise ValueError("INVALID_STRICT_PRICE_HISTORY_EVIDENCE")
+    ordered = _ordered(buckets)
     favorite = _favorite(ordered, tolerance=_STRICT_TOL)
     if favorite is None:
         return _rejected(
@@ -213,17 +429,53 @@ def evaluate_strict_a(
 
 
 def evaluate_pf1(
+    identity_id: str,
     checkpoint_minutes: int,
     buckets: tuple[BucketInput, ...],
     *,
     prior_position: bool = False,
+    snapshot_evidence: Pf1SnapshotEvidence | None = None,
 ) -> V1Evaluation:
-    checkpoint = _checkpoint(checkpoint_minutes, frozenset({30, 60}))
+    if identity_id not in {
+        "YES_PF1_OPERATIONAL",
+        "YES_PF1_T60",
+        "YES_PF1_T30",
+    }:
+        raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
+    checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)
     if type(prior_position) is not bool:
         raise ValueError("INVALID_PRIOR_POSITION")
-    ordered = _ordered(buckets)
     if checkpoint == 30 and prior_position:
         return _rejected("SKIPPED_ALREADY_POSITIONED", side="YES", checkpoint_minutes=30)
+    if snapshot_evidence is None:
+        return _rejected(
+            "PF1_SNAPSHOT_EVIDENCE_REQUIRED",
+            side="YES",
+            checkpoint_minutes=checkpoint,
+        )
+    if type(snapshot_evidence) is not Pf1SnapshotEvidence:
+        raise ValueError("INVALID_PF1_SNAPSHOT_EVIDENCE")
+    if snapshot_evidence.bucket_count != 11 or not snapshot_evidence.snapshot_complete:
+        return _rejected(
+            "PF1_SNAPSHOT_INCOMPLETE", side="YES", checkpoint_minutes=checkpoint
+        )
+    if not snapshot_evidence.synchronized:
+        return _rejected(
+            "PF1_SNAPSHOT_UNSYNCHRONIZED",
+            side="YES",
+            checkpoint_minutes=checkpoint,
+        )
+    if not snapshot_evidence.fresh:
+        return _rejected("PF1_SNAPSHOT_STALE", side="YES", checkpoint_minutes=checkpoint)
+    if snapshot_evidence.crossed_book_count:
+        return _rejected("PF1_CROSSED_BOOK", side="YES", checkpoint_minutes=checkpoint)
+    if snapshot_evidence.fee_provenance != "GAMMA_FEE_SCHEDULE_FILL_WEIGHTED":
+        return _rejected(
+            "PF1_FEE_PROVENANCE_INVALID",
+            side="YES",
+            checkpoint_minutes=checkpoint,
+        )
+    ordered = _ordered(buckets)
     if any(row.vwap5 is None for row in ordered):
         return _rejected(
             "EXECUTION_REJECTED_MISSING_DEPTH",
@@ -267,7 +519,7 @@ def evaluate_pf1(
     )
 
 
-def evaluate_pf1_historical(
+def _evaluate_candidate_b(
     checkpoint_minutes: int, buckets: tuple[BucketInput, ...]
 ) -> V1Evaluation:
     checkpoint = _checkpoint(
@@ -295,16 +547,43 @@ def evaluate_pf1_historical(
     )
 
 
-def evaluate_no_fade(
-    partition: str,
+def evaluate_pf1_historical(
+    identity_id: str,
     checkpoint_minutes: int,
     buckets: tuple[BucketInput, ...],
 ) -> V1Evaluation:
-    if type(partition) is not str or partition not in {"P1", "P2"}:
-        raise ValueError("UNKNOWN_NO_FADE_PARTITION")
-    checkpoint = _checkpoint(
-        checkpoint_minutes, frozenset({30, 60, 120, 240, 720, 1080})
-    )
+    if identity_id not in {
+        "YES_PF1_OPERATIONAL",
+        "YES_PF1_T60",
+        "YES_PF1_T30",
+        "YES_PF1_T6H",
+        "YES_PF1_T8H",
+    }:
+        raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
+    checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)
+    return _evaluate_candidate_b(checkpoint, buckets)
+
+
+def evaluate_no_fade(
+    identity_id: str,
+    checkpoint_minutes: int,
+    buckets: tuple[BucketInput, ...],
+    *,
+    no_execution: tuple[NoExecutionEvidence, ...] = (),
+) -> V1Evaluation:
+    if type(identity_id) is not str or not identity_id.startswith("NO_FADE_P"):
+        raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
+    checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)
+    partition = "P1" if identity_id.startswith("NO_FADE_P1_") else "P2"
+    if type(no_execution) is not tuple or any(
+        type(evidence) is not NoExecutionEvidence for evidence in no_execution
+    ):
+        raise ValueError("INVALID_NO_EXECUTION_EVIDENCE")
+    if len({evidence.bucket_index for evidence in no_execution}) != len(no_execution):
+        raise ValueError("DUPLICATE_NO_EXECUTION_EVIDENCE")
+    execution_by_bucket = {
+        evidence.bucket_index: evidence for evidence in no_execution
+    }
     ordered = _ordered(buckets)
     favorite = _favorite(ordered, tolerance=_STRICT_TOL)
     if favorite is None:
@@ -348,6 +627,52 @@ def evaluate_no_fade(
             stressed_cost=stressed_cost,
             historical_edge=gate_edge,
         )
+    execution = execution_by_bucket.get(selected.bucket_index)
+    if (
+        execution is None
+        or execution.actual_no_vwap5 is None
+        or execution.confirmed_fee is None
+        or execution.fee_provenance_sha256 is None
+    ):
+        return _rejected(
+            "NO_EXECUTION_NOT_CALCULABLE",
+            side="NO",
+            checkpoint_minutes=checkpoint,
+            selected=(selected.bucket_index,),
+            favorite=favorite.bucket_index,
+            row=selected,
+            stressed_cost=stressed_cost,
+            historical_edge=gate_edge,
+            no_execution=execution,
+        )
+    if execution.available_depth_shares < 5.0:
+        return _rejected(
+            "NO_EXECUTION_INSUFFICIENT_DEPTH",
+            side="NO",
+            checkpoint_minutes=checkpoint,
+            selected=(selected.bucket_index,),
+            favorite=favorite.bucket_index,
+            row=selected,
+            stressed_cost=stressed_cost,
+            historical_edge=gate_edge,
+            no_execution=execution,
+        )
+    actual_cost = execution.actual_no_vwap5 + execution.confirmed_fee
+    actual_edge = p_no - actual_cost
+    if actual_edge < _EDGE_MINIMUM - _STRICT_TOL:
+        return _rejected(
+            "NO_EXECUTABLE_EDGE_GATE_REJECTED",
+            side="NO",
+            checkpoint_minutes=checkpoint,
+            selected=(selected.bucket_index,),
+            favorite=favorite.bucket_index,
+            row=selected,
+            stressed_cost=stressed_cost,
+            historical_edge=gate_edge,
+            no_execution=execution,
+            actual_no_execution_cost=actual_cost,
+            actual_no_executable_edge=actual_edge,
+        )
     return V1Evaluation(
         True,
         reason,
@@ -359,40 +684,54 @@ def evaluate_no_fade(
         q_no_proxy,
         stressed_cost,
         gate_edge,
+        actual_no_vwap5=execution.actual_no_vwap5,
+        actual_no_fee=execution.confirmed_fee,
+        actual_no_depth_shares=execution.available_depth_shares,
+        actual_no_execution_cost=actual_cost,
+        actual_no_executable_edge=actual_edge,
     )
 
 
 def evaluate_favorite_only(
     checkpoint_minutes: int, buckets: tuple[BucketInput, ...]
 ) -> V1Evaluation:
-    checkpoint = _checkpoint(checkpoint_minutes, frozenset({30, 60}))
+    checkpoint = validate_identity_checkpoint("YES_FAVORITE_ONLY", checkpoint_minutes)
     ordered = _ordered(buckets)
+    candidate = _evaluate_candidate_b(checkpoint, ordered)
+    selected = ordered[candidate.selected_bucket_indices[0]]
+    if not candidate.accepted:
+        return candidate
     favorite = _favorite(ordered, tolerance=_STRICT_TOL)
-    if favorite is None:
+    if favorite is None or selected.bucket_index != favorite.bucket_index:
         return _rejected(
-            "NO_UNIQUE_MARKET_FAVORITE", side="YES", checkpoint_minutes=checkpoint
+            "CANDIDATE_B_SELECTED_NOT_UNIQUE_FAVORITE",
+            side="YES",
+            checkpoint_minutes=checkpoint,
+            selected=(selected.bucket_index,),
+            favorite=None if favorite is None else favorite.bucket_index,
+            row=selected,
+            historical_edge=candidate.historical_edge,
         )
-    cost = favorite.market_q_yes + _STRESS
-    edge = favorite.model_p - cost
-    accepted = edge >= _EDGE_MINIMUM - _STRICT_TOL and cost < 1.0 - _STRICT_TOL
     return V1Evaluation(
-        accepted,
-        "SIGNAL_ACCEPTED" if accepted else "FAVORITE_ONLY_GATE",
+        True,
+        "SIGNAL_ACCEPTED",
         "YES",
         checkpoint,
-        (favorite.bucket_index,),
+        (selected.bucket_index,),
         favorite.bucket_index,
-        favorite.model_p,
-        favorite.market_q_yes,
-        cost,
-        edge,
+        selected.model_p,
+        selected.market_q_yes,
+        min(1.0, selected.market_q_yes + _STRESS),
+        candidate.historical_edge,
     )
 
 
 def evaluate_favorite_neighbor(
     checkpoint_minutes: int, buckets: tuple[BucketInput, ...]
 ) -> V1Evaluation:
-    checkpoint = _checkpoint(checkpoint_minutes, frozenset({30, 60}))
+    checkpoint = validate_identity_checkpoint(
+        "YES_FAVORITE_NEIGHBOR_BASKET", checkpoint_minutes
+    )
     ordered = _ordered(buckets)
     favorite = _favorite(ordered, tolerance=_STRICT_TOL)
     if favorite is None:
@@ -488,10 +827,12 @@ def _confirmation_single(
     pool = ordered if concept == "A2" else tuple(
         row for row in ordered if row.bucket_index in {0, 1, 9, 10}
     )
-    ranked = tuple(
-        (1.0 - row.model_p - _actual_no(row), row) for row in pool
+    ranked = tuple((1.0 - row.model_p - _actual_no(row), row) for row in pool)
+    maximum = max(pair[0] for pair in ranked)
+    edge, selected = min(
+        (pair for pair in ranked if abs(pair[0] - maximum) <= _CONFIRMATION_TOL),
+        key=lambda pair: pair[1].bucket_index,
     )
-    edge, selected = max(ranked, key=lambda pair: (pair[0], -pair[1].bucket_index))
     accepted = edge + _CONFIRMATION_TOL >= _NO_EDGE_MINIMUM
     return V1Evaluation(
         accepted,
@@ -506,13 +847,15 @@ def _confirmation_single(
 
 
 def evaluate_confirmation(
-    concept: str,
+    identity_id: str,
     buckets: tuple[BucketInput, ...],
     *,
     t30: tuple[BucketInput, ...] | None = None,
 ) -> V1Evaluation:
-    if type(concept) is not str or concept not in {"A0", "A2", "B2", "C1"}:
+    concepts = {"NO_A0": "A0", "NO_A2": "A2", "NO_B2": "B2", "NO_C1": "C1"}
+    if type(identity_id) is not str or identity_id not in concepts:
         raise ValueError("UNAPPROVED_CONFIRMATION_CONCEPT")
+    concept = concepts[identity_id]
     if concept != "C1":
         first = _confirmation_single(concept, buckets, 60)
         if first.accepted or t30 is None:
