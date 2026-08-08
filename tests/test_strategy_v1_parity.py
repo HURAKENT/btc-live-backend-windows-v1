@@ -9,6 +9,11 @@ import unittest
 from pathlib import Path
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PARITY_ROOT = PROJECT_ROOT / "strategy_sources" / "frozen" / "parity"
+BUILDER = PROJECT_ROOT / "tools" / "build_c4_v1_parity_fixture.py"
+
+
 def _sha(label: str) -> str:
     return hashlib.sha256(label.encode("utf-8")).hexdigest()
 
@@ -133,6 +138,51 @@ class StrategyV1ParityTests(unittest.TestCase):
 
     def test_module_exists(self) -> None:
         self.assertIsNotNone(importlib.util.find_spec("src.strategy_v1_parity"))
+
+    def test_frozen_early_fixtures_and_receipts_are_byte_bound_and_replayed(self) -> None:
+        expected = {
+            "EARLY_HORIZON": {
+                "fixture": "V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+                "receipt": "V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+                "fixture_sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730",
+                "decision_sha256": "01e6d6840d24437127e5c03233680337e409af45b5875af19169fcd0be65d0ce",
+                "records": 855,
+                "source_rows": 8426,
+                "strategies": 17,
+            },
+            "EARLY_CONFIDENCE": {
+                "fixture": "V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+                "receipt": "V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+                "fixture_sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433",
+                "decision_sha256": "7c87c1340b8124889e1b32d6795cf55d4534a43bddf0009ae892bcd2b56b4e9d",
+                "records": 621,
+                "source_rows": 2216,
+                "strategies": 11,
+            },
+        }
+        converter_sha = hashlib.sha256(BUILDER.read_bytes()).hexdigest()
+        for population, contract in expected.items():
+            with self.subTest(population=population):
+                fixture = PARITY_ROOT / contract["fixture"]
+                receipt_path = PARITY_ROOT / contract["receipt"]
+                receipt = json.loads(receipt_path.read_text("utf-8"))
+                fixture_sha = hashlib.sha256(fixture.read_bytes()).hexdigest()
+                self.assertEqual(fixture_sha, contract["fixture_sha256"])
+                self.assertEqual(receipt["fixture_sha256"], fixture_sha)
+                self.assertEqual(receipt["converter_sha256"], converter_sha)
+                self.assertEqual(receipt["source_population"], population)
+                self.assertEqual(receipt["matrix_parquet_sha256"], "026dc0be49119c6b4a36c77cd343f606c39464de256008a1c70b041bfa42d0c7")
+                self.assertEqual(receipt["decision_parquet_sha256"], contract["decision_sha256"])
+                self.assertEqual(receipt["fixture_record_count"], contract["records"])
+                self.assertEqual(receipt["source_decision_row_count"], contract["source_rows"])
+                self.assertEqual(receipt["strategy_count"], contract["strategies"])
+                self.assertEqual(receipt["source_commit"], "fd3afac2c9254cf32f41062a92de49a99f2e823b")
+                self.assertEqual(receipt["network_requests"], 0)
+                self.assertFalse(receipt["trading_approval"])
+                report = self._module().verify_v1_historical_parity(fixture)
+                self.assertTrue(report.parity_pass)
+                self.assertEqual(report.strategy_count, contract["strategies"])
+                self.assertEqual(report.fixture_record_count, contract["records"])
 
     def test_fixed_identity_replays_accepted_and_rejected_population(self) -> None:
         accepted = self._record("accepted", 60, self._expectation())

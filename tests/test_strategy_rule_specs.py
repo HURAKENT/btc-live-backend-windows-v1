@@ -38,7 +38,17 @@ class StrategyRulePackContractTests(unittest.TestCase):
 
     def test_all_frozen_artifacts_are_resolvable_and_byte_verified(self) -> None:
         pack = self._load()
-        self.assertGreaterEqual(len(pack.artifacts), 27)
+        expected_v1_full_decision = {
+            "PARITY_V1_CONFIRMATION_BASKET_FULL",
+            "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+            "PARITY_V1_EARLY_CONFIDENCE_FULL",
+            "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+            "PARITY_V1_EARLY_HORIZON_FULL",
+            "PARITY_V1_EARLY_HORIZON_RECEIPT",
+        }
+        self.assertTrue(expected_v1_full_decision.issubset(
+            {artifact.artifact_id for artifact in pack.artifacts}
+        ))
         for artifact in pack.artifacts:
             with self.subTest(artifact_id=artifact.artifact_id):
                 path = FROZEN_ROOT / artifact.relative_path

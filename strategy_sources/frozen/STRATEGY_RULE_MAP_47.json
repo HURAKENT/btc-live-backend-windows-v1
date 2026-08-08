@@ -127,6 +127,48 @@
       "size_bytes": 757
     },
     {
+      "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_FULL",
+      "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl",
+      "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+      "sha256": "37e9c5e35655191fb8894ed091a29a985d5a852dcf46e34585deb4ed791a7267",
+      "size_bytes": 983504
+    },
+    {
+      "artifact_id": "PARITY_V1_CONFIRMATION_BASKET_RECEIPT",
+      "relative_path": "parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json",
+      "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+      "sha256": "dcd6d0bcdaf2c344d21bf3a3925b75ad775cd0b1d55a95d824db6ba3dba6f388",
+      "size_bytes": 1124
+    },
+    {
+      "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_FULL",
+      "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl",
+      "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+      "sha256": "c83268b19536fe9a877ff36164710bf911a9bf70ffcb70eeb709d5f1e3269433",
+      "size_bytes": 1304729
+    },
+    {
+      "artifact_id": "PARITY_V1_EARLY_CONFIDENCE_RECEIPT",
+      "relative_path": "parity/V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY_RECEIPT.json",
+      "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+      "sha256": "a2539dc11a34f566192c97fbc0677d7c4a548542a4d7d6d979d2f9c3ee5ff66a",
+      "size_bytes": 661
+    },
+    {
+      "artifact_id": "PARITY_V1_EARLY_HORIZON_FULL",
+      "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl",
+      "role": "IMMUTABLE_FULL_DECISION_PARITY_FIXTURE",
+      "sha256": "0fc7468f2e1457dcddf3bceab785beaf4d5e29a43978dc5e6ada76e76501f730",
+      "size_bytes": 2088183
+    },
+    {
+      "artifact_id": "PARITY_V1_EARLY_HORIZON_RECEIPT",
+      "relative_path": "parity/V1_EARLY_HORIZON_FULL_DECISION_PARITY_RECEIPT.json",
+      "role": "IMMUTABLE_PARITY_CONVERSION_RECEIPT",
+      "sha256": "ed01032d45aae55ffa642ad1c3f576c25ea16296333a123275410d12473b401d",
+      "size_bytes": 658
+    },
+    {
       "artifact_id": "SRC_EARLY_CONFIDENCE_EXPERIMENT",
       "relative_path": "source_snapshots/early_confidence_experiment.py.source",
       "role": "EXACT_COMPOSITION_SOURCE",

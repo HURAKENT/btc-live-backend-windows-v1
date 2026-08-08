@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib
 import importlib.util
 import json
@@ -11,6 +12,10 @@ from pathlib import Path
 _FIXTURE = Path(
     "strategy_sources/frozen/parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl"
 )
+_RECEIPT = Path(
+    "strategy_sources/frozen/parity/V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY_RECEIPT.json"
+)
+_BUILDER = Path("tools/build_c4_v1_other_parity_fixture.py")
 
 
 class StrategyV1OtherParityTests(unittest.TestCase):
@@ -38,6 +43,35 @@ class StrategyV1OtherParityTests(unittest.TestCase):
                 "NO_C1",
                 "YES_FAVORITE_NEIGHBOR_BASKET",
                 "YES_FAVORITE_ONLY",
+            },
+        )
+
+    def test_frozen_fixture_receipt_binds_converter_sources_and_counts(self) -> None:
+        receipt = json.loads(_RECEIPT.read_text("utf-8"))
+        self.assertEqual(
+            receipt["fixture_sha256"],
+            hashlib.sha256(_FIXTURE.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(
+            receipt["converter_sha256"],
+            hashlib.sha256(_BUILDER.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(receipt["source_commit"], "fd3afac2c9254cf32f41062a92de49a99f2e823b")
+        self.assertEqual(receipt["fixture_record_count"], 171)
+        self.assertEqual(receipt["decision_count"], 884)
+        self.assertEqual(receipt["strategy_count"], 6)
+        self.assertEqual(receipt["network_requests"], 0)
+        self.assertFalse(receipt["trading_approval"])
+        self.assertEqual(
+            receipt["source_hashes"],
+            {
+                "BASKET_TRADE_CLASSIFICATION.csv": "6d6d71d03002a5c3e62566b5ddd4cc20d18204affff6debaa6c461c3618d5361",
+                "CONFIRMATION_DATES_136.csv": "2f87e5bcb0078a10e3a58453c3c4f1c6eb5e7d0057bfb359f5fb873eb15aeea8",
+                "CONFIRMATION_TRADE_LEDGER.csv": "74e0c479e81558f38c5f152a0ec62c923fe6eda080dda75167f8015a8da51440",
+                "actual_bucket_probabilities_170.parquet": "66e81c1864c353be6b52318891c23439d4090baaedec22fbca5adb547a6b25fa",
+                "checkpoint_coverage.csv": "4d4a1f9c634990b2941ac3dc90e88660331030da8255dfdbf1b2bb26d48d4967",
+                "markets.parquet": "8c197dc99a1acf48a0c85166ffeba8af0dff9536d19d3beab1d0991faa1fa6ec",
+                "settlements.parquet": "ea9ed11c1aa7a975c499bcd27332fdbfa0dd927cf2ef4323e89b372516c4e8e1",
             },
         )
 

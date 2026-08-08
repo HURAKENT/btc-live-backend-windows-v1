@@ -507,6 +507,8 @@ def evaluate_pf1(
         "YES_PF1_OPERATIONAL",
         "YES_PF1_T60",
         "YES_PF1_T30",
+        "YES_PF1_T6H",
+        "YES_PF1_T8H",
     }:
         raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
     checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)

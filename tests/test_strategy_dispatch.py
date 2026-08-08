@@ -7,6 +7,12 @@ import unittest
 from pathlib import Path
 
 from src.strategy_registry import load_strategy_rule_pack
+from src.strategy_v1 import (
+    BucketInput,
+    Pf1SnapshotEvidence,
+    StrictPriceHistoryEvidence,
+    V1_IDENTITY_POLICIES,
+)
 from src.strategy_v2 import (
     ParentOverlayDecision,
     V2_OVERLAY_BINDINGS,
@@ -58,6 +64,81 @@ def _request(*, strategy_id: str = "NO_A2", side: str = "NO"):
             forecast_row_sha256=_sha("forecast-row"),
         ),
     )
+
+
+def _buckets(*, favorite: int = 5) -> tuple[BucketInput, ...]:
+    return tuple(
+        BucketInput(
+            bucket_index=index,
+            model_p=0.70 if index == favorite else 0.05,
+            market_q_yes=0.50 if index == favorite else 0.05,
+            market_q_no=0.50 if index == favorite else 0.95,
+            vwap5=0.50 if index == favorite else 0.05,
+            confirmed_fee=0.0,
+            no_token_id=f"synthetic-no-{index}",
+        )
+        for index in range(11)
+    )
+
+
+def _v1_request(strategy_id: str):
+    from src.strategy_dispatch import (
+        V1ExecutableCheckpointInput,
+        V1HistoricalCheckpointInput,
+        V1StrategyDispatchRequest,
+    )
+
+    policy = V1_IDENTITY_POLICIES[strategy_id]
+    executable = strategy_id.startswith("YES_STRICT_A_") or strategy_id.startswith(
+        "YES_PF1_"
+    )
+    checkpoints = []
+    for checkpoint in policy.checkpoints:
+        rows = _buckets(favorite=4 if strategy_id == "NO_C1" and checkpoint == 30 else 5)
+        if executable:
+            checkpoints.append(
+                V1ExecutableCheckpointInput(
+                    checkpoint_minutes=checkpoint,
+                    buckets=rows,
+                    prior_position=False,
+                    strict_price_history_evidence=(
+                        StrictPriceHistoryEvidence(
+                            provenance="CLOB_PRICE_HISTORY",
+                            source_sha256=_sha(f"strict-{strategy_id}-{checkpoint}"),
+                            checkpoint_timestamp_ms=2,
+                            observation_timestamp_ms=1,
+                        )
+                        if strategy_id.startswith("YES_STRICT_A_")
+                        else None
+                    ),
+                    pf1_snapshot_evidence=(
+                        Pf1SnapshotEvidence(
+                            bucket_count=11,
+                            snapshot_complete=True,
+                            synchronized=True,
+                            fresh=True,
+                            crossed_book_count=0,
+                            fee_provenance="GAMMA_FEE_SCHEDULE_FILL_WEIGHTED",
+                            snapshot_sha256=_sha(
+                                f"snapshot-{strategy_id}-{checkpoint}"
+                            ),
+                            fee_schedule_sha256=_sha(
+                                f"fee-{strategy_id}-{checkpoint}"
+                            ),
+                        )
+                        if strategy_id.startswith("YES_PF1_")
+                        else None
+                    ),
+                )
+            )
+        else:
+            checkpoints.append(
+                V1HistoricalCheckpointInput(
+                    checkpoint_minutes=checkpoint,
+                    buckets=rows,
+                )
+            )
+    return V1StrategyDispatchRequest(checkpoints=tuple(checkpoints))
 
 
 class StrategyDispatchBindingTests(unittest.TestCase):
@@ -161,6 +242,23 @@ class StrategyDispatchBindingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "C4_DISPATCH_BINDING_DRIFT"):
             _build_strategy_dispatch_bindings(drifted)
 
+    def test_v1_in_memory_binding_drift_fails_closed(self):
+        from src.strategy_dispatch import StrategyDispatcher, load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        bindings = list(dispatcher.bindings)
+        index = next(
+            index
+            for index, binding in enumerate(bindings)
+            if binding.strategy_id == "NO_A2"
+        )
+        bindings[index] = dataclasses.replace(
+            bindings[index],
+            evaluator_key="NO_FADE_P1_V1",
+        )
+        with self.assertRaisesRegex(ValueError, "C4_DISPATCH_BINDING_DRIFT"):
+            StrategyDispatcher(tuple(bindings))
+
     def test_all_thirteen_v2_bindings_match_immutable_evaluator_contract(self):
         from src.strategy_dispatch import load_strategy_dispatcher
 
@@ -244,12 +342,79 @@ class StrategyDispatcherEvaluationTests(unittest.TestCase):
                 request=_request(strategy_id="NO_A0"),
             )
 
-    def test_v1_dispatch_is_explicitly_not_implemented(self):
+    def test_all_thirty_four_v1_identities_dispatch_through_bound_evaluator(self):
         from src.strategy_dispatch import load_strategy_dispatcher
 
         dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
-        with self.assertRaisesRegex(ValueError, "C4_V1_DISPATCH_NOT_IMPLEMENTED"):
-            dispatcher.dispatch(strategy_id="NO_A2", request=object())
+        observed = {}
+        for binding in dispatcher.bindings:
+            if binding.version != "V1":
+                continue
+            result = dispatcher.dispatch(
+                strategy_id=binding.strategy_id,
+                request=_v1_request(binding.strategy_id),
+            )
+            observed[binding.strategy_id] = result
+
+        self.assertEqual(set(observed), set(V1_IDENTITY_POLICIES))
+        self.assertEqual(len(observed), 34)
+        self.assertTrue(all(type(value) is tuple for value in observed.values()))
+        self.assertTrue(
+            all(value and value[0].checkpoint_minutes in V1_IDENTITY_POLICIES[key].checkpoints for key, value in observed.items())
+        )
+
+    def test_v1_dispatch_requires_binding_selected_input_schema(self):
+        from src.strategy_dispatch import (
+            V1ExecutableCheckpointInput,
+            V1StrategyDispatchRequest,
+            load_strategy_dispatcher,
+        )
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        rows = _buckets()
+        executable = V1StrategyDispatchRequest(
+            checkpoints=(
+                V1ExecutableCheckpointInput(
+                    checkpoint_minutes=60,
+                    buckets=rows,
+                    prior_position=False,
+                ),
+                V1ExecutableCheckpointInput(
+                    checkpoint_minutes=30,
+                    buckets=rows,
+                    prior_position=False,
+                ),
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "C4_V1_INPUT_SCHEMA_MISMATCH"):
+            dispatcher.dispatch(strategy_id="NO_A2", request=executable)
+
+    def test_pf1_t6h_and_t8h_are_executable_bound_identities(self):
+        from src.strategy_dispatch import load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        for strategy_id in ("YES_PF1_T6H", "YES_PF1_T8H"):
+            result = dispatcher.dispatch(
+                strategy_id=strategy_id,
+                request=_v1_request(strategy_id),
+            )
+            self.assertEqual(len(result), 1)
+            self.assertTrue(result[0].execution_eligible)
+
+    def test_v1_request_rejects_missing_duplicate_or_extra_checkpoints(self):
+        from src.strategy_dispatch import V1StrategyDispatchRequest, load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        base = _v1_request("NO_A2")
+        with self.assertRaisesRegex(ValueError, "C4_V1_CHECKPOINT_SET_MISMATCH"):
+            dispatcher.dispatch(
+                strategy_id="NO_A2",
+                request=V1StrategyDispatchRequest(checkpoints=base.checkpoints[:1]),
+            )
+        with self.assertRaisesRegex(ValueError, "C4_V1_DUPLICATE_CHECKPOINT"):
+            V1StrategyDispatchRequest(
+                checkpoints=(base.checkpoints[0], base.checkpoints[0])
+            )
 
 
 if __name__ == "__main__":
