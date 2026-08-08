@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Final, Mapping
 
@@ -219,6 +219,12 @@ class V1Evaluation:
     actual_no_depth_shares: float | None = None
     actual_no_execution_cost: float | None = None
     actual_no_executable_edge: float | None = None
+    historical_only: bool = False
+    execution_eligible: bool = False
+
+
+def _as_historical(result: V1Evaluation) -> V1Evaluation:
+    return replace(result, historical_only=True, execution_eligible=False)
 
 
 def validate_identity_checkpoint(identity_id: str, checkpoint_minutes: int) -> int:
@@ -435,6 +441,50 @@ def evaluate_strict_a(
     )
 
 
+def evaluate_strict_historical(
+    identity_id: str,
+    checkpoint_minutes: int,
+    buckets: tuple[BucketInput, ...],
+) -> V1Evaluation:
+    if identity_id not in {
+        "YES_STRICT_A_T60",
+        "YES_STRICT_A_OPERATIONAL",
+        "YES_STRICT_A_T30",
+    }:
+        raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
+    checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)
+    ordered = _ordered(buckets)
+    favorite = _favorite(ordered, tolerance=_STRICT_TOL)
+    if favorite is None:
+        return _as_historical(
+            _rejected(
+                "NO_UNIQUE_FAVORITE",
+                side="YES",
+                checkpoint_minutes=checkpoint,
+            )
+        )
+    stressed_cost = min(1.0, favorite.market_q_yes + _STRESS)
+    edge = favorite.model_p - stressed_cost
+    accepted = (
+        edge >= _EDGE_MINIMUM - _STRICT_TOL
+        and stressed_cost < 1.0 - _STRICT_TOL
+    )
+    return _as_historical(
+        V1Evaluation(
+            accepted,
+            "SIGNAL_ACCEPTED" if accepted else "STRICT_EDGE_GATE",
+            "YES",
+            checkpoint,
+            (favorite.bucket_index,),
+            favorite.bucket_index,
+            favorite.model_p,
+            favorite.market_q_yes,
+            stressed_cost,
+            edge,
+        )
+    )
+
+
 def evaluate_pf1(
     identity_id: str,
     checkpoint_minutes: int,
@@ -568,7 +618,7 @@ def evaluate_pf1_historical(
     }:
         raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
     checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)
-    return _evaluate_candidate_b(checkpoint, buckets)
+    return _as_historical(_evaluate_candidate_b(checkpoint, buckets))
 
 
 def evaluate_no_fade(
@@ -696,6 +746,73 @@ def evaluate_no_fade(
         actual_no_depth_shares=execution.available_depth_shares,
         actual_no_execution_cost=actual_cost,
         actual_no_executable_edge=actual_edge,
+    )
+
+
+def evaluate_no_fade_historical(
+    identity_id: str,
+    checkpoint_minutes: int,
+    buckets: tuple[BucketInput, ...],
+) -> V1Evaluation:
+    if type(identity_id) is not str or not identity_id.startswith("NO_FADE_P"):
+        raise ValueError("IDENTITY_EVALUATOR_MISMATCH")
+    checkpoint = validate_identity_checkpoint(identity_id, checkpoint_minutes)
+    partition = "P1" if identity_id.startswith("NO_FADE_P1_") else "P2"
+    ordered = _ordered(buckets)
+    favorite = _favorite(ordered, tolerance=_STRICT_TOL)
+    if favorite is None:
+        return _as_historical(
+            _rejected(
+                "NO_UNIQUE_MARKET_FAVORITE",
+                side="NO",
+                checkpoint_minutes=checkpoint,
+            )
+        )
+    candidates = tuple(row for row in ordered if row is not favorite)
+    minimum = min(row.model_p - row.market_q_yes for row in candidates)
+    tied = tuple(
+        row
+        for row in candidates
+        if abs((row.model_p - row.market_q_yes) - minimum) <= _STRICT_TOL
+    )
+    if len(tied) != 1:
+        return _as_historical(
+            _rejected(
+                "TIED_NO_FADE_SCORE",
+                side="NO",
+                checkpoint_minutes=checkpoint,
+                favorite=favorite.bucket_index,
+            )
+        )
+    selected = tied[0]
+    p_no = 1.0 - selected.model_p
+    q_no_proxy = 1.0 - selected.market_q_yes
+    raw_edge = p_no - q_no_proxy
+    stressed_cost = q_no_proxy + _STRESS
+    gate_edge = p_no - stressed_cost if partition == "P1" else raw_edge
+    if stressed_cost >= 1.0 - _STRICT_TOL:
+        reason = "REJECTED_NONPOSITIVE_WIN_PAYOUT_AFTER_STRESS"
+    elif gate_edge < _EDGE_MINIMUM - _STRICT_TOL:
+        reason = (
+            "STRESSED_EDGE_BELOW_002"
+            if partition == "P1"
+            else "RAW_EDGE_BELOW_002"
+        )
+    else:
+        reason = "SIGNAL_ACCEPTED"
+    return _as_historical(
+        V1Evaluation(
+            reason == "SIGNAL_ACCEPTED",
+            reason,
+            "NO",
+            checkpoint,
+            (selected.bucket_index,),
+            favorite.bucket_index,
+            p_no,
+            q_no_proxy,
+            stressed_cost,
+            gate_edge,
+        )
     )
 
 

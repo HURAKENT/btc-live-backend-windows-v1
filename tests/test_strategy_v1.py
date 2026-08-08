@@ -242,6 +242,8 @@ class StrategyV1Tests(unittest.TestCase):
         self.assertTrue(result.accepted)
         self.assertEqual((2,), result.selected_bucket_indices)
         self.assertAlmostEqual(0.03, result.historical_edge)
+        self.assertTrue(result.historical_only)
+        self.assertFalse(result.execution_eligible)
 
     def test_historical_pf1_q_cap_is_point_nine_seven(self):
         rows = self._replace(
@@ -401,6 +403,91 @@ class StrategyV1Tests(unittest.TestCase):
             "NO_FADE_P1_U1_OPERATIONAL", 60, rows, no_execution=()
         )
         self.assertEqual("NO_EXECUTION_NOT_CALCULABLE", result.reason)
+
+    def test_strict_historical_reproduces_selector_without_execution_evidence(self):
+        rows = self._replace(self._buckets(), 5, model_p=0.25)
+        result = self._api("evaluate_strict_historical")(
+            "YES_STRICT_A_T60", 60, rows
+        )
+        self.assertTrue(result.accepted)
+        self.assertEqual((5,), result.selected_bucket_indices)
+        self.assertAlmostEqual(0.23, result.stressed_reference_cost)
+        self.assertAlmostEqual(0.02, result.historical_edge)
+        self.assertTrue(result.historical_only)
+        self.assertFalse(result.execution_eligible)
+
+        execution = self._api("evaluate_strict_a")(
+            "YES_STRICT_A_T60", 60, rows
+        )
+        self.assertEqual("STRICT_PRICE_HISTORY_EVIDENCE_REQUIRED", execution.reason)
+        self.assertFalse(execution.historical_only)
+        self.assertFalse(execution.execution_eligible)
+        operational_t30 = self._api("evaluate_strict_historical")(
+            "YES_STRICT_A_OPERATIONAL", 30, rows
+        )
+        self.assertTrue(operational_t30.accepted)
+        self.assertEqual(30, operational_t30.checkpoint_minutes)
+
+    def test_strict_historical_rejects_gate_and_wrong_schedule(self):
+        rejected = self._api("evaluate_strict_historical")(
+            "YES_STRICT_A_T60", 60, self._buckets()
+        )
+        self.assertFalse(rejected.accepted)
+        self.assertEqual("STRICT_EDGE_GATE", rejected.reason)
+        self.assertTrue(rejected.historical_only)
+        with self.assertRaisesRegex(ValueError, "IDENTITY_CHECKPOINT_MISMATCH"):
+            self._api("evaluate_strict_historical")(
+                "YES_STRICT_A_T60", 30, self._buckets()
+            )
+        with self.assertRaisesRegex(ValueError, "IDENTITY_EVALUATOR_MISMATCH"):
+            self._api("evaluate_strict_historical")(
+                "YES_PF1_T60", 60, self._buckets()
+            )
+
+    def test_no_fade_historical_reproduces_proxy_only_p1_and_p2(self):
+        rows = self._replace(
+            self._buckets(), 2, model_p=0.05, market_q_yes=0.10
+        )
+        p1 = self._api("evaluate_no_fade_historical")(
+            "NO_FADE_P1_U1_OPERATIONAL", 60, rows
+        )
+        p2 = self._api("evaluate_no_fade_historical")(
+            "NO_FADE_P2_U1_OPERATIONAL", 60, rows
+        )
+        for result in (p1, p2):
+            self.assertTrue(result.accepted)
+            self.assertEqual((2,), result.selected_bucket_indices)
+            self.assertTrue(result.historical_only)
+            self.assertFalse(result.execution_eligible)
+            self.assertIsNone(result.actual_no_vwap5)
+
+        execution = self._api("evaluate_no_fade")(
+            "NO_FADE_P1_U1_OPERATIONAL", 60, rows, no_execution=()
+        )
+        self.assertEqual("NO_EXECUTION_NOT_CALCULABLE", execution.reason)
+        self.assertFalse(execution.historical_only)
+
+    def test_no_fade_historical_rejects_proxy_gate_and_wrong_schedule(self):
+        rows = self._replace(
+            self._buckets(), 2, model_p=0.08, market_q_yes=0.10
+        )
+        rejected = self._api("evaluate_no_fade_historical")(
+            "NO_FADE_P1_U1_OPERATIONAL", 60, rows
+        )
+        self.assertFalse(rejected.accepted)
+        self.assertEqual("STRESSED_EDGE_BELOW_002", rejected.reason)
+        self.assertTrue(rejected.historical_only)
+        p2_control = self._api("evaluate_no_fade_historical")(
+            "NO_FADE_P2_U1_OPERATIONAL", 60, rows
+        )
+        self.assertTrue(p2_control.accepted)
+        self.assertAlmostEqual(0.02, p2_control.historical_edge)
+        with self.assertRaisesRegex(ValueError, "IDENTITY_CHECKPOINT_MISMATCH"):
+            self._api("evaluate_no_fade_historical")(
+                "NO_FADE_P2_U2_T4H", 60, rows
+            )
+        with self.assertRaisesRegex(ValueError, "IDENTITY_EVALUATOR_MISMATCH"):
+            self._api("evaluate_no_fade_historical")("NO_A0", 60, rows)
 
     def test_no_fade_uses_distinct_actual_no_vwap_depth_and_fee(self):
         rows = self._replace(
