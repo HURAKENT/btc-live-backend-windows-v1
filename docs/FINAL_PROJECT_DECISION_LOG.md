@@ -117,3 +117,17 @@ Every requested range must end in one of the five states frozen by the database
 contract; unknown or silently truncated ranges block the gate. The status report
 may advance only from generated receipt-linked evidence. C7 and C11 are blocked
 until this gate passes. Historical C1-C5 evidence is not rewritten.
+
+## D-013 — C6 closes scheduling, not production input completeness
+
+Date: 2026-08-09
+
+Decision: C6 accepts the persistent exactly-once scheduler and recovered replay
+contract at migration version 3. The load-bearing loopback gate uses the real
+dispatcher and single writer, proves recurring A→B→C registration, immutable
+evaluation identity, restart origin retention, current reevaluation claims and
+atomic evaluation/signal/outbox persistence. Production has no source capable
+of constructing the full depth/fee/model checkpoint input, so it remains
+fail-closed with `production_input_ready=false`. This is not a C7 paper
+execution authorization. The locked next train is the separate
+`DATA_COMPLETION_ACCEPTANCE`; C7 remains blocked and `trading_approval=false`.

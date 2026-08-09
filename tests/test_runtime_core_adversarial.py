@@ -620,7 +620,12 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first.writer_consumer_count, 1)
         self.assertEqual(
             set(first.pending_owned_tasks),
-            {"writer", "binance_stream", "polymarket_stream"},
+            {
+                "writer",
+                "binance_stream",
+                "polymarket_stream",
+                "checkpoint_scheduler",
+            },
         )
         first_last_event_id = first.status().last_event_id
         await first.stop()
@@ -648,7 +653,12 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second.writer_consumer_count, 1)
         self.assertEqual(
             set(second.pending_owned_tasks),
-            {"writer", "binance_stream", "polymarket_stream"},
+            {
+                "writer",
+                "binance_stream",
+                "polymarket_stream",
+                "checkpoint_scheduler",
+            },
         )
         self.assertEqual(self.store.count("market_catalog"), 1)
         self.assertGreater(second.status().last_event_id, first_last_event_id)

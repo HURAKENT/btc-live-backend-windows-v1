@@ -3,11 +3,11 @@
 ## Current state
 
 - Goal status: `ACTIVE`.
-- Current train: `C6_PERSISTENT_SCHEDULER_REPLAY`.
+- Current train: `DATA_COMPLETION_ACCEPTANCE`.
 - Verified baseline: `579289b550cff3793a74bbafba0d8e78670f0c2a`.
 - Integration branch: `codex/final-project-completion`.
 - Branch published: yes.
-- Last verified integration commit: `e9cc951` (`fix: stabilize C4 V2 converter evidence hash`).
+- Last verified integration commit: `46d3adf` (`feat: add persistent C6 checkpoint scheduler`).
 - Manual action required: no.
 - Trading approval: `false`.
 
@@ -26,7 +26,7 @@
 - [x] Phase 0 baseline offline gate and hypothesis reproduction.
 - [x] C4 executable rules and parity.
 - [x] C5 activation classification.
-- [ ] C6 persistent scheduler/replay.
+- [x] C6 persistent scheduler/replay.
 - [ ] Data completion acceptance: inventory plus append/backfill/reconcile/import
   and future-market evidence. This gate must PASS before C7 starts.
 - [ ] C7 paper execution.
@@ -94,6 +94,24 @@
 - Provider requests and paper executions for C5: `0`;
   `paper_execution_authorized=false`; `trading_approval=false`.
 
+## C6 accepted scheduler/replay gate
+
+- Gate: `C6_CHECKPOINT_SCHEDULER_PASS`; migration version `3`.
+- Three recurring loopback markets register `30` durable schedules (`10` per
+  market) for the eight C5-enabled evaluation identities.
+- Scheduled evaluation identity binds the checkpoint group, complete immutable
+  input hash and evaluation revision; exact replay creates no duplicate
+  evaluation, signal or outbox event.
+- LIVE/RECOVERED origin survives restart; missing recovered depth blocks
+  fail-closed; recovered decisions require a claimed current reevaluation.
+- Market identity plus schedules commit atomically through the single runtime
+  writer; concurrent scheduled/current pollers claim work exactly once.
+- The production input source remains unavailable by design and is recorded as
+  `production_input_ready=false`; C6 does not authorize paper execution.
+- Acceptance report: `reports/C6_CHECKPOINT_SCHEDULER_ACCEPTANCE.json`.
+- External provider requests and Task 14 runs: `0`;
+  `paper_execution_authorized=false`; `trading_approval=false`.
+
 ## Phase 0 accepted baseline
 
 - Gate: `BTC_DAILY_RANGE_WINDOWS_V1_PHASE0_PASS`.
@@ -117,10 +135,8 @@
 
 ## Locked next step
 
-Implement C6 persistent checkpoint scheduling and recovered replay with an
-exactly-once evaluation identity, explicit LIVE/RECOVERED origin, recurring
-future-market schedules and no duplicate signal after restart.
-
-After C6 PASS, complete the separate `DATA_COMPLETION_ACCEPTANCE` gate before
-starting C7. The current data status remains `PHASE_0_AUDIT_PENDING`; empty
-source-range/import inventories are not completion evidence.
+Complete the separate `DATA_COMPLETION_ACCEPTANCE` gate before starting C7.
+The current data status remains `PHASE_0_AUDIT_PENDING`; empty source-range and
+import-run inventories are not completion evidence. Inventory every required
+range and prove append, bounded backfill, reconcile, idempotent import and
+future-market support with receipt-linked evidence.

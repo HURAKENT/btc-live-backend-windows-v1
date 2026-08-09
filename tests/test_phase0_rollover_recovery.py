@@ -157,17 +157,16 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_rollover_recurs_from_a_to_b_to_c(self) -> None:
         scheduler_writer_tasks: list[str | None] = []
-        register_market = self.runtime._checkpoint_scheduler.register_market
+        persist_market = (
+            self.runtime._checkpoint_scheduler.persist_market_and_register
+        )
 
-        def register_through_runtime_writer(*, market_id, created_at_ms):
+        def register_through_runtime_writer(**values):
             task = asyncio.current_task()
             scheduler_writer_tasks.append(None if task is None else task.get_name())
-            return register_market(
-                market_id=market_id,
-                created_at_ms=created_at_ms,
-            )
+            return persist_market(**values)
 
-        self.runtime._checkpoint_scheduler.register_market = (
+        self.runtime._checkpoint_scheduler.persist_market_and_register = (
             register_through_runtime_writer
         )
         await self.runtime.start()
@@ -211,9 +210,7 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
             scheduler_writer_tasks,
             ["phase0-recurring:writer"] * 3,
         )
-        self.assertFalse(
-            any("scheduler" in name for name in self.runtime._tasks)
-        )
+        self.assertIn("checkpoint_scheduler", self.runtime._tasks)
 
     async def test_refresh_identity_mismatch_blocks_without_pass(
         self,

@@ -11,7 +11,7 @@ Source baseline: `579289b550cff3793a74bbafba0d8e78670f0c2a`
 | C3 Market rollover | PASS_REVALIDATED_PHASE0 | Recurring A→B→C, durable cutover restart and stream-liveness regressions |
 | C4 Executable rules/parity | PASS | 47/47 exact sources/specs/evaluators/dispatcher; V1 full-decision historical parity 34/34, V2 full-decision parity 13/13; `C4_STRATEGY_47_ACCEPTANCE.json` |
 | C5 Activation classification | PASS | 47/47 classified: 8 paper-evaluation enabled, 26 missing-execution-data disabled, 13 V2 research-only; zero unknown; `C5_STRATEGY_47_ACTIVATION_ACCEPTANCE.json` |
-| C6 Scheduler/replay | IN_PROGRESS | Exactly-once checkpoints and recovered replay |
+| C6 Scheduler/replay | PASS | Migration v3; 8 enabled identities, 30 recurring schedules across A/B/C, exactly-once scheduled/current replay; `C6_CHECKPOINT_SCHEDULER_ACCEPTANCE.json` |
 | Data completion | NOT_STARTED_BLOCKS_C7 | `DATA_COMPLETENESS_STATUS.json` currently remains `PHASE_0_AUDIT_PENDING`; require source/range inventory, import runs, append/backfill/reconcile/import and future-market evidence |
 | C7 Paper execution | NOT_STARTED | Five-share depth-backed restart-safe accounting |
 | C8 API | NOT_STARTED | Versioned bootstrap and resumable WebSocket |

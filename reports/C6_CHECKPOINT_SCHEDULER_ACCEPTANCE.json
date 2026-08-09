@@ -1,0 +1,32 @@
+{
+  "acceptance_pass": true,
+  "atomic_commit_pass": true,
+  "current_reevaluation_pass": true,
+  "data_completion_gate": "OPEN_BLOCKS_C7",
+  "enabled_strategy_count": 8,
+  "evaluation_count": 18,
+  "exact_replay_pass": true,
+  "external_provider_requests": 0,
+  "market_count": 3,
+  "migration_version": 3,
+  "missing_depth_block_pass": true,
+  "outbox_count": 5,
+  "paper_execution_authorized": false,
+  "production_input_ready": false,
+  "real_dispatcher_pass": true,
+  "recovered_replay_pass": true,
+  "runtime_writer_path_pass": true,
+  "schedule_count": 30,
+  "schedules_per_market": [
+    10,
+    10,
+    10
+  ],
+  "schema_version": "BTC_C6_CHECKPOINT_SCHEDULER_ACCEPTANCE_V2",
+  "signal_count": 5,
+  "source_commit": "46d3adf355c892a7383c472e23e4c0e03a9fcc1e",
+  "stale_market_guard_pass": true,
+  "status": "C6_CHECKPOINT_SCHEDULER_PASS",
+  "trading_approval": false,
+  "verified_at_utc": "2026-08-09T17:28:09Z"
+}

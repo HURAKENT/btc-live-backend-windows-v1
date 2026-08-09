@@ -87,6 +87,32 @@ class CheckpointC6AcceptanceTests(unittest.TestCase):
         self.assertIn("D-012", decision)
         self.assertIn("C7 and C11 are blocked", decision)
 
+    def test_committed_c6_report_equals_fresh_gate(self) -> None:
+        from src.checkpoint_c6_acceptance import (
+            acceptance_report_payload,
+            verify_c6_acceptance,
+        )
+
+        report_path = PROJECT_ROOT / "reports/C6_CHECKPOINT_SCHEDULER_ACCEPTANCE.json"
+        persisted = json.loads(report_path.read_text(encoding="utf-8"))
+        fresh = verify_c6_acceptance(PROJECT_ROOT)
+        self.assertEqual(
+            persisted,
+            acceptance_report_payload(
+                fresh,
+                source_commit=persisted["source_commit"],
+                verified_at_utc=persisted["verified_at_utc"],
+            ),
+        )
+        progress = (PROJECT_ROOT / "docs/FINAL_PROJECT_PROGRESS.md").read_text(
+            encoding="utf-8"
+        )
+        matrix = (
+            PROJECT_ROOT / "reports/FINAL_PROJECT_ACCEPTANCE_MATRIX.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("- [x] C6 persistent scheduler/replay.", progress)
+        self.assertIn("| C6 Scheduler/replay | PASS |", matrix)
+
 
 if __name__ == "__main__":
     unittest.main()
