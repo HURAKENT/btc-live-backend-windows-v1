@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -42,7 +43,7 @@ class DataCompletionLedgerTests(unittest.TestCase):
             artifact_sha256="a" * 64,
             source_path_fingerprint="b" * 64,
             dataset_start_ms=60_000,
-            dataset_end_ms=60_000,
+            dataset_end_ms=120_000,
             declared_row_count=1,
             schema_mapping_sha256="e" * 64,
             inserted_row_count=1,
@@ -92,6 +93,39 @@ class DataCompletionLedgerTests(unittest.TestCase):
         }
         self.assertIn("data_import_runs", tables)
         self.assertIn("data_source_ranges", tables)
+
+    def test_migration_rejects_empty_half_open_import_dataset(self) -> None:
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store._connection.execute(
+                "INSERT INTO data_import_runs(import_run_id,artifact_sha256,source_path_fingerprint,"
+                "schema_mapping_sha256,dataset_start_ms,dataset_end_ms,declared_row_count,"
+                "inserted_row_count,replayed_row_count,conflict_row_count,dropped_row_count,status,"
+                "created_at_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ("empty", "a" * 64, "b" * 64, "c" * 64, 1, 1, 0, 0, 0, 0, 0, "COMPLETE", 1),
+            )
+
+    def test_migration_rejects_negative_or_unaligned_range_boundaries(self) -> None:
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store._connection.execute(
+                "INSERT INTO data_import_runs(import_run_id,artifact_sha256,source_path_fingerprint,"
+                "schema_mapping_sha256,dataset_start_ms,dataset_end_ms,declared_row_count,"
+                "inserted_row_count,replayed_row_count,conflict_row_count,dropped_row_count,status,"
+                "created_at_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ("negative", "a" * 64, "b" * 64, "c" * 64, -1, 1, 0, 0, 0, 0, 0, "COMPLETE", 1),
+            )
+        for start_ms, end_ms in ((-1, 60_000), (1, 60_001)):
+            with self.subTest(start_ms=start_ms, end_ms=end_ms):
+                with self.assertRaises(sqlite3.IntegrityError):
+                    self.store._connection.execute(
+                        "INSERT INTO data_source_ranges(range_key,source,canonical_scope_json,"
+                        "canonical_scope_sha256,requested_start_ms,requested_end_ms,granularity_ms,"
+                        "contract_version) VALUES (?,?,?,?,?,?,?,?)",
+                        (
+                            hashlib.sha256(f"{start_ms}:{end_ms}".encode()).hexdigest(),
+                            "binance", "{}", hashlib.sha256(b"{}").hexdigest(),
+                            start_ms, end_ms, 60_000, "BTC_DATA_COMPLETENESS_V1",
+                        ),
+                    )
 
     def test_exact_five_states_are_enforced_by_database(self) -> None:
         import dataclasses
@@ -301,7 +335,7 @@ class DataCompletionLedgerTests(unittest.TestCase):
         existing = self._event(value="old", natural_key="existing", timestamp_ms=120_000)
         self.store.append_source_event(existing)
         run, source_range = self._records()
-        run = dataclasses.replace(run, declared_row_count=2, inserted_row_count=2, dataset_end_ms=120_000)
+        run = dataclasses.replace(run, declared_row_count=2, inserted_row_count=2, dataset_end_ms=180_000)
         source_range = dataclasses.replace(
             source_range, requested_end_ms=180_000, expected_row_count=2, observed_row_count=2
         )
@@ -589,11 +623,21 @@ class DataCompletionLedgerTests(unittest.TestCase):
             return Mutex()
 
         path = Path(self.temp.name) / "offline-import.sqlite3"
+        artifact_bytes = b"verified-artifact"
+        schema_bytes = b"verified-schema"
+        import dataclasses
+        run = dataclasses.replace(
+            run,
+            artifact_sha256=hashlib.sha256(artifact_bytes).hexdigest(),
+            schema_mapping_sha256=hashlib.sha256(schema_bytes).hexdigest(),
+        )
         result = execute_offline_import(
             path,
             run,
             (source_range,),
             (self._event(),),
+            artifact_bytes=artifact_bytes,
+            schema_mapping_bytes=schema_bytes,
             mutex_factory=acquire,
             trace=trace,
         )
@@ -603,10 +647,16 @@ class DataCompletionLedgerTests(unittest.TestCase):
         self.assertIn("transaction-complete", trace)
 
     def test_offline_import_mutex_collision_writes_nothing(self) -> None:
+        import dataclasses
         from src.data_completion import execute_offline_import
         from src.single_instance import AlreadyRunningError
 
         run, source_range = self._records()
+        run = dataclasses.replace(
+            run,
+            artifact_sha256=hashlib.sha256(b"artifact").hexdigest(),
+            schema_mapping_sha256=hashlib.sha256(b"schema").hexdigest(),
+        )
         path = Path(self.temp.name) / "blocked-import.sqlite3"
 
         def blocked(_name: str):
@@ -618,9 +668,96 @@ class DataCompletionLedgerTests(unittest.TestCase):
                 run,
                 (source_range,),
                 (self._event(),),
+                artifact_bytes=b"artifact",
+                schema_mapping_bytes=b"schema",
                 mutex_factory=blocked,
             )
         self.assertFalse(path.exists())
+
+    def test_offline_import_verifies_artifact_and_schema_bytes_before_db_open(self) -> None:
+        import dataclasses
+        from src.data_completion import execute_offline_import
+
+        run, source_range = self._records()
+        path = Path(self.temp.name) / "hash-mismatch.sqlite3"
+        run = dataclasses.replace(
+            run,
+            artifact_sha256=hashlib.sha256(b"expected-artifact").hexdigest(),
+            schema_mapping_sha256=hashlib.sha256(b"expected-schema").hexdigest(),
+        )
+        with self.assertRaisesRegex(ValueError, "IMPORT_ARTIFACT_HASH_MISMATCH"):
+            execute_offline_import(
+                path,
+                run,
+                (source_range,),
+                (self._event(),),
+                artifact_bytes=b"changed-artifact",
+                schema_mapping_bytes=b"expected-schema",
+                mutex_factory=lambda _name: self.fail("mutex must not be acquired"),
+            )
+        self.assertFalse(path.exists())
+        with self.assertRaisesRegex(ValueError, "IMPORT_SCHEMA_MAPPING_HASH_MISMATCH"):
+            execute_offline_import(
+                path,
+                run,
+                (source_range,),
+                (self._event(),),
+                artifact_bytes=b"expected-artifact",
+                schema_mapping_bytes=b"changed-schema",
+                mutex_factory=lambda _name: self.fail("mutex must not be acquired"),
+            )
+        self.assertFalse(path.exists())
+
+    def test_retryable_range_can_record_partial_observations_then_complete(self) -> None:
+        import dataclasses
+        from src.data_completion import DataCompletionLedger
+
+        _, source_range = self._records()
+        partial = dataclasses.replace(
+            source_range,
+            import_run_id=None,
+            requested_end_ms=240_000,
+            status="SOURCE_UNAVAILABLE_RETRYABLE",
+            expected_row_count=3,
+            observed_row_count=1,
+            missing_row_count=2,
+            reason_code="PARTIAL_SOURCE_RESPONSE",
+            updated_at_ms=70_000,
+        )
+        ledger = DataCompletionLedger(self.store)
+        ledger.record_range_assessment(partial)
+        self.assertEqual(
+            self.store.scalar("SELECT status FROM data_source_range_assessments"),
+            "SOURCE_UNAVAILABLE_RETRYABLE",
+        )
+        run, _ = self._records()
+        events = (
+            self._event(natural_key="partial:1", timestamp_ms=60_000),
+            self._event(natural_key="partial:2", timestamp_ms=120_000),
+            self._event(natural_key="partial:3", timestamp_ms=180_000),
+        )
+        run = dataclasses.replace(
+            run,
+            declared_row_count=3,
+            inserted_row_count=3,
+            dataset_end_ms=240_000,
+        )
+        complete = dataclasses.replace(
+            partial,
+            import_run_id=run.import_run_id,
+            status="COMPLETE",
+            observed_row_count=3,
+            missing_row_count=0,
+            reason_code=None,
+            updated_at_ms=80_000,
+        )
+        ledger.commit_import(run, (complete,), events)
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT status FROM data_source_range_assessments ORDER BY assessment_row_id DESC LIMIT 1"
+            ),
+            "COMPLETE",
+        )
 
 
 if __name__ == "__main__":

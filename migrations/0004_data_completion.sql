@@ -13,7 +13,9 @@ CREATE TABLE data_import_runs (
     dropped_row_count INTEGER NOT NULL CHECK (dropped_row_count = 0),
     status TEXT NOT NULL CHECK (status = 'COMPLETE'),
     created_at_ms INTEGER NOT NULL,
-    CHECK (dataset_start_ms <= dataset_end_ms),
+    CHECK (dataset_start_ms >= 0),
+    CHECK (dataset_end_ms > 0),
+    CHECK (dataset_start_ms < dataset_end_ms),
     CHECK (declared_row_count = inserted_row_count + replayed_row_count)
 );
 
@@ -28,7 +30,11 @@ CREATE TABLE data_source_ranges (
     granularity_ms INTEGER NOT NULL,
     contract_version TEXT NOT NULL,
     CHECK (requested_start_ms < requested_end_ms),
-    CHECK (granularity_ms > 0)
+    CHECK (granularity_ms > 0),
+    CHECK (requested_start_ms >= 0),
+    CHECK (requested_end_ms > 0),
+    CHECK (requested_start_ms % granularity_ms = 0),
+    CHECK (requested_end_ms % granularity_ms = 0)
 );
 
 CREATE TABLE data_source_range_assessments (

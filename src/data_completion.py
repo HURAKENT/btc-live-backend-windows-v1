@@ -105,7 +105,7 @@ class ImportRunRecord:
             self.created_at_ms,
         ):
             _integer(value, "INVALID_IMPORT_RUN_BOUNDARY")
-        if self.dataset_start_ms > self.dataset_end_ms:
+        if self.dataset_start_ms >= self.dataset_end_ms:
             raise ValueError("INVALID_IMPORT_RUN_BOUNDARY")
         if self.status not in COMPLETENESS_STATES:
             raise ValueError("INVALID_COMPLETENESS_STATUS")
@@ -199,7 +199,9 @@ class SourceRangeRecord:
             self.expected_row_count or self.observed_row_count or self.missing_row_count
         ):
             raise ValueError("SOURCE_RANGE_STATUS_SEMANTICS_INVALID")
-        if self.status in {"SOURCE_UNAVAILABLE_RETRYABLE", "SOURCE_CONFLICT_FATAL"} and self.observed_row_count:
+        if self.status in {"SOURCE_UNAVAILABLE_RETRYABLE", "SOURCE_CONFLICT_FATAL"} and (
+            self.observed_row_count + self.missing_row_count != self.expected_row_count
+        ):
             raise ValueError("SOURCE_RANGE_STATUS_SEMANTICS_INVALID")
 
     @property
@@ -249,6 +251,45 @@ class DataCompletionLedger:
         ranges: tuple[SourceRangeRecord, ...],
         events: tuple[SourceEvent, ...],
     ) -> ImportCommitResult:
+        self._validate_import(run, ranges, events)
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            result = self._commit_import_in_transaction(run, ranges, events)
+            self._connection.commit()
+            return result
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def commit_import_pack(
+        self,
+        imports: tuple[
+            tuple[ImportRunRecord, tuple[SourceRangeRecord, ...], tuple[SourceEvent, ...]], ...
+        ],
+    ) -> tuple[ImportCommitResult, ...]:
+        if type(imports) is not tuple or not imports:
+            raise ValueError("INVALID_IMPORT_PACK")
+        for item in imports:
+            if type(item) is not tuple or len(item) != 3:
+                raise ValueError("INVALID_IMPORT_PACK")
+            self._validate_import(*item)
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            results = tuple(self._commit_import_in_transaction(*item) for item in imports)
+            self._connection.commit()
+            return results
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def _validate_import(
+        self,
+        run: ImportRunRecord,
+        ranges: tuple[SourceRangeRecord, ...],
+        events: tuple[SourceEvent, ...],
+    ) -> None:
         if type(run) is not ImportRunRecord:
             raise ValueError("INVALID_IMPORT_RUN")
         if type(ranges) is not tuple or any(type(x) is not SourceRangeRecord for x in ranges):
@@ -274,7 +315,7 @@ class DataCompletionLedger:
             if len(matches) != 1:
                 raise ValueError("IMPORT_EVENT_RANGE_AMBIGUOUS")
             event_matches[matches[0].range_key].append(event)
-            if not run.dataset_start_ms <= event.source_timestamp_ms <= run.dataset_end_ms:
+            if not run.dataset_start_ms <= event.source_timestamp_ms < run.dataset_end_ms:
                 raise ValueError("IMPORT_EVENT_OUTSIDE_DATASET_BOUNDARY")
         for item in ranges:
             observed = len({event.natural_key for event in event_matches[item.range_key]})
@@ -308,32 +349,31 @@ class DataCompletionLedger:
                 )
                 if actual_hashes != expected_hashes:
                     raise ValueError("SPARSE_RANGE_EXPECTED_KEYS_MISMATCH")
-        try:
-            self._connection.execute("BEGIN IMMEDIATE")
-            existing = self._read_run(run.import_run_id)
-            if existing is not None:
-                row_id = self._verify_run(run, existing)
-                self._verify_existing_import(run, ranges, events)
-                self._connection.commit()
-                return ImportCommitResult(row_id, False)
-            outcomes = tuple(self._classify_event(event) for event in events)
-            inserted_count = sum(item[0] for item in outcomes)
-            replayed_count = len(outcomes) - inserted_count
-            if (run.inserted_row_count, run.replayed_row_count, run.conflict_row_count) != (
-                inserted_count, replayed_count, 0
-            ):
-                raise ValueError("IMPORT_ROW_COUNTS_MISMATCH")
-            inserted, row_id = self._insert_run(run)
-            for item in ranges:
-                self._insert_range(item)
-            for event, (will_insert, _) in zip(events, outcomes, strict=True):
-                self._insert_event(run.import_run_id, event, will_insert)
-            self._connection.commit()
-            return ImportCommitResult(row_id, inserted)
-        except BaseException:
-            if self._connection.in_transaction:
-                self._connection.rollback()
-            raise
+
+    def _commit_import_in_transaction(
+        self,
+        run: ImportRunRecord,
+        ranges: tuple[SourceRangeRecord, ...],
+        events: tuple[SourceEvent, ...],
+    ) -> ImportCommitResult:
+        existing = self._read_run(run.import_run_id)
+        if existing is not None:
+            row_id = self._verify_run(run, existing)
+            self._verify_existing_import(run, ranges, events)
+            return ImportCommitResult(row_id, False)
+        outcomes = tuple(self._classify_event(event) for event in events)
+        inserted_count = sum(item[0] for item in outcomes)
+        replayed_count = len(outcomes) - inserted_count
+        if (run.inserted_row_count, run.replayed_row_count, run.conflict_row_count) != (
+            inserted_count, replayed_count, 0
+        ):
+            raise ValueError("IMPORT_ROW_COUNTS_MISMATCH")
+        inserted, row_id = self._insert_run(run)
+        for item in ranges:
+            self._insert_range(item)
+        for event, (will_insert, _) in zip(events, outcomes, strict=True):
+            self._insert_event(run.import_run_id, event, will_insert)
+        return ImportCommitResult(row_id, inserted)
 
     def _insert_run(self, run: ImportRunRecord) -> tuple[bool, int]:
         names = tuple(field.name for field in fields(run))
@@ -534,11 +574,17 @@ def execute_offline_import(
     ranges: tuple[SourceRangeRecord, ...],
     events: tuple[SourceEvent, ...],
     *,
+    artifact_bytes: bytes,
+    schema_mapping_bytes: bytes,
     mutex_factory: Callable[[str], Any] | None = None,
     trace: list[str] | None = None,
 ) -> ImportCommitResult:
     if not isinstance(database_path, Path):
         raise ValueError("INVALID_DATABASE_PATH_TYPE")
+    if type(artifact_bytes) is not bytes or hashlib.sha256(artifact_bytes).hexdigest() != run.artifact_sha256:
+        raise ValueError("IMPORT_ARTIFACT_HASH_MISMATCH")
+    if type(schema_mapping_bytes) is not bytes or hashlib.sha256(schema_mapping_bytes).hexdigest() != run.schema_mapping_sha256:
+        raise ValueError("IMPORT_SCHEMA_MAPPING_HASH_MISMATCH")
     if mutex_factory is None:
         from src.single_instance import WindowsMutex
 

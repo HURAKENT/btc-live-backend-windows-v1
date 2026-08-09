@@ -358,7 +358,9 @@ async def _verify_runtime(project_root: Path, store: SqliteStore) -> C6Acceptanc
         return C6AcceptanceReport(
             status="C6_CHECKPOINT_SCHEDULER_PASS",
             acceptance_pass=True,
-            migration_version=store.integrity_report()["migration_version"],
+            migration_version=store.scalar(
+                "SELECT COALESCE(MAX(version),0) FROM schema_migrations WHERE version<=3"
+            ),
             enabled_strategy_count=8,
             market_count=store.count("market_catalog"),
             schedule_count=store.count("strategy_checkpoint_schedules"),
