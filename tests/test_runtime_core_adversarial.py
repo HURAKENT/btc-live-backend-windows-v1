@@ -177,11 +177,14 @@ class FakePolymarket:
         self.live = live
         self.return_normally = return_normally
         self.closed = False
-        identity_value = market_payload or {
+        identity_value = dict(market_payload) if market_payload is not None else {
             "asset_ids": list(self.asset_ids),
             "event_id": "event-1",
             "market_ids": list(self.market_ids),
         }
+        identity_value.setdefault(
+            "resolution_utc", "2033-05-18T03:33:20+00:00"
+        )
         identity_json = _canonical(identity_value)
         self.reconciliation = MarketReconciliation(
             market_identity_json=identity_json,
@@ -291,6 +294,8 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(second.status().live_ready)
         self.assertEqual(self.store.count("market_catalog"), 1)
+        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 10)
+        self.assertEqual(second.scheduler_writer_operation_count, 1)
         self.assertNotIn("MARKET_IDENTITY_CONFLICT", second.status().failure or "")
 
     async def test_same_market_id_with_changed_authoritative_payload_blocks(self):

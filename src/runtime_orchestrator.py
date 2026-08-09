@@ -6,16 +6,23 @@ import inspect
 import json
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import aiohttp
 
 from src.binance_provider import BinanceStream, MINUTE_MS
 from src.canary import commit_canary_if_new, evaluate_canary
+from src.checkpoint_scheduler import (
+    CheckpointScheduler,
+    DueCheckpoint,
+    PendingCurrentReevaluation,
+    encode_executable_checkpoint_input,
+)
 from src.lifecycle import STARTUP_SEQUENCE, LifecycleStateMachine
-from src.models import CanonicalSnapshot, SourceEvent
+from src.models import CanonicalSnapshot, SignalRecord, SourceEvent, StrategyEvaluation
 from src.market_rollover import C3RolloverSummary, MarketRolloverLifecycle
 from src.outbox import OutboxBroker
 from src.polymarket_provider import PolymarketStream
@@ -42,6 +49,10 @@ from src.runtime_projection import (
     CommittedSourceEvent,
 )
 from src.storage import PersistResult, SqliteStore
+from src.strategy_dispatch import (
+    V1ExecutableCheckpointInput,
+    load_strategy_dispatcher,
+)
 
 
 _STOP = object()
@@ -50,6 +61,63 @@ DEFAULT_LIVE_BUFFER_MAX_EVENTS = 8192
 MAX_BINANCE_BOUNDARY_REFRESHES = 4
 DEFAULT_STREAM_READY_TIMEOUT_SECONDS = 15.0
 DEFAULT_LIVE_EVIDENCE_TIMEOUT_SECONDS = 75.0
+DEFAULT_CHECKPOINT_POLL_INTERVAL_SECONDS = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class CheckpointInputResult:
+    executable_input: V1ExecutableCheckpointInput | None
+    historical_depth_available: bool
+    reason_code: str | None
+
+    def __post_init__(self) -> None:
+        if self.executable_input is not None and type(
+            self.executable_input
+        ) is not V1ExecutableCheckpointInput:
+            raise ValueError("C6_INVALID_CHECKPOINT_INPUT_RESULT")
+        if type(self.historical_depth_available) is not bool:
+            raise ValueError("C6_INVALID_CHECKPOINT_INPUT_RESULT")
+        if self.reason_code is not None and (
+            type(self.reason_code) is not str or not self.reason_code
+        ):
+            raise ValueError("C6_INVALID_CHECKPOINT_INPUT_RESULT")
+        if self.executable_input is None and self.reason_code is None:
+            raise ValueError("C6_INVALID_CHECKPOINT_INPUT_RESULT")
+
+
+@dataclass(frozen=True, slots=True)
+class _CheckpointCaptureWrite:
+    due: DueCheckpoint
+    payload_json: str
+    payload_sha256: str
+    historical_depth_available: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _CheckpointCompleteWrite:
+    due: DueCheckpoint
+    evaluation: StrategyEvaluation
+    signal: SignalRecord | None
+
+
+@dataclass(frozen=True, slots=True)
+class _CheckpointReleaseWrite:
+    due: DueCheckpoint
+    reason_code: str
+    updated_at_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class _CurrentCaptureWrite:
+    pending: PendingCurrentReevaluation
+    payload_json: str
+    payload_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class _CurrentCompleteWrite:
+    pending: PendingCurrentReevaluation
+    evaluation: StrategyEvaluation
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +242,11 @@ class C1RuntimeOrchestrator:
         ),
         enable_market_rollover: bool = False,
         rollover_wait: Callable[[MarketDiscovery], Any] | None = None,
+        checkpoint_input_source: Any | None = None,
+        checkpoint_recovery_cutoff_ms: int | None = None,
+        checkpoint_poll_interval_seconds: float = (
+            DEFAULT_CHECKPOINT_POLL_INTERVAL_SECONDS
+        ),
     ) -> None:
         if type(run_id) is not str or not run_id:
             raise ValueError("INVALID_RUNTIME_RUN_ID")
@@ -207,6 +280,11 @@ class C1RuntimeOrchestrator:
             raise ValueError("INVALID_RUNTIME_RECOVERY_CURSOR")
         self._run_id = run_id
         self._store = store
+        self._checkpoint_scheduler = CheckpointScheduler(
+            project_root=Path(__file__).resolve().parent.parent,
+            store=store,
+        )
+        self._scheduler_writer_operation_count = 0
         self._broker = broker
         self._binance = binance_adapter
         self._polymarket = polymarket_adapter
@@ -244,8 +322,38 @@ class C1RuntimeOrchestrator:
             raise ValueError("INVALID_RUNTIME_ROLLOVER_FLAG")
         if rollover_wait is not None and not callable(rollover_wait):
             raise ValueError("INVALID_RUNTIME_ROLLOVER_WAIT")
+        if checkpoint_input_source is not None and not callable(
+            getattr(checkpoint_input_source, "capture", None)
+        ):
+            raise ValueError("C6_INVALID_CHECKPOINT_INPUT_SOURCE")
+        if checkpoint_recovery_cutoff_ms is not None and (
+            type(checkpoint_recovery_cutoff_ms) is not int
+            or checkpoint_recovery_cutoff_ms < 0
+        ):
+            raise ValueError("C6_INVALID_RECOVERY_CUTOFF")
+        if (
+            type(checkpoint_poll_interval_seconds) not in (int, float)
+            or type(checkpoint_poll_interval_seconds) is bool
+            or checkpoint_poll_interval_seconds <= 0
+        ):
+            raise ValueError("C6_INVALID_POLL_INTERVAL")
         self._history_end_ts = history_end_ts
         self._clock_ms = clock_ms
+        self._checkpoint_input_source = checkpoint_input_source
+        self._checkpoint_dispatcher = (
+            None
+            if checkpoint_input_source is None
+            else load_strategy_dispatcher(Path(__file__).resolve().parent.parent)
+        )
+        self._checkpoint_recovery_cutoff_ms = (
+            self._clock_ms()
+            if checkpoint_recovery_cutoff_ms is None
+            else checkpoint_recovery_cutoff_ms
+        )
+        self._checkpoint_poll_interval_seconds = float(
+            checkpoint_poll_interval_seconds
+        )
+        self._checkpoint_input_unavailable_recorded = False
         self._binance_end_resolver = binance_end_resolver
         self._stream_ready_timeout_seconds = float(
             stream_ready_timeout_seconds
@@ -264,6 +372,7 @@ class C1RuntimeOrchestrator:
         self._projector = CanonicalProjector(backend_session_id=run_id)
         self._ready = asyncio.Event()
         self._progress = asyncio.Event()
+        self._checkpoint_progress = asyncio.Event()
         self._failure_lock = asyncio.Lock()
         self._started = False
         self._stopping = False
@@ -322,6 +431,10 @@ class C1RuntimeOrchestrator:
     @property
     def registry_execution_count(self) -> int:
         return 0
+
+    @property
+    def scheduler_writer_operation_count(self) -> int:
+        return self._scheduler_writer_operation_count
 
     @property
     def recovery_summary(self) -> C2RecoverySummary:
@@ -679,6 +792,10 @@ class C1RuntimeOrchestrator:
             await self._transition("LIVE_READY")
             self._started = True
             self._ready.set()
+            self._tasks["checkpoint_scheduler"] = asyncio.create_task(
+                self._run_checkpoint_scheduler(),
+                name=f"{self._run_id}:checkpoint-scheduler",
+            )
             if self._enable_market_rollover:
                 self._tasks["market_rollover"] = asyncio.create_task(
                     self._run_market_rollover(),
@@ -705,6 +822,349 @@ class C1RuntimeOrchestrator:
         await self._ready.wait()
         if not self.status().live_ready:
             raise RuntimeError(self._failure or "RUNTIME_NOT_READY")
+
+    async def wait_checkpoint_progress(self) -> None:
+        await self._checkpoint_progress.wait()
+        if self._failure is not None:
+            raise RuntimeError(self._failure)
+
+    async def _run_checkpoint_scheduler(self) -> None:
+        while not self._stopping:
+            try:
+                completed = await self.poll_strategy_checkpoints_once()
+                if completed > 0:
+                    self._checkpoint_progress.set()
+                await asyncio.sleep(self._checkpoint_poll_interval_seconds)
+            except asyncio.CancelledError:
+                raise
+            except BaseException as error:
+                if not self._stopping:
+                    await self._fail(f"C6_CHECKPOINT_SCHEDULER_FAILED: {error}")
+                return
+
+    async def poll_strategy_checkpoints_once(self) -> int:
+        market = self._market
+        if market is None or self.status().state != "LIVE_READY":
+            return 0
+        if self._checkpoint_input_source is None:
+            if not self._checkpoint_input_unavailable_recorded:
+                await self._submit_write(
+                    "INCIDENT",
+                    {
+                        "incident_key": f"c6-input-source-unavailable:{market.market_id}",
+                        "severity": "WARNING",
+                        "status": "C6_EXECUTABLE_INPUT_SOURCE_UNAVAILABLE",
+                        "payload_json": json.dumps(
+                            {
+                                "market_id": market.market_id,
+                                "production_input_ready": False,
+                            },
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                        "created_at_ms": self._clock_ms(),
+                    },
+                )
+                self._checkpoint_input_unavailable_recorded = True
+            return 0
+        now_ms = self._clock_ms()
+        due_items = await self._submit_write(
+            "C6_CLAIM_DUE",
+            {
+                "now_ms": now_ms,
+                "recovery_cutoff_ms": self._checkpoint_recovery_cutoff_ms,
+                "active_market_id": market.market_id,
+                "runtime_state": self.status().state,
+                "poller_id": f"{self._run_id}:checkpoint",
+                "limit": 100,
+            },
+        )
+        completed = 0
+        for due in due_items:
+            if due.schedule.state != "CAPTURED":
+                source = self._checkpoint_input_source
+                result = (
+                    None
+                    if source is None
+                    else await source.capture(due=due, current=False)
+                )
+                if result is not None and type(result) is not CheckpointInputResult:
+                    raise ValueError("C6_INVALID_CHECKPOINT_INPUT_RESULT")
+                if result is None or result.executable_input is None:
+                    reason = (
+                        "C6_EXECUTABLE_INPUT_SOURCE_UNAVAILABLE"
+                        if result is None
+                        else result.reason_code
+                    )
+                    if (
+                        due.origin == "RECOVERED_AFTER_DOWNTIME"
+                        and result is not None
+                        and not result.historical_depth_available
+                    ):
+                        payload_json = json.dumps(
+                            {
+                                "checkpoint_minutes": due.schedule.checkpoint_minutes,
+                                "market_id": due.schedule.market_id,
+                                "schema_version": "C6_MISSING_HISTORICAL_DEPTH_V1",
+                                "strategy_id": due.schedule.strategy_id,
+                            },
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        )
+                        await self._submit_write(
+                            "C6_CAPTURE",
+                            _CheckpointCaptureWrite(
+                                due=due,
+                                payload_json=payload_json,
+                                payload_sha256=hashlib.sha256(
+                                    payload_json.encode("utf-8")
+                                ).hexdigest(),
+                                historical_depth_available=False,
+                            ),
+                        )
+                    else:
+                        await self._submit_write(
+                            "C6_RELEASE_UNAVAILABLE",
+                            _CheckpointReleaseWrite(
+                                due=due,
+                                reason_code=reason
+                                or "C6_EXECUTABLE_INPUT_UNAVAILABLE",
+                                updated_at_ms=now_ms,
+                            ),
+                        )
+                        await self._submit_write(
+                            "INCIDENT",
+                            {
+                                "incident_key": (
+                                    "c6-input-unavailable:"
+                                    + due.schedule.schedule_key
+                                ),
+                                "severity": "WARNING",
+                                "status": reason
+                                or "C6_EXECUTABLE_INPUT_UNAVAILABLE",
+                                "payload_json": json.dumps(
+                                    {
+                                        "schedule_key": due.schedule.schedule_key,
+                                        "strategy_id": due.schedule.strategy_id,
+                                    },
+                                    sort_keys=True,
+                                    separators=(",", ":"),
+                                ),
+                                "created_at_ms": due.schedule.due_at_ms,
+                            },
+                        )
+                    continue
+                payload_json, payload_sha256 = encode_executable_checkpoint_input(
+                    result.executable_input
+                )
+                await self._submit_write(
+                    "C6_CAPTURE",
+                    _CheckpointCaptureWrite(
+                        due=due,
+                        payload_json=payload_json,
+                        payload_sha256=payload_sha256,
+                        historical_depth_available=(
+                            result.historical_depth_available
+                        ),
+                    ),
+                )
+            composition = self._checkpoint_scheduler.compose_dispatch(
+                market_id=due.schedule.market_id,
+                strategy_id=due.schedule.strategy_id,
+            )
+            if composition is None:
+                continue
+            dispatcher = self._checkpoint_dispatcher
+            if dispatcher is None:
+                raise RuntimeError("C6_DISPATCHER_UNAVAILABLE")
+            results = self._checkpoint_scheduler.dispatch_composition(
+                composition,
+                dispatcher=dispatcher,
+            )
+            evaluation, signal = self._checkpoint_records(due, results)
+            await self._submit_write(
+                "C6_COMPLETE",
+                _CheckpointCompleteWrite(
+                    due=due,
+                    evaluation=evaluation,
+                    signal=signal,
+                ),
+            )
+            completed += 1
+        completed += await self._poll_current_reevaluations_once()
+        return completed
+
+    async def _poll_current_reevaluations_once(self) -> int:
+        source = self._checkpoint_input_source
+        dispatcher = self._checkpoint_dispatcher
+        market = self._market
+        if source is None or dispatcher is None or market is None:
+            return 0
+        completed = 0
+        pending_items = await self._submit_write(
+            "C6_CLAIM_CURRENT",
+            {
+                "market_id": market.market_id,
+                "poller_id": f"{self._run_id}:current",
+                "now_ms": self._clock_ms(),
+                "limit": 100,
+            },
+        )
+        for pending in pending_items:
+            schedules = self._checkpoint_scheduler.current_reevaluation_schedules(
+                pending
+            )
+            for schedule in schedules:
+                due = DueCheckpoint(
+                    schedule=schedule,
+                    origin="LIVE",
+                    poller_id=f"{self._run_id}:current",
+                )
+                result = await source.capture(due=due, current=True)
+                if type(result) is not CheckpointInputResult or (
+                    result.executable_input is None
+                    or not result.historical_depth_available
+                ):
+                    continue
+                payload_json, payload_sha256 = encode_executable_checkpoint_input(
+                    result.executable_input
+                )
+                await self._submit_write(
+                    "C6_CAPTURE_CURRENT",
+                    _CurrentCaptureWrite(
+                        pending=pending,
+                        payload_json=payload_json,
+                        payload_sha256=payload_sha256,
+                    ),
+                )
+            composition = self._checkpoint_scheduler.compose_current_dispatch(
+                pending
+            )
+            if composition is None:
+                continue
+            results = self._checkpoint_scheduler.dispatch_composition(
+                composition,
+                dispatcher=dispatcher,
+            )
+            current_hash = self._checkpoint_scheduler.current_input_snapshot_hash(
+                pending.evaluation_group_key
+            )
+            current_key = self._checkpoint_scheduler.current_reevaluation_key(
+                pending.evaluation_group_key,
+                current_hash,
+                1,
+            )
+            accepted = any(getattr(item, "accepted", False) for item in results)
+            payload_json = json.dumps(
+                {
+                    "evaluation_key": current_key,
+                    "origin": "LIVE",
+                    "results": [asdict(item) for item in results],
+                    "schema_version": "C6_CURRENT_REEVALUATION_V1",
+                    "strategy_id": pending.strategy_id,
+                },
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            evaluation = StrategyEvaluation(
+                evaluation_key=current_key,
+                strategy_id=pending.strategy_id,
+                strategy_version=pending.strategy_version,
+                status="SIGNAL" if accepted else "NO_SIGNAL",
+                input_snapshot_hash=current_hash,
+                evaluation_revision=1,
+                execution_eligible=False,
+                evaluated_at_ms=self._clock_ms(),
+                payload_json=payload_json,
+                reason_code=(
+                    "C6_CURRENT_DISPATCH_ACCEPTED"
+                    if accepted
+                    else "C6_CURRENT_DISPATCH_REJECTED"
+                ),
+                origin="LIVE",
+                historical_signal_is_current_live_signal=False,
+                current_reevaluation_required=False,
+            )
+            await self._submit_write(
+                "C6_COMPLETE_CURRENT",
+                _CurrentCompleteWrite(pending=pending, evaluation=evaluation),
+            )
+            completed += 1
+        return completed
+
+    def _checkpoint_records(
+        self,
+        due: DueCheckpoint,
+        results: tuple[Any, ...],
+    ) -> tuple[StrategyEvaluation, SignalRecord | None]:
+        accepted = any(getattr(item, "accepted", False) for item in results)
+        input_snapshot_hash = (
+            self._checkpoint_scheduler.evaluation_input_snapshot_hash(
+                due.schedule.evaluation_key
+            )
+        )
+        evaluation_key = self._checkpoint_scheduler.scheduled_evaluation_key(
+            due.schedule.evaluation_key,
+            input_snapshot_hash,
+            1,
+        )
+        payload_json = json.dumps(
+            {
+                "evaluation_key": evaluation_key,
+                "origin": due.origin,
+                "results": [asdict(item) for item in results],
+                "schema_version": "C6_STRATEGY_EVALUATION_V1",
+                "strategy_id": due.schedule.strategy_id,
+            },
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        evaluated_at_ms = self._clock_ms()
+        evaluation = StrategyEvaluation(
+            evaluation_key=evaluation_key,
+            strategy_id=due.schedule.strategy_id,
+            strategy_version=due.schedule.strategy_version,
+            status="SIGNAL" if accepted else "NO_SIGNAL",
+            input_snapshot_hash=input_snapshot_hash,
+            evaluation_revision=1,
+            execution_eligible=False,
+            evaluated_at_ms=evaluated_at_ms,
+            payload_json=payload_json,
+            reason_code=(
+                "C6_DISPATCH_ACCEPTED" if accepted else "C6_DISPATCH_REJECTED"
+            ),
+            origin=due.origin,
+            historical_signal_is_current_live_signal=False,
+            current_reevaluation_required=(
+                due.origin == "RECOVERED_AFTER_DOWNTIME"
+            ),
+        )
+        if not accepted:
+            return evaluation, None
+        signal_payload = json.dumps(
+            {
+                "evaluation_key": evaluation.evaluation_key,
+                "origin": due.origin,
+                "strategy_id": evaluation.strategy_id,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return evaluation, SignalRecord(
+            identity_key="c6-signal:" + evaluation.evaluation_key,
+            evaluation_key=evaluation.evaluation_key,
+            strategy_id=evaluation.strategy_id,
+            signal_type="STRATEGY_EVALUATION_SIGNAL",
+            payload_json=signal_payload,
+            created_at_ms=evaluated_at_ms,
+            origin=due.origin,
+            execution_eligible=False,
+            infrastructure_only=False,
+        )
 
     async def wait_rollover(self) -> None:
         task = self._tasks.get("market_rollover")
@@ -734,6 +1194,7 @@ class C1RuntimeOrchestrator:
             self._tasks.get("polymarket_stream"),
             self._tasks.get("next_polymarket_stream"),
             self._tasks.get("market_rollover"),
+            self._tasks.get("checkpoint_scheduler"),
         ]
         for task in provider_tasks:
             if task is not None and not task.done():
@@ -1282,7 +1743,76 @@ class C1RuntimeOrchestrator:
         if operation == "INCIDENT":
             return self._store.append_incident(**payload)
         if operation == "MARKET_IDENTITY":
-            return self._persist_market_identity(payload)
+            result = self._checkpoint_scheduler.persist_market_and_register(
+                market_id=payload.market_id,
+                market_identity_json=payload.market_identity_json,
+                market_identity_sha256=hashlib.sha256(
+                    payload.market_identity_json.encode("utf-8")
+                ).hexdigest(),
+                created_at_ms=self._clock_ms(),
+            )
+            self._scheduler_writer_operation_count += 1
+            return result
+        if operation == "C6_CLAIM_DUE":
+            result = self._checkpoint_scheduler.claim_due(**payload)
+            self._scheduler_writer_operation_count += 1
+            return result
+        if operation == "C6_CLAIM_CURRENT":
+            result = self._checkpoint_scheduler.claim_current_reevaluations(
+                **payload
+            )
+            self._scheduler_writer_operation_count += 1
+            return result
+        if operation == "C6_CAPTURE":
+            if type(payload) is not _CheckpointCaptureWrite:
+                raise ValueError("C6_INVALID_CAPTURE_WRITE")
+            result = self._checkpoint_scheduler.capture(
+                payload.due,
+                input_payload_json=payload.payload_json,
+                input_snapshot_hash=payload.payload_sha256,
+                historical_depth_available=payload.historical_depth_available,
+            )
+            self._scheduler_writer_operation_count += 1
+            return result
+        if operation == "C6_RELEASE_UNAVAILABLE":
+            if type(payload) is not _CheckpointReleaseWrite:
+                raise ValueError("C6_INVALID_RELEASE_WRITE")
+            result = self._checkpoint_scheduler.release_unavailable(
+                payload.due,
+                reason_code=payload.reason_code,
+                updated_at_ms=payload.updated_at_ms,
+            )
+            self._scheduler_writer_operation_count += 1
+            return result
+        if operation == "C6_COMPLETE":
+            if type(payload) is not _CheckpointCompleteWrite:
+                raise ValueError("C6_INVALID_COMPLETE_WRITE")
+            result = self._checkpoint_scheduler.complete(
+                payload.due,
+                evaluation=payload.evaluation,
+                signal=payload.signal,
+            )
+            self._scheduler_writer_operation_count += 1
+            return result
+        if operation == "C6_CAPTURE_CURRENT":
+            if type(payload) is not _CurrentCaptureWrite:
+                raise ValueError("C6_INVALID_CURRENT_CAPTURE_WRITE")
+            result = self._checkpoint_scheduler.capture_current_reevaluation(
+                payload.pending,
+                input_payload_json=payload.payload_json,
+                input_snapshot_hash=payload.payload_sha256,
+            )
+            self._scheduler_writer_operation_count += 1
+            return result
+        if operation == "C6_COMPLETE_CURRENT":
+            if type(payload) is not _CurrentCompleteWrite:
+                raise ValueError("C6_INVALID_CURRENT_COMPLETE_WRITE")
+            result = self._checkpoint_scheduler.complete_current_reevaluation(
+                payload.pending,
+                evaluation=payload.evaluation,
+            )
+            self._scheduler_writer_operation_count += 1
+            return result
         if operation == "SET_MARKET":
             self._projector.set_market_identity(payload)
             return None

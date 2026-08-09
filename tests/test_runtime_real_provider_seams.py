@@ -450,7 +450,10 @@ class DynamicCutoverBoundaryTests(unittest.IsolatedAsyncioTestCase):
             event_id="event-real",
             event_slug="bitcoin-price-on-2026-08-01",
             active=True,
-            resolution_utc=datetime.now(timezone.utc) + timedelta(days=1),
+            resolution_utc=(
+                datetime.now(timezone.utc).replace(microsecond=0)
+                + timedelta(days=1)
+            ),
             market_ids=market_ids,
             outcomes=tuple(
                 outcome

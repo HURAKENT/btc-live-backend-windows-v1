@@ -27,6 +27,8 @@
 - [x] C4 executable rules and parity.
 - [x] C5 activation classification.
 - [ ] C6 persistent scheduler/replay.
+- [ ] Data completion acceptance: inventory plus append/backfill/reconcile/import
+  and future-market evidence. This gate must PASS before C7 starts.
 - [ ] C7 paper execution.
 - [ ] C8 stable API.
 - [ ] Stage D dashboard.
@@ -118,3 +120,7 @@
 Implement C6 persistent checkpoint scheduling and recovered replay with an
 exactly-once evaluation identity, explicit LIVE/RECOVERED origin, recurring
 future-market schedules and no duplicate signal after restart.
+
+After C6 PASS, complete the separate `DATA_COMPLETION_ACCEPTANCE` gate before
+starting C7. The current data status remains `PHASE_0_AUDIT_PENDING`; empty
+source-range/import inventories are not completion evidence.

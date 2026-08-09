@@ -31,6 +31,7 @@ _COUNTABLE_TABLES = frozenset(
         "signals",
         "outbox_events",
         "incidents",
+        "strategy_checkpoint_schedules",
     }
 )
 
@@ -1129,7 +1130,7 @@ class SqliteStore:
                 and foreign_key_violations == 0
                 and foreign_keys == 1
                 and journal_mode == "wal"
-                and migration_version == 2
+                and migration_version == 3
             )
             else "FAIL"
         )

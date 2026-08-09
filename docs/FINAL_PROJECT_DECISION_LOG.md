@@ -100,3 +100,20 @@ execution data; all 13 V2 overlays remain research-only. An enabled evaluation
 cannot create a paper intent or fill until C7 separately proves depth, fee,
 five-share and restart-safe accounting contracts. C5 keeps
 `paper_execution_authorized=false` and `trading_approval=false`.
+
+## D-012 — Data completion is a separate blocking gate before C7
+
+Date: 2026-08-09
+
+Decision: Task 2 data completion is not closed by the C4 strategy-parity gate.
+`reports/DATA_COMPLETENESS_STATUS.json` remains authoritative at
+`PHASE_0_AUDIT_PENDING`, with empty `source_ranges` and `import_runs` and
+`unknown_ranges=NOT_YET_INVENTORIED`. After C6 scheduler/replay acceptance and
+before any C7 paper-execution implementation, run a separate
+`DATA_COMPLETION_ACCEPTANCE` train that inventories every required source/range,
+adds a versioned import ledger where required, and proves append, bounded
+backfill, reconcile, idempotent import and recurring future-market support.
+Every requested range must end in one of the five states frozen by the database
+contract; unknown or silently truncated ranges block the gate. The status report
+may advance only from generated receipt-linked evidence. C7 and C11 are blocked
+until this gate passes. Historical C1-C5 evidence is not rewritten.

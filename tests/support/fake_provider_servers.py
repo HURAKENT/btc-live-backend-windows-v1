@@ -166,7 +166,7 @@ class FakeProviderServer:
         self._rollover_schedule_armed = True
 
     def _rollover_now(self) -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(timezone.utc).replace(microsecond=0)
 
     async def _binance_rest(self, request: web.Request) -> web.Response:
         start = int(request.query["startTime"])

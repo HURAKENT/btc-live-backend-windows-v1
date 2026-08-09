@@ -238,8 +238,26 @@ class FakeRolloverPolymarketAdapter:
 
     @staticmethod
     def _discovery(market_id: str, assets: tuple[str, ...]) -> MarketDiscovery:
+        market_order = {
+            "current-event": 0,
+            "next-event": 1,
+            "later-event": 2,
+            "a-event": 0,
+            "b-event": 1,
+            "c-event": 2,
+            "d-event": 3,
+        }
+        resolution_utc = datetime.fromtimestamp(
+            (2_000_000_000_000 + market_order[market_id] * 86_400_000)
+            / 1_000,
+            tz=timezone.utc,
+        ).isoformat()
         identity_json = json.dumps(
-            {"asset_ids": list(assets), "event_id": market_id},
+            {
+                "asset_ids": list(assets),
+                "event_id": market_id,
+                "resolution_utc": resolution_utc,
+            },
             sort_keys=True,
             separators=(",", ":"),
         )

@@ -18,7 +18,10 @@ class _StableRestartFakeProviderServer(FakeProviderServer):
     """Arm one future market pair once, then keep it stable across restarts."""
 
     def _rollover_now(self) -> datetime:
-        return datetime.now(timezone.utc) + timedelta(hours=12)
+        return (
+            datetime.now(timezone.utc).replace(microsecond=0)
+            + timedelta(hours=12)
+        )
 
 
 class SameDatabaseRestartIdentityTests(unittest.IsolatedAsyncioTestCase):

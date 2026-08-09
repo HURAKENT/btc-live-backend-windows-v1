@@ -156,6 +156,20 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
         self.temp.cleanup()
 
     async def test_rollover_recurs_from_a_to_b_to_c(self) -> None:
+        scheduler_writer_tasks: list[str | None] = []
+        register_market = self.runtime._checkpoint_scheduler.register_market
+
+        def register_through_runtime_writer(*, market_id, created_at_ms):
+            task = asyncio.current_task()
+            scheduler_writer_tasks.append(None if task is None else task.get_name())
+            return register_market(
+                market_id=market_id,
+                created_at_ms=created_at_ms,
+            )
+
+        self.runtime._checkpoint_scheduler.register_market = (
+            register_through_runtime_writer
+        )
         await self.runtime.start()
         self.gates["a-event"].set()
         await self.runtime.wait_rollover()
@@ -175,6 +189,15 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runtime.status().market_id, "c-event")
         self.assertEqual(self.adapter.next_subscriptions, 2)
         self.assertEqual(self.store.count("market_catalog"), 3)
+        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 30)
+        self.assertEqual(
+            self.store.rows(
+                "SELECT market_id, COUNT(*) "
+                "FROM strategy_checkpoint_schedules "
+                "GROUP BY market_id ORDER BY market_id"
+            ),
+            [("a-event", 10), ("b-event", 10), ("c-event", 10)],
+        )
         self.assertEqual(
             self.store.scalar(
                 "SELECT COUNT(*) FROM incidents "
@@ -183,6 +206,14 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
             2,
         )
         self.assertEqual(self.runtime.writer_consumer_count, 1)
+        self.assertEqual(self.runtime.scheduler_writer_operation_count, 3)
+        self.assertEqual(
+            scheduler_writer_tasks,
+            ["phase0-recurring:writer"] * 3,
+        )
+        self.assertFalse(
+            any("scheduler" in name for name in self.runtime._tasks)
+        )
 
     async def test_refresh_identity_mismatch_blocks_without_pass(
         self,

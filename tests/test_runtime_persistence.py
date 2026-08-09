@@ -483,9 +483,9 @@ class RuntimePersistenceTests(unittest.TestCase):
             reader.close()
         self.assertEqual(latest["state"], "BOOTING")
 
-    def test_migration_version_remains_exactly_two(self):
-        self.assertEqual(self.store.count("schema_migrations"), 2)
-        self.assertEqual(self.store.integrity_report()["migration_version"], 2)
+    def test_migration_version_is_exactly_three(self):
+        self.assertEqual(self.store.count("schema_migrations"), 3)
+        self.assertEqual(self.store.integrity_report()["migration_version"], 3)
 
     def test_required_table_set_is_unchanged(self):
         rows = self.store.rows(
@@ -493,7 +493,8 @@ class RuntimePersistenceTests(unittest.TestCase):
         )
         self.assertEqual(
             {row[0] for row in rows},
-            REQUIRED_TABLES | {"sqlite_sequence"},
+            REQUIRED_TABLES
+            | {"sqlite_sequence", "strategy_checkpoint_schedules"},
         )
 
     def test_new_persistence_methods_open_no_write_connection(self):

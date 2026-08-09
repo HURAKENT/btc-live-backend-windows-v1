@@ -12,6 +12,62 @@ from src.outbox import OutboxBroker
 from src.runtime_adapters import MarketReconciliation
 from src.storage import SqliteStore
 
+
+class LoopbackCheckpointInputSource:
+    async def capture(self, *, due, current):
+        from src.runtime_orchestrator import CheckpointInputResult
+        from src.strategy_dispatch import V1ExecutableCheckpointInput
+        from src.strategy_v1 import (
+            BucketInput,
+            Pf1SnapshotEvidence,
+            StrictPriceHistoryEvidence,
+        )
+
+        buckets = tuple(
+            BucketInput(
+                bucket_index=index,
+                model_p=0.50 if index == 0 else 0.05,
+                market_q_yes=0.30 if index == 0 else 0.10 + index / 100,
+                market_q_no=None,
+                vwap5=0.35 if index == 0 else 0.15,
+                confirmed_fee=0.0,
+                no_token_id=None,
+            )
+            for index in range(11)
+        )
+        evidence_sha = "1" * 64
+        strict = None
+        pf1 = None
+        if "STRICT" in due.schedule.strategy_id:
+            strict = StrictPriceHistoryEvidence(
+                provenance="CLOB_PRICE_HISTORY",
+                source_sha256=evidence_sha,
+                checkpoint_timestamp_ms=due.schedule.due_at_ms,
+                observation_timestamp_ms=due.schedule.due_at_ms - 1,
+            )
+        else:
+            pf1 = Pf1SnapshotEvidence(
+                bucket_count=11,
+                snapshot_complete=True,
+                synchronized=True,
+                fresh=True,
+                crossed_book_count=0,
+                fee_provenance="PUBLIC_CLOB_FEE_SCHEDULE",
+                snapshot_sha256=evidence_sha,
+                fee_schedule_sha256=evidence_sha,
+            )
+        return CheckpointInputResult(
+            executable_input=V1ExecutableCheckpointInput(
+                checkpoint_minutes=due.schedule.checkpoint_minutes,
+                buckets=buckets,
+                prior_position=False,
+                strict_price_history_evidence=strict,
+                pf1_snapshot_evidence=pf1,
+            ),
+            historical_depth_available=True,
+            reason_code=None,
+        )
+
 try:
     from src.runtime_orchestrator import C1RuntimeOrchestrator
 except ModuleNotFoundError:
@@ -131,7 +187,11 @@ class FakePolymarketRuntimeAdapter:
             for index, asset_id in enumerate(self.assets[:count])
         )
         identity = json.dumps(
-            {"asset_ids": list(self.assets), "event_id": "event-1"},
+            {
+                "asset_ids": list(self.assets),
+                "event_id": "event-1",
+                "resolution_utc": "2033-05-18T03:33:20+00:00",
+            },
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -201,12 +261,13 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
         values.update(overrides)
         return C1RuntimeOrchestrator(**values)
 
-    async def test_orchestrator_owns_exact_three_managed_tasks(self):
+    async def test_orchestrator_owns_runtime_and_checkpoint_tasks(self):
         await self.runtime.start()
         self.assertEqual(set(self.runtime.owned_task_names), {
             "writer",
             "binance_stream",
             "polymarket_stream",
+            "checkpoint_scheduler",
         })
 
     async def test_startup_transitions_follow_frozen_sequence(self):
@@ -240,6 +301,80 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
         await self.runtime.start()
         self.assertEqual(self.runtime.writer_consumer_count, 1)
         self.assertGreater(self.store.count("source_events"), 0)
+
+    async def test_scheduler_poll_uses_real_dispatcher_and_single_writer(self):
+        self.runtime = self._runtime(
+            clock_ms=lambda: 2_000_000_000_000,
+            checkpoint_input_source=LoopbackCheckpointInputSource(),
+            checkpoint_recovery_cutoff_ms=0,
+        )
+        await self.runtime.start()
+        await asyncio.wait_for(self.runtime.wait_checkpoint_progress(), timeout=5)
+        self.assertIn("checkpoint_scheduler", self.runtime.owned_task_names)
+        self.assertEqual(self.runtime.writer_consumer_count, 1)
+        self.assertGreater(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM strategy_evaluations "
+                "WHERE checkpoint_group_key IS NOT NULL"
+            ),
+            0,
+        )
+        self.assertGreater(self.runtime.scheduler_writer_operation_count, 1)
+
+    async def test_missing_production_input_releases_without_strategy_output(self):
+        self.runtime = self._runtime(
+            clock_ms=lambda: 2_000_000_000_000,
+            checkpoint_recovery_cutoff_ms=0,
+        )
+        await self.runtime.start()
+        await self.runtime.poll_strategy_checkpoints_once()
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM strategy_evaluations "
+                "WHERE checkpoint_group_key IS NOT NULL"
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM strategy_checkpoint_schedules "
+                "WHERE state<>'PENDING'"
+            ),
+            0,
+        )
+        self.assertGreater(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM incidents "
+                "WHERE incident_key LIKE 'c6-input-source-unavailable:%'"
+            ),
+            0,
+        )
+
+    async def test_recovered_scheduler_persists_current_reevaluation(self):
+        self.runtime = self._runtime(
+            clock_ms=lambda: 2_000_000_000_000,
+            checkpoint_input_source=LoopbackCheckpointInputSource(),
+            checkpoint_recovery_cutoff_ms=2_000_000_000_001,
+        )
+        await self.runtime.start()
+        await self.runtime.poll_strategy_checkpoints_once()
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(DISTINCT evaluation_key) "
+                "FROM strategy_checkpoint_schedules "
+                "WHERE current_reevaluation_required=1 "
+                "AND current_reevaluation_evaluation_id IS NOT NULL"
+            ),
+            8,
+        )
+        self.assertEqual(
+            self.store.scalar(
+                "SELECT COUNT(*) FROM strategy_evaluations "
+                "WHERE checkpoint_group_key IS NULL "
+                "AND rule_spec_sha256 IS NOT NULL AND origin='LIVE'"
+            ),
+            8,
+        )
 
     async def test_duplicate_source_event_is_not_projected_twice(self):
         await self.runtime.start()
