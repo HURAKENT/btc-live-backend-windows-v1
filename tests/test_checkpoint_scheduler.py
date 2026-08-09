@@ -178,7 +178,10 @@ class CheckpointSchedulerTests(unittest.TestCase):
         self.assertIsNotNone(importlib.util.find_spec("src.checkpoint_scheduler"))
 
     def test_schema_v3_contains_checkpoint_schedule(self) -> None:
-        self.assertEqual(self.store.integrity_report()["migration_version"], 3)
+        self.assertEqual(
+            self.store.scalar("SELECT 1 FROM schema_migrations WHERE version=3"),
+            1,
+        )
         names = {
             row[0]
             for row in self.store.rows(

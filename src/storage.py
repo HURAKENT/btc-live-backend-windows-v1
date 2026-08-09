@@ -32,6 +32,10 @@ _COUNTABLE_TABLES = frozenset(
         "outbox_events",
         "incidents",
         "strategy_checkpoint_schedules",
+        "data_import_runs",
+        "data_source_ranges",
+        "data_source_range_assessments",
+        "data_import_run_events",
     }
 )
 
@@ -1130,7 +1134,10 @@ class SqliteStore:
                 and foreign_key_violations == 0
                 and foreign_keys == 1
                 and journal_mode == "wal"
-                and migration_version == 3
+                and migration_version == max(
+                    int(path.name[:4])
+                    for path in _MIGRATIONS_DIR.glob("[0-9][0-9][0-9][0-9]_*.sql")
+                )
             )
             else "FAIL"
         )
