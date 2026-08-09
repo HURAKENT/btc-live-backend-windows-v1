@@ -15,6 +15,78 @@ from unittest import mock
 
 
 class Phase0EvidenceTests(unittest.TestCase):
+    def test_canonical_phase0_c1_c2_c3_evidence_has_crlf_checkout_contract(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        canonical_reports = (
+            "reports/PHASE0_ACCEPTED_BASELINE.json",
+            "reports/PHASE0_COMMAND_RECEIPT.json",
+            "reports/C1_DOWNTIME_ACCEPTANCE.json",
+            "reports/C1_FINAL_ACCEPTANCE.json",
+            "reports/C2_RECOVERY_ACCEPTANCE.json",
+            "reports/C3_MARKET_ROLLOVER_ACCEPTANCE.json",
+            "reports/C2_C3_FINAL_ACCEPTANCE.json",
+        )
+
+        for relative_path in canonical_reports:
+            result = subprocess.run(
+                (
+                    "git",
+                    "-C",
+                    str(project_root),
+                    "check-attr",
+                    "text",
+                    "eol",
+                    "--",
+                    relative_path,
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            attributes = result.stdout.splitlines()
+            self.assertIn(
+                f"{relative_path}: text: set",
+                attributes,
+                msg=relative_path,
+            )
+            self.assertIn(
+                f"{relative_path}: eol: crlf",
+                attributes,
+                msg=relative_path,
+            )
+
+        for relative_path in (
+            "reports/C4_STRATEGY_47_ACCEPTANCE.json",
+            "reports/C5_STRATEGY_47_ACTIVATION_ACCEPTANCE.json",
+            "reports/STRATEGY_47_STATUS_MATRIX.json",
+        ):
+            result = subprocess.run(
+                (
+                    "git",
+                    "-C",
+                    str(project_root),
+                    "check-attr",
+                    "text",
+                    "eol",
+                    "--",
+                    relative_path,
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            attributes = result.stdout.splitlines()
+            self.assertIn(
+                f"{relative_path}: text: unset",
+                attributes,
+                msg=relative_path,
+            )
+            self.assertIn(
+                f"{relative_path}: eol: unspecified",
+                attributes,
+                msg=relative_path,
+            )
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)

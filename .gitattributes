@@ -1,6 +1,13 @@
 /.gitattributes text eol=lf
 tools/build_c4_v2_parity_fixture.py text eol=lf
 *.json -text
+reports/PHASE0_ACCEPTED_BASELINE.json text eol=crlf
+reports/PHASE0_COMMAND_RECEIPT.json text eol=crlf
+reports/C1_DOWNTIME_ACCEPTANCE.json text eol=crlf
+reports/C1_FINAL_ACCEPTANCE.json text eol=crlf
+reports/C2_RECOVERY_ACCEPTANCE.json text eol=crlf
+reports/C3_MARKET_ROLLOVER_ACCEPTANCE.json text eol=crlf
+reports/C2_C3_FINAL_ACCEPTANCE.json text eol=crlf
 registry/STRATEGY_REGISTRY_47.csv text eol=crlf
 strategy_sources/frozen/contracts/* -text whitespace=cr-at-eol,-blank-at-eof
 strategy_sources/frozen/source_snapshots/* -text whitespace=cr-at-eol,-blank-at-eof
