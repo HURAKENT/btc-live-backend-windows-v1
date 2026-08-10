@@ -181,7 +181,7 @@ class DataCompletionLedgerTests(unittest.TestCase):
         ledger = DataCompletionLedger(self.store)
         ledger.commit_import(run, (source_range,), (self._event(),))
         absent_evidence = json.dumps(
-            {"inventory": {"absence_confirmed": True, "provenance_sha256": "f" * 64, "reason_code": "NO_MARKET"}},
+            {"inventory": {"absence_confirmed": True, "artifact_sha256": "f" * 64, "artifact_type": "SANITIZED_PROVIDER_INVENTORY_V1", "reason_code": "NO_MARKET"}},
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -193,6 +193,7 @@ class DataCompletionLedgerTests(unittest.TestCase):
                     status="EXPECTED_ABSENT",
                     expected_row_count=0,
                     observed_row_count=0,
+                    reason_code="NO_MARKET",
                     evidence_metadata_json=absent_evidence,
                     evidence_sha256=hashlib.sha256(absent_evidence.encode()).hexdigest(),
                 ),),
@@ -248,6 +249,102 @@ class DataCompletionLedgerTests(unittest.TestCase):
                 evidence_metadata_json="{}",
                 evidence_sha256=hashlib.sha256(b"{}").hexdigest(),
             )
+
+    def test_expected_absent_assessment_binds_verified_inventory_artifact_bytes(self) -> None:
+        import dataclasses
+        from src.data_completion import DataCompletionLedger
+
+        _, source_range = self._records()
+        inventory_bytes = json.dumps(
+            {
+                "canonical_scope_sha256": source_range.canonical_scope_sha256,
+                "observed_row_count": 0,
+                "reason_code": "NO_EVENT_IN_EXACT_RANGE",
+                "requested_end_ms": source_range.requested_end_ms,
+                "requested_start_ms": source_range.requested_start_ms,
+                "schema_version": "SANITIZED_PROVIDER_INVENTORY_V1",
+                "source": source_range.source,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        inventory_sha256 = hashlib.sha256(inventory_bytes).hexdigest()
+        evidence = json.dumps(
+            {
+                "inventory": {
+                    "absence_confirmed": True,
+                    "artifact_sha256": inventory_sha256,
+                    "artifact_type": "SANITIZED_PROVIDER_INVENTORY_V1",
+                    "reason_code": "NO_EVENT_IN_EXACT_RANGE",
+                }
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        absent = dataclasses.replace(
+            source_range,
+            import_run_id=None,
+            status="EXPECTED_ABSENT",
+            expected_row_count=1,
+            observed_row_count=0,
+            missing_row_count=1,
+            reason_code="NO_EVENT_IN_EXACT_RANGE",
+            evidence_metadata_json=evidence,
+            evidence_sha256=hashlib.sha256(evidence.encode()).hexdigest(),
+        )
+        ledger = DataCompletionLedger(self.store)
+        with self.assertRaisesRegex(ValueError, "EXPECTED_ABSENT_INVENTORY_BYTES_REQUIRED"):
+            ledger.record_range_assessment(absent)
+        with self.assertRaisesRegex(ValueError, "EXPECTED_ABSENT_INVENTORY_HASH_MISMATCH"):
+            ledger.record_range_assessment(absent, inventory_artifact_bytes=b"wrong")
+        wrong_inventory_bytes = json.dumps(
+            {
+                **json.loads(inventory_bytes),
+                "observed_row_count": 1,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        wrong_evidence = json.dumps(
+            {
+                "inventory": {
+                    "absence_confirmed": True,
+                    "artifact_sha256": hashlib.sha256(wrong_inventory_bytes).hexdigest(),
+                    "artifact_type": "SANITIZED_PROVIDER_INVENTORY_V1",
+                    "reason_code": "NO_EVENT_IN_EXACT_RANGE",
+                }
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        self_consistent_but_false = dataclasses.replace(
+            absent,
+            evidence_metadata_json=wrong_evidence,
+            evidence_sha256=hashlib.sha256(wrong_evidence.encode()).hexdigest(),
+        )
+        with self.assertRaisesRegex(ValueError, "EXPECTED_ABSENT_INVENTORY_CONTRACT_MISMATCH"):
+            ledger.record_range_assessment(
+                self_consistent_but_false,
+                inventory_artifact_bytes=wrong_inventory_bytes,
+            )
+        for changed_inventory, error in (
+            ({**json.loads(evidence)["inventory"], "artifact_type": "ARBITRARY_SCHEMA_V9"}, "EXPECTED_ABSENT_EVIDENCE_REQUIRED"),
+            ({**json.loads(evidence)["inventory"], "reason_code": "CONTRADICTORY_REASON"}, "EXPECTED_ABSENT_EVIDENCE_REQUIRED"),
+        ):
+            with self.subTest(error=error, inventory=changed_inventory):
+                changed_evidence = json.dumps(
+                    {"inventory": changed_inventory},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                with self.assertRaisesRegex(ValueError, error):
+                    dataclasses.replace(
+                        absent,
+                        evidence_metadata_json=changed_evidence,
+                        evidence_sha256=hashlib.sha256(changed_evidence.encode()).hexdigest(),
+                    )
+        ledger.record_range_assessment(absent, inventory_artifact_bytes=inventory_bytes)
+        self.assertEqual(self.store.count("data_source_range_assessments"), 1)
 
     def test_import_run_records_schema_and_zero_dropped_rows(self) -> None:
         import dataclasses
@@ -587,8 +684,21 @@ class DataCompletionLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SOURCE_RANGE_ASSESSMENT_NOT_MONOTONIC"):
             ledger.record_range_assessment(dataclasses.replace(retryable, updated_at_ms=60_000))
 
+        inventory_bytes = json.dumps(
+            {
+                "canonical_scope_sha256": retryable.canonical_scope_sha256,
+                "observed_row_count": 0,
+                "reason_code": "NO_MARKET",
+                "requested_end_ms": retryable.requested_end_ms,
+                "requested_start_ms": retryable.requested_start_ms,
+                "schema_version": "SANITIZED_PROVIDER_INVENTORY_V1",
+                "source": retryable.source,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
         absence = json.dumps(
-            {"inventory": {"absence_confirmed": True, "provenance_sha256": "f" * 64, "reason_code": "NO_MARKET"}},
+            {"inventory": {"absence_confirmed": True, "artifact_sha256": hashlib.sha256(inventory_bytes).hexdigest(), "artifact_type": "SANITIZED_PROVIDER_INVENTORY_V1", "reason_code": "NO_MARKET"}},
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -602,7 +712,7 @@ class DataCompletionLedgerTests(unittest.TestCase):
             evidence_sha256=hashlib.sha256(absence.encode()).hexdigest(),
             updated_at_ms=80_000,
         )
-        ledger.record_range_assessment(terminal)
+        ledger.record_range_assessment(terminal, inventory_artifact_bytes=inventory_bytes)
         with self.assertRaisesRegex(ValueError, "SOURCE_RANGE_TERMINAL_REGRESSION"):
             ledger.record_range_assessment(dataclasses.replace(retryable, updated_at_ms=90_000))
 

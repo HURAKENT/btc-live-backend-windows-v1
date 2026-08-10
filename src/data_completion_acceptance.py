@@ -49,6 +49,27 @@ def _hash(value: str | bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _absence_inventory_artifact(
+    *,
+    canonical_scope_sha256: str,
+    source: str,
+    start_ms: int,
+    end_ms: int,
+    reason_code: str,
+) -> bytes:
+    return _canonical(
+        {
+            "canonical_scope_sha256": canonical_scope_sha256,
+            "observed_row_count": 0,
+            "reason_code": reason_code,
+            "requested_end_ms": end_ms,
+            "requested_start_ms": start_ms,
+            "schema_version": "SANITIZED_PROVIDER_INVENTORY_V1",
+            "source": source,
+        }
+    ).encode()
+
+
 def _event(source: str, key: str, timestamp_ms: int, event_type: str) -> SourceEvent:
     payload = _canonical(
         {
@@ -155,9 +176,17 @@ def _range(
         observed = 0
         missing = 1
         reason = "CONFIRMED_INVENTORY_ABSENCE"
+        artifact = _absence_inventory_artifact(
+            canonical_scope_sha256=_hash(scope),
+            source=source,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            reason_code=reason,
+        )
         evidence["inventory"] = {
             "absence_confirmed": True,
-            "provenance_sha256": _hash("deterministic-loopback-inventory"),
+            "artifact_sha256": _hash(artifact),
+            "artifact_type": "SANITIZED_PROVIDER_INVENTORY_V1",
             "reason_code": reason,
         }
     elif status == "NOT_REQUIRED_BY_CONTRACT":
@@ -445,7 +474,16 @@ def verify_data_completion_acceptance(project_root: Path) -> DataCompletionAccep
                 status="NOT_REQUIRED_BY_CONTRACT",
                 updated_at_ms=300_001,
             )
-            ledger.record_range_assessment(absent)
+            ledger.record_range_assessment(
+                absent,
+                inventory_artifact_bytes=_absence_inventory_artifact(
+                    canonical_scope_sha256=absent.canonical_scope_sha256,
+                    source=absent.source,
+                    start_ms=absent.requested_start_ms,
+                    end_ms=absent.requested_end_ms,
+                    reason_code=absent.reason_code or "",
+                ),
+            )
             ledger.record_range_assessment(not_required)
 
             live_event = _event("binance", "dc:live:append", 240_000, "BINANCE_KLINE_CLOSED")

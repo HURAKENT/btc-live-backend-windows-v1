@@ -185,9 +185,11 @@ class SourceRangeRecord:
                 or self.missing_row_count != self.expected_row_count
                 or type(inventory) is not dict
                 or inventory.get("absence_confirmed") is not True
-                or _SHA64.fullmatch(str(inventory.get("provenance_sha256", ""))) is None
+                or _SHA64.fullmatch(str(inventory.get("artifact_sha256", ""))) is None
+                or inventory.get("artifact_type") != "SANITIZED_PROVIDER_INVENTORY_V1"
                 or type(inventory.get("reason_code")) is not str
                 or not inventory["reason_code"]
+                or inventory["reason_code"] != self.reason_code
             ):
                 raise ValueError("EXPECTED_ABSENT_EVIDENCE_REQUIRED")
         if self.status in {
@@ -467,9 +469,46 @@ class DataCompletionLedger:
         if stored is None or tuple(stored) != values:
             raise ValueError("SOURCE_RANGE_ASSESSMENT_CONFLICT")
 
-    def record_range_assessment(self, item: SourceRangeRecord) -> None:
+    def record_range_assessment(
+        self,
+        item: SourceRangeRecord,
+        *,
+        inventory_artifact_bytes: bytes | None = None,
+    ) -> None:
         if type(item) is not SourceRangeRecord or item.import_run_id is not None:
             raise ValueError("INVALID_STANDALONE_RANGE_ASSESSMENT")
+        if item.status == "EXPECTED_ABSENT":
+            if type(inventory_artifact_bytes) is not bytes:
+                raise ValueError("EXPECTED_ABSENT_INVENTORY_BYTES_REQUIRED")
+            inventory = json.loads(item.evidence_metadata_json)["inventory"]
+            if hashlib.sha256(inventory_artifact_bytes).hexdigest() != inventory["artifact_sha256"]:
+                raise ValueError("EXPECTED_ABSENT_INVENTORY_HASH_MISMATCH")
+            try:
+                artifact_text = inventory_artifact_bytes.decode("utf-8")
+                artifact = json.loads(artifact_text)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise ValueError("EXPECTED_ABSENT_INVENTORY_CONTRACT_MISMATCH") from None
+            if (
+                json.dumps(
+                    artifact,
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ) != artifact_text
+                or artifact != {
+                    "canonical_scope_sha256": item.canonical_scope_sha256,
+                    "observed_row_count": 0,
+                    "reason_code": item.reason_code,
+                    "requested_end_ms": item.requested_end_ms,
+                    "requested_start_ms": item.requested_start_ms,
+                    "schema_version": inventory["artifact_type"],
+                    "source": item.source,
+                }
+            ):
+                raise ValueError("EXPECTED_ABSENT_INVENTORY_CONTRACT_MISMATCH")
+        elif inventory_artifact_bytes is not None:
+            raise ValueError("UNEXPECTED_INVENTORY_ARTIFACT_BYTES")
         try:
             self._connection.execute("BEGIN IMMEDIATE")
             self._insert_range(item)
