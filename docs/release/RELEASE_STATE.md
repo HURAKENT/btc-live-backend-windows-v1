@@ -16,15 +16,15 @@
 | C9 EXPRESS | 30 | 30 | ACCEPTED |
 | C10 EXPRESS | 40 | 40 | ACCEPTED |
 | C11 PREP | 20 | 20 | ACCEPTED |
-| FINAL COMBINED ACCEPTANCE | 10 | 0 | NOT STARTED |
-| **Total** | **100** | **90/100** | **ACTIVE** |
+| FINAL COMBINED ACCEPTANCE | 10 | 10 | ACCEPTED |
+| **Total** | **100** | **100/100** | **COMPLETE** |
 
 The real 48-hour C11 observation is outside this sprint. Sprint completion
 means readiness to launch it, not completion of elapsed observation time.
 
 ## Control state
 
-- ACTIVE: final combined acceptance on the integrated C9+C10+C11 PREP build.
+- ACTIVE: none.
 - BLOCKED: none.
 - Accepted C9 integration commit: `769c9eeb1aab4ac116a08acc6c1f79ae9b882f1d`.
 - Accepted C9 boundary remediation:
@@ -37,8 +37,11 @@ means readiness to launch it, not completion of elapsed observation time.
 - C11 PREP dry-run: 4 native Windows tests, 4 PASS, 0 FAIL; the real
   48-hour observation was not started. Receipt:
   `reports/C11_PREP_ACCEPTANCE.json`.
-- Next integration step: perform final combined acceptance and the single full
-  native Windows suite.
+- Final combined acceptance: 1009 native Windows tests, 1007 PASS, 2 documented
+  SKIP, 0 FAIL, exit code 0. Receipt:
+  `reports/C9_C11_PREP_FINAL_ACCEPTANCE.json`.
+- Next stage: launch the real C11 48-hour observation under
+  `docs/release/C11_48H_ACCEPTANCE.md`; it was not started during this sprint.
 
 ## Security state
 

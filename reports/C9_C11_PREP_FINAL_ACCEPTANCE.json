@@ -1,0 +1,85 @@
+{
+  "schema_version": "C9_C11_PREP_FINAL_ACCEPTANCE_V1",
+  "status": "PASS",
+  "integration_branch": "codex/final-project-completion",
+  "tested_commit": "4d6fe1897ced23035e7a8a50d9b6e2e561541998",
+  "release_hub_base": "cb6699e433a86c151e3953da30bfa4618931ba85",
+  "accepted_mvp_commit": "e097d9bb2ea2e03d0ca43fe7e9130cb10dbe1a90",
+  "progress": {
+    "c9": "30/30",
+    "c10": "40/40",
+    "c11_prep": "20/20",
+    "final_combined_acceptance": "10/10",
+    "total": "100/100"
+  },
+  "c9": {
+    "worker_head": "f7a1a3b0bc125fadfd5672b065b84618d1852da5",
+    "integration_commit": "769c9eeb1aab4ac116a08acc6c1f79ae9b882f1d",
+    "boundary_remediation_commit": "83fb525435173958f6dc807822ac8688e6f77ff3",
+    "focused_native_windows": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0
+    },
+    "final_suite_covered_task_scheduler": true,
+    "final_suite_covered_startup_backup_restore": true
+  },
+  "c10": {
+    "worker_head": "14fdcad66bd98c8a88ba8b5a19240664e880fbe6",
+    "integration_commit": "35ffc4be6a381540ece6533568d394ef1c0bce63",
+    "focused_native_windows": {
+      "tests": 3,
+      "pass": 3,
+      "fail": 0
+    },
+    "production_changes": false,
+    "final_suite_covered_failure_cases": true
+  },
+  "c11_prep": {
+    "implementation_commit": "150b92c05e964c1bb1d93b2d22aa8b6fbe4411fb",
+    "receipt": "reports/C11_PREP_ACCEPTANCE.json",
+    "focused_native_windows": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "elapsed_seconds": 7.068
+    },
+    "real_48h_observation_started": false,
+    "future_report_status_during_dry_run": "BLOCKED",
+    "final_suite_covered_dry_run": true
+  },
+  "full_native_windows_suite": {
+    "command": ".venv/Scripts/python.exe -m unittest discover -s tests -v",
+    "started_at": "2026-08-11T21:25:32Z",
+    "ended_at": "2026-08-11T21:28:40Z",
+    "tests": 1009,
+    "pass": 1007,
+    "skip": 2,
+    "fail": 0,
+    "error": 0,
+    "test_elapsed_seconds": 185.975,
+    "exit_code": 0,
+    "result": "OK (skipped=2)",
+    "documented_skips": [
+      {
+        "test": "test_historical_source_pack_import.HistoricalSourcePackImportTests.test_authoritative_70_and_100_universes_are_disjoint_with_zero_silent_drops",
+        "reason": "authoritative local source packs unavailable"
+      },
+      {
+        "test": "test_live_contract_smoke.LiveContractSmokeTests.test_task_13_clob_schema_blocker_is_exact_and_hashed",
+        "reason": "provider schema blocker is not the current result"
+      }
+    ]
+  },
+  "security": {
+    "trading_approval": false,
+    "real_orders": false,
+    "wallet": false,
+    "signing": false,
+    "authenticated_clob_writes": false
+  },
+  "p0_p1_open": [],
+  "real_48h_ready": true,
+  "next": "Real C11 48-hour observation",
+  "review_completed_at": "2026-08-11T21:32:51Z"
+}
