@@ -10,7 +10,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TASK_SCRIPT = PROJECT_ROOT / "scripts" / "C9_TASK_SCHEDULER.ps1"
-PYTHON_PATH = PROJECT_ROOT.parents[1] / ".venv" / "Scripts" / "python.exe"
+PYTHON_PATH = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
 
 
 @unittest.skipUnless(os.name == "nt", "native Windows Task Scheduler required")
@@ -44,6 +44,7 @@ class C9TaskSchedulerAcceptanceTests(unittest.TestCase):
             Path(verified["project_root"]),
             PROJECT_ROOT,
         )
+        self.assertNotIn("-ExecutionPolicy", self._registered_action_arguments())
 
         removed = self._run("Unregister")
         self.assertEqual(removed["status"], "PASS")
@@ -84,6 +85,32 @@ class C9TaskSchedulerAcceptanceTests(unittest.TestCase):
                 f"with {result.returncode}: {result.stderr}"
             )
         return json.loads(result.stdout.strip().splitlines()[-1])
+
+    def _registered_action_arguments(self) -> str:
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                (
+                    "(Get-ScheduledTask -TaskName '"
+                    + self.task_name
+                    + "' -TaskPath '\\').Actions[0].Arguments"
+                ),
+            ],
+            cwd=PROJECT_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if result.returncode != 0:
+            self.fail(
+                "Task Scheduler action lookup failed with "
+                f"{result.returncode}: {result.stderr}"
+            )
+        return result.stdout.strip()
 
 
 if __name__ == "__main__":

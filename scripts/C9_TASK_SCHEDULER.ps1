@@ -32,7 +32,7 @@ function Get-ExpectedDefinition {
     }
     $LauncherPath = Join-Path $ResolvedRoot "scripts\C9_RUN_BACKEND.ps1"
     $PowerShellPath = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-    $Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $LauncherPath + '" -PythonPath "' + $ResolvedPython + '"'
+    $Arguments = '-NoProfile -NonInteractive -File "' + $LauncherPath + '" -PythonPath "' + $ResolvedPython + '"'
     $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     return [ordered]@{
         execute = $PowerShellPath
