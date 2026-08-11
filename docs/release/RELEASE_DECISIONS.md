@@ -29,3 +29,10 @@ approved bootstrap contract and `docs/release/HANDOFF_MVP_TO_C9_C11.md`.
     `authenticated_CLOB_writes=false`.
 12. Accepted MVP behavior is frozen unless a new reproducible P0/P1 is found.
     Historical Data Completion and PF1 are outside this sprint.
+13. The C9 startup adapter is accepted because it returns the exact
+    `SqliteStore` type, preserves migration/runtime initialization, and replaces
+    only the startup integrity report with bounded `quick_check(1)` plus exact
+    migration/table validation.
+14. C9 Task Scheduler actions must run without `-ExecutionPolicy Bypass`, as
+    required by the frozen C0/C1 contract. Integration removed that flag and
+    added native registered-action verification; no shared MVP file changed.

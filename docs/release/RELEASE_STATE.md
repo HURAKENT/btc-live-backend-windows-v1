@@ -5,8 +5,7 @@
 - Integration branch: `codex/final-project-completion`.
 - Audited handoff input base: `b448fcb10d264840e0f918048d4ec975555def7d`.
 - Accepted functional MVP: `e097d9bb2ea2e03d0ca43fe7e9130cb10dbe1a90`.
-- Worker release-hub base: the bootstrap commit containing this control plane;
-  workers must resolve and record its full SHA before creating either worktree.
+- Worker release-hub base: `cb6699e433a86c151e3953da30bfa4618931ba85`.
 - Evidence: `docs/release/HANDOFF_MVP_TO_C9_C11.md` and the bootstrap Git
   verification recorded in the release-manager handoff.
 
@@ -14,22 +13,27 @@
 
 | Stage | Weight | Progress | State |
 |---|---:|---:|---|
-| C9 EXPRESS | 30 | 0 | NOT STARTED |
-| C10 EXPRESS | 40 | 0 | NOT STARTED |
+| C9 EXPRESS | 30 | 30 | ACCEPTED |
+| C10 EXPRESS | 40 | 40 | ACCEPTED |
 | C11 PREP | 20 | 0 | DEFERRED UNTIL C9+C10 INTEGRATION |
 | FINAL COMBINED ACCEPTANCE | 10 | 0 | NOT STARTED |
-| **Total** | **100** | **0/100** | **ACTIVE** |
+| **Total** | **100** | **70/100** | **ACTIVE** |
 
 The real 48-hour C11 observation is outside this sprint. Sprint completion
 means readiness to launch it, not completion of elapsed observation time.
 
 ## Control state
 
-- ACTIVE: release-manager bootstrap only.
+- ACTIVE: C11 PREP on the integrated C9+C10 build.
 - BLOCKED: none.
-- Next integration step: create both worker branches/worktrees from the same
-  bootstrap commit, then dispatch the two packets in
-  `docs/release/RELEASE_WORKER_HANDOFF_TEMPLATE.md`.
+- Accepted C9 integration commit: `769c9eeb1aab4ac116a08acc6c1f79ae9b882f1d`.
+- Accepted C9 boundary remediation:
+  `83fb525435173958f6dc807822ac8688e6f77ff3` removes the forbidden scheduled
+  action policy bypass and makes its native acceptance path canonical-checkout
+  independent.
+- Accepted C10 integration commit: `35ffc4be6a381540ece6533568d394ef1c0bce63`.
+- Next integration step: implement and dry-run the minimal C11 observation
+  harness, then perform final combined acceptance.
 
 ## Security state
 
@@ -45,7 +49,8 @@ These values are invariant for C9, C10, C11 PREP, and final acceptance.
 
 | Worker | Proposed branch | Proposed worktree | Status | Accepted handoff |
 |---|---|---|---|---|
-| C9 Windows Operations | `codex/release-c9` | `.worktrees/release-c9` | NOT CREATED | none |
-| C10 Failure Coverage | `codex/release-c10` | `.worktrees/release-c10` | NOT CREATED | none |
+| C9 Windows Operations | `codex/release-c9` | `.worktrees/release-c9` | INTEGRATED | `f7a1a3b0bc125fadfd5672b065b84618d1852da5` |
+| C10 Failure Coverage | `codex/release-c10` | `.worktrees/release-c10` | INTEGRATED | `14fdcad66bd98c8a88ba8b5a19240664e880fbe6` |
 
-No worker branch or worktree was created during bootstrap.
+C9 focused native Windows integration smoke: 16 tests, 16 PASS, 0 FAIL.
+C10 focused native Windows integration smoke: 3 tests, 3 PASS, 0 FAIL.
