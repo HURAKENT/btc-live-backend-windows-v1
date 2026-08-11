@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BTC Daily Range · Paper Dashboard</title>
+  <link rel="stylesheet" href="/dashboard/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">BTC DAILY RANGE · LOCAL PAPER</p>
+      <h1>Execution console</h1>
+    </div>
+    <div id="connection-status" class="status status-warn" role="status" aria-live="polite">CONNECTING</div>
+  </header>
+
+  <main>
+    <section class="hero" aria-label="Current market">
+      <div>
+        <span class="label">Market</span>
+        <strong id="market-id">NO_DATA</strong>
+      </div>
+      <div>
+        <span class="label">Market date</span>
+        <strong id="market-date">NO_DATA</strong>
+      </div>
+      <div>
+        <span class="label">System health</span>
+        <strong id="system-health">NO_DATA</strong>
+      </div>
+    </section>
+
+    <section class="grid grid-primary">
+      <article class="panel">
+        <h2>Strict A signal</h2>
+        <div id="strict-a-signal" class="stack muted">NO_DATA</div>
+      </article>
+      <article class="panel">
+        <h2>Execution readiness</h2>
+        <div id="execution-readiness" class="stack muted">NO_DATA</div>
+        <div class="reason">
+          <span class="label">Explicit block reason</span>
+          <strong id="block-reason">NO_DATA</strong>
+        </div>
+      </article>
+      <article class="panel">
+        <h2>Paper account</h2>
+        <dl class="metrics">
+          <div><dt>Bankroll / equity</dt><dd id="bankroll">NO_DATA</dd></div>
+          <div><dt>Realized PnL</dt><dd id="realized-pnl">NO_DATA</dd></div>
+          <div><dt>Unrealized PnL</dt><dd id="unrealized-pnl">NO_DATA</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="grid grid-secondary">
+      <article class="panel panel-wide">
+        <h2>Source health</h2>
+        <div id="source-health" class="list muted">NO_DATA</div>
+      </article>
+      <article class="panel panel-wide">
+        <h2>Paper position</h2>
+        <div id="paper-position" class="list muted">NO_DATA</div>
+      </article>
+      <article class="panel panel-wide">
+        <h2>Fills</h2>
+        <div id="paper-fills" class="list muted">NO_DATA</div>
+      </article>
+      <article class="panel panel-wide">
+        <h2>Incidents</h2>
+        <div id="incidents" class="list muted">NO_DATA</div>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    Read-only localhost consumer · no provider, wallet, signing, or order access
+  </footer>
+  <script src="/dashboard/app.js" defer></script>
+</body>
+</html>
