@@ -14,6 +14,9 @@ from src.current_input import (
     assert_current_model_enabled,
     build_executable_checkpoint_input,
     exact_vwap5,
+    fee_evidence_from_public_schedule,
+    frozen_model_probabilities,
+    authorize_current_model_for_paper,
     validate_closed_candles,
 )
 from src.fixed_point import ProbabilityMicros
@@ -34,9 +37,9 @@ SHA_D = "d" * 64
 SHA_E = "e" * 64
 
 
-def _candle(open_time_ms: int) -> SourceEvent:
+def _candle(open_time_ms: int, close: int = 100_001) -> SourceEvent:
     payload = {
-        "close": "100001",
+        "close": str(close),
         "close_time_ms": open_time_ms + MINUTE_MS - 1,
         "high": "100002",
         "interval": "1m",
@@ -66,6 +69,13 @@ def _candles(count: int = 181) -> tuple[SourceEvent, ...]:
     return tuple(
         _candle(FIRST_OPEN_MS + index * MINUTE_MS)
         for index in range(count)
+    )
+
+
+def _model_candles() -> tuple[SourceEvent, ...]:
+    return tuple(
+        _candle(FIRST_OPEN_MS + index * MINUTE_MS, 99_900 + (index % 17) * 13)
+        for index in range(181)
     )
 
 
@@ -115,6 +125,53 @@ class ClosedCandleWindowTests(unittest.TestCase):
         with self.assertRaisesRegex(CurrentInputBlocked, "MODEL_INPUT_INVALID"):
             validate_closed_candles(
                 _candles(), observed_at_ms=LAST_OPEN_MS + 30_000
+            )
+
+    def test_versioned_paper_authorization_does_not_enable_real_trading(self):
+        bundle_hash = authorize_current_model_for_paper(
+            Path("strategy_sources/frozen/contracts/STRICT_A_MODEL_FROZEN.json"),
+            paper_authorized=True,
+            trading_approval=False,
+            real_orders=False,
+            wallet=False,
+            signing=False,
+        )
+        self.assertEqual(len(bundle_hash), 64)
+
+    def test_frozen_model_produces_normalized_eleven_bucket_probabilities(self):
+        bounds = tuple(
+            [(None, 99_500.0)]
+            + [(99_500.0 + index * 100.0, 99_600.0 + index * 100.0) for index in range(9)]
+            + [(100_400.0, None)]
+        )
+        probabilities = frozen_model_probabilities(
+            _model_candles(),
+            observed_at_ms=OBSERVED_AT_MS,
+            checkpoint_minutes=60,
+            bucket_bounds=bounds,
+            contract_path=Path(
+                "strategy_sources/frozen/contracts/STRICT_A_MODEL_FROZEN.json"
+            ),
+            paper_authorized=True,
+        )
+        self.assertEqual(len(probabilities), 11)
+        self.assertEqual(sum(item.value for item in probabilities), 1_000_000)
+
+    def test_public_fee_schedule_uses_documented_taker_formula_and_provenance(self):
+        evidence = fee_evidence_from_public_schedule(
+            token_id="yes-token",
+            price_micros=500_000,
+            fee_schedule={"rate": 0.07, "exponent": 1, "takerOnly": True},
+        )
+        self.assertEqual(evidence.fee_per_share_usd_micros, 17_500)
+        self.assertIn("POLYMARKET_PUBLIC_FEE_SCHEDULE", evidence.provenance)
+
+    def test_unknown_fee_curve_fails_closed(self):
+        with self.assertRaisesRegex(CurrentInputBlocked, "MISSING_FEE_PROVENANCE"):
+            fee_evidence_from_public_schedule(
+                token_id="yes-token",
+                price_micros=500_000,
+                fee_schedule={"rate": 0.02, "exponent": 2, "takerOnly": True},
             )
 
 

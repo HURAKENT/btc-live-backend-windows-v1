@@ -31,3 +31,19 @@ version.
     wiring, runtime orchestration, and config. Workers return shared requests.
 13. **Verification cadence:** focused worker tests; one fresh full Windows suite
     only after current input, C7, API extension, and dashboard are integrated.
+14. **Paper-only authorization:** frozen Strict A evidence is not edited.
+    `BTC_DAILY_RANGE_MVP_RUNTIME_V1` explicitly permits current evaluation and
+    local paper simulation while every real-money switch remains false.
+15. **Structured current market input:** market date and bucket bounds come from
+    machine-readable discovery metadata. Missing or malformed metadata fails
+    closed; display names are not parsed as bucket authority.
+16. **Fee evidence:** paper economics use the contemporaneous public Polymarket
+    fee schedule and its documented formula. Missing or unsupported schedule
+    provenance fails closed; zero is never assumed.
+17. **No sub-five-share position:** the first MVP executes exactly five shares
+    or blocks. Worker B's task-local `<5` partial-fill path is disabled because
+    its VWAP5 price is not evidence for a smaller actual fill. No general
+    partial-fill engine is added.
+18. **Single persistence path:** paper tables and paper outbox topics use the
+    existing primary SQLite connection and resumable event stream; no second
+    writer or order router exists.

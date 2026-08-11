@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import signal
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
@@ -10,7 +11,7 @@ from typing import Any, Protocol
 from aiohttp import web
 
 from src.api import create_api_app
-from src.config import RuntimeConfig, load_runtime_config
+from src.config import RuntimeConfig, load_versioned_runtime_config
 from src.outbox import OutboxBroker
 from src.single_instance import AlreadyRunningError, WindowsMutex
 from src.storage import SqliteReadStore, SqliteStore
@@ -92,6 +93,10 @@ class BackendRuntime:
         self._store = store
         self._read_store = store.open_read_store()
         self._broker = OutboxBroker()
+        if config.paper_enabled:
+            store.paper_ledger().initialize_account(
+                updated_at_ms=time.time_ns() // 1_000_000
+            )
 
     async def start_runtime_tasks(self) -> None:
         if self._store is None or self._broker is None:
@@ -103,7 +108,10 @@ class BackendRuntime:
             )
 
             factory = build_default_runtime_orchestrator
-        orchestrator = factory(store=self._store, broker=self._broker)
+        factory_kwargs = {"store": self._store, "broker": self._broker}
+        if "runtime_config" in inspect.signature(factory).parameters:
+            factory_kwargs["runtime_config"] = self._config
+        orchestrator = factory(**factory_kwargs)
         if inspect.isawaitable(orchestrator):
             orchestrator = await orchestrator
         self._orchestrator = orchestrator
@@ -196,7 +204,7 @@ class LiveBackend:
         database_path: Path,
         runtime: RuntimeLifecycle | None = None,
         mutex_name: str = DEFAULT_MUTEX_NAME,
-        config_loader: Callable[[Path], RuntimeConfig] = load_runtime_config,
+        config_loader: Callable[[Path], RuntimeConfig] = load_versioned_runtime_config,
         mutex_factory: Callable[[str], WindowsMutex] = WindowsMutex.acquire,
         store_factory: Callable[[Path], SqliteStore] = SqliteStore.open,
     ) -> None:

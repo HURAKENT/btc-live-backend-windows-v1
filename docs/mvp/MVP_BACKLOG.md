@@ -14,6 +14,15 @@ These items do not block the functional Strict A paper MVP or dashboard:
 - nonessential refactoring;
 - UI polish beyond accurate real-state display and live updates.
 
+Current P2/P3 entries:
+
+- additional provider-contract fixtures and provenance receipts beyond the
+  bounded public fee/market metadata required for MVP;
+- optional actual-quantity partial-fill simulation, only with separately frozen
+  pricing and minimum-position semantics;
+- aiohttp application-key cleanup and other nonfunctional API refactoring;
+- visual polish beyond the single functional dashboard pass.
+
 Recovered historical execution remains forbidden rather than backlogged.
 Real-money execution, wallet, signing, authenticated writes, and C12/Linux
 migration remain outside authorized MVP scope.

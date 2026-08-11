@@ -36,6 +36,11 @@ _COUNTABLE_TABLES = frozenset(
         "data_source_ranges",
         "data_source_range_assessments",
         "data_import_run_events",
+        "paper_execution_readiness",
+        "paper_intents",
+        "paper_fills",
+        "paper_positions",
+        "paper_accounts",
     }
 )
 
@@ -1117,6 +1122,22 @@ class SqliteStore:
     def open_read_store(self) -> SqliteReadStore:
         return SqliteReadStore(self.open_read_only())
 
+    def paper_ledger(self, *, publisher: CommittedPublisher | None = None):
+        from src.paper import PaperLedger
+
+        return PaperLedger(
+            self._connection,
+            publisher=publisher,
+            owns_connection=False,
+        )
+
+    def has_paper_execution_for_date(self, market_date: str) -> bool:
+        _require_nonempty_string(market_date, "INVALID_PAPER_MARKET_DATE")
+        return self.scalar(
+            "SELECT 1 FROM paper_intents WHERE market_date = ? LIMIT 1",
+            (market_date,),
+        ) == 1
+
     def integrity_report(self) -> dict[str, Any]:
         quick_check = self.scalar("PRAGMA quick_check")
         integrity_check = self.scalar("PRAGMA integrity_check")
@@ -1427,6 +1448,93 @@ class SqliteReadStore:
             }
             for row in rows
         ]
+
+    def paper_account(self) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            """
+            SELECT schema_version, account_key, starting_bankroll_usd_micros,
+                cash_usd_micros, open_cost_basis_usd_micros, equity_usd_micros,
+                realized_pnl_usd_micros, unrealized_pnl_usd_micros, updated_at_ms
+            FROM paper_accounts WHERE account_key = 'default'
+            """
+        ).fetchone()
+        if row is None:
+            return None
+        names = (
+            "schema_version", "account_key", "starting_bankroll_usd_micros",
+            "cash_usd_micros", "open_cost_basis_usd_micros", "equity_usd_micros",
+            "realized_pnl_usd_micros", "unrealized_pnl_usd_micros", "updated_at_ms",
+        )
+        return dict(zip(names, row))
+
+    def paper_positions(self) -> list[dict[str, Any]]:
+        rows = self.rows(
+            """
+            SELECT schema_version, position_key, intent_key, market_id,
+                market_date, token_id, side, status, filled_shares_micros,
+                average_price_micros, cost_basis_usd_micros, fees_paid_usd_micros,
+                settlement_value_usd_micros, realized_pnl_usd_micros,
+                unrealized_pnl_usd_micros, opened_at_ms, updated_at_ms, settled_at_ms
+            FROM paper_positions ORDER BY market_date DESC
+            """
+        )
+        names = (
+            "schema_version", "position_key", "intent_key", "market_id",
+            "market_date", "token_id", "side", "status", "filled_shares_micros",
+            "average_price_micros", "cost_basis_usd_micros", "fees_paid_usd_micros",
+            "settlement_value_usd_micros", "realized_pnl_usd_micros",
+            "unrealized_pnl_usd_micros", "opened_at_ms", "updated_at_ms", "settled_at_ms",
+        )
+        return [dict(zip(names, row)) for row in rows]
+
+    def paper_fills(self) -> list[dict[str, Any]]:
+        rows = self.rows(
+            """
+            SELECT schema_version, fill_key, intent_key, fill_sequence,
+                shares_micros, price_micros, fee_usd_micros, gross_cost_usd_micros,
+                evidence_key, book_sha256, filled_at_ms
+            FROM paper_fills ORDER BY filled_at_ms DESC, fill_key DESC
+            """
+        )
+        names = (
+            "schema_version", "fill_key", "intent_key", "fill_sequence",
+            "shares_micros", "price_micros", "fee_usd_micros", "gross_cost_usd_micros",
+            "evidence_key", "book_sha256", "filled_at_ms",
+        )
+        return [dict(zip(names, row)) for row in rows]
+
+    def paper_readiness(self) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            """
+            SELECT schema_version, readiness_key, market_id, market_date,
+                checkpoint_minutes, signal_key, evidence_key, ready, reason_code,
+                requested_shares_micros, checked_at_ms
+            FROM paper_execution_readiness
+            ORDER BY checked_at_ms DESC, readiness_key DESC LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return None
+        names = (
+            "schema_version", "readiness_key", "market_id", "market_date",
+            "checkpoint_minutes", "signal_key", "evidence_key", "ready", "reason_code",
+            "requested_shares_micros", "checked_at_ms",
+        )
+        payload = dict(zip(names, row))
+        payload["ready"] = bool(payload["ready"])
+        return payload
+
+    def latest_strict_a_signal(self) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            """
+            SELECT payload_json FROM signals
+            WHERE strategy_id IN (
+                'YES_STRICT_A_OPERATIONAL', 'YES_STRICT_A_T60', 'YES_STRICT_A_T30'
+            )
+            ORDER BY created_at_ms DESC, signal_id DESC LIMIT 1
+            """
+        ).fetchone()
+        return None if row is None else _decode_stored_json(row[0])
 
     def last_event_id(self) -> int:
         return self.scalar(

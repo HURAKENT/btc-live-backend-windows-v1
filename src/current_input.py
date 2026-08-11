@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -421,3 +423,229 @@ def assert_current_model_enabled(contract_path: Path) -> str:
     ):
         raise CurrentInputBlocked("MODEL_INPUT_INVALID")
     return hashlib.sha256(raw).hexdigest()
+
+
+def authorize_current_model_for_paper(
+    contract_path: Path,
+    *,
+    paper_authorized: bool,
+    trading_approval: bool,
+    real_orders: bool,
+    wallet: bool,
+    signing: bool,
+) -> str:
+    """Authorize evaluation only under the versioned local-paper safety profile."""
+
+    if (
+        paper_authorized is not True
+        or trading_approval is not False
+        or real_orders is not False
+        or wallet is not False
+        or signing is not False
+    ):
+        raise CurrentInputBlocked("MODEL_INPUT_INVALID")
+    try:
+        raw = contract_path.read_bytes()
+        payload = json.loads(raw)
+    except (OSError, json.JSONDecodeError):
+        raise CurrentInputBlocked("MODEL_INPUT_INVALID") from None
+    if (
+        type(payload) is not dict
+        or payload.get("bundle_id")
+        != "STRICT_A_HISTORICAL_FIDELITY_MODEL_BUNDLE_V1"
+        or payload.get("live_enabled") is not False
+        or payload.get("features", {}).get("closed_candles")
+        != REQUIRED_CLOSED_CANDLES
+    ):
+        raise CurrentInputBlocked("MODEL_INPUT_INVALID")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _regularized_incomplete_beta(a: float, b: float, x: float) -> float:
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+
+    def continued_fraction(left: float, right: float, value: float) -> float:
+        tiny = 1e-300
+        qab = left + right
+        qap = left + 1.0
+        qam = left - 1.0
+        c = 1.0
+        d = 1.0 - qab * value / qap
+        d = 1.0 / max(abs(d), tiny) * (1.0 if d >= 0 else -1.0)
+        result = d
+        for index in range(1, 201):
+            twice = 2 * index
+            coefficient = index * (right - index) * value / (
+                (qam + twice) * (left + twice)
+            )
+            d = 1.0 + coefficient * d
+            d = 1.0 / max(abs(d), tiny) * (1.0 if d >= 0 else -1.0)
+            c = 1.0 + coefficient / c
+            if abs(c) < tiny:
+                c = tiny
+            result *= d * c
+            coefficient = -(
+                (left + index) * (qab + index) * value
+                / ((left + twice) * (qap + twice))
+            )
+            d = 1.0 + coefficient * d
+            d = 1.0 / max(abs(d), tiny) * (1.0 if d >= 0 else -1.0)
+            c = 1.0 + coefficient / c
+            if abs(c) < tiny:
+                c = tiny
+            delta = d * c
+            result *= delta
+            if abs(delta - 1.0) <= 3e-14:
+                return result
+        raise CurrentInputBlocked("MODEL_INPUT_INVALID")
+
+    front = math.exp(
+        math.lgamma(a + b)
+        - math.lgamma(a)
+        - math.lgamma(b)
+        + a * math.log(x)
+        + b * math.log1p(-x)
+    )
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * continued_fraction(a, b, x) / a
+    return 1.0 - front * continued_fraction(b, a, 1.0 - x) / b
+
+
+def _student_t_cdf(value: float, *, df: float, loc: float, scale: float) -> float:
+    standardized = (value - loc) / scale
+    if standardized == 0.0:
+        return 0.5
+    beta = _regularized_incomplete_beta(
+        df / 2.0, 0.5, df / (df + standardized * standardized)
+    )
+    return 1.0 - beta / 2.0 if standardized > 0 else beta / 2.0
+
+
+def _quantile_cdf(value: float, quantiles: list[float], probabilities: list[float]) -> float:
+    if value <= quantiles[0]:
+        return probabilities[0]
+    if value >= quantiles[-1]:
+        return probabilities[-1]
+    for index in range(1, len(quantiles)):
+        if value <= quantiles[index]:
+            fraction = (value - quantiles[index - 1]) / (
+                quantiles[index] - quantiles[index - 1]
+            )
+            return probabilities[index - 1] + fraction * (
+                probabilities[index] - probabilities[index - 1]
+            )
+    raise CurrentInputBlocked("MODEL_INPUT_INVALID")
+
+
+def frozen_model_probabilities(
+    candles: tuple[SourceEvent, ...],
+    *,
+    observed_at_ms: int,
+    checkpoint_minutes: int,
+    bucket_bounds: tuple[tuple[float | None, float | None], ...],
+    contract_path: Path,
+    paper_authorized: bool,
+) -> tuple[ProbabilityMicros, ...]:
+    """Evaluate the frozen Strict A distribution without third-party numerics."""
+
+    validate_closed_candles(candles, observed_at_ms=observed_at_ms)
+    authorize_current_model_for_paper(
+        contract_path,
+        paper_authorized=paper_authorized,
+        trading_approval=False,
+        real_orders=False,
+        wallet=False,
+        signing=False,
+    )
+    if checkpoint_minutes not in (30, 60) or len(bucket_bounds) != 11:
+        raise CurrentInputBlocked("MODEL_INPUT_INVALID")
+    try:
+        bundle = json.loads(contract_path.read_text(encoding="utf-8"))
+        closes = [float(json.loads(item.payload_json)["close"]) for item in candles]
+        returns = [math.log(current / previous) for previous, current in zip(closes, closes[1:])]
+        mean = sum(returns) / len(returns)
+        sigma = math.sqrt(
+            sum((value - mean) ** 2 for value in returns) / (len(returns) - 1)
+        )
+        spot = closes[-1]
+        horizon_scale = sigma * math.sqrt(checkpoint_minutes)
+        if not math.isfinite(horizon_scale) or horizon_scale <= 0 or spot <= 0:
+            raise ValueError
+        spec = bundle["models"][str(checkpoint_minutes)]
+        probability_quantiles = [float(item) for item in bundle["probability_quantiles"]]
+    except (KeyError, TypeError, ValueError, ZeroDivisionError, json.JSONDecodeError):
+        raise CurrentInputBlocked("MODEL_INPUT_INVALID") from None
+
+    def cdf(price: float | None, *, upper: bool) -> float:
+        if price is None:
+            return 1.0 if upper else 0.0
+        if type(price) not in (int, float) or price <= 0 or not math.isfinite(price):
+            raise CurrentInputBlocked("MODEL_INPUT_INVALID")
+        z = math.log(float(price) / spot) / horizon_scale
+        if checkpoint_minutes == 30:
+            return _quantile_cdf(
+                z,
+                [float(item) for item in spec["quantile_z"]],
+                probability_quantiles,
+            )
+        clipped = min(max(z, float(spec["clip_z"][0])), float(spec["clip_z"][1]))
+        return _student_t_cdf(
+            clipped,
+            df=float(spec["df"]),
+            loc=float(spec["loc"]),
+            scale=float(spec["scale"]),
+        )
+
+    raw: list[float] = []
+    for lower, upper in bucket_bounds:
+        probability = max(0.0, cdf(upper, upper=True) - cdf(lower, upper=False))
+        raw.append(probability)
+    total = sum(raw)
+    if not math.isfinite(total) or total <= 0:
+        raise CurrentInputBlocked("MODEL_INPUT_INVALID")
+    scaled = [value / total * 1_000_000 for value in raw]
+    floors = [math.floor(value) for value in scaled]
+    remainder = 1_000_000 - sum(floors)
+    order = sorted(range(11), key=lambda index: (scaled[index] - floors[index], -index), reverse=True)
+    for index in order[:remainder]:
+        floors[index] += 1
+    return tuple(ProbabilityMicros(value) for value in floors)
+
+
+def fee_evidence_from_public_schedule(
+    *, token_id: str, price_micros: int, fee_schedule: Mapping[str, Any]
+) -> FeeEvidenceV1:
+    """Apply the public taker formula; unsupported curves remain fail-closed."""
+
+    if type(token_id) is not str or not token_id or type(fee_schedule) is not dict:
+        raise CurrentInputBlocked("MISSING_FEE_PROVENANCE")
+    if (
+        type(price_micros) is not int
+        or not 0 <= price_micros <= 1_000_000
+        or fee_schedule.get("exponent") != 1
+        or fee_schedule.get("takerOnly") is not True
+    ):
+        raise CurrentInputBlocked("MISSING_FEE_PROVENANCE")
+    try:
+        rate = Decimal(str(fee_schedule["rate"]))
+        price = Decimal(price_micros) / Decimal(1_000_000)
+        if not rate.is_finite() or rate < 0 or rate > 1:
+            raise ValueError
+        fee = (rate * price * (Decimal(1) - price)).quantize(
+            Decimal("0.00001"), rounding=ROUND_HALF_UP
+        )
+    except (KeyError, InvalidOperation, ValueError):
+        raise CurrentInputBlocked("MISSING_FEE_PROVENANCE") from None
+    source = {
+        "documentation": "https://docs.polymarket.com/trading/fees",
+        "fee_schedule": dict(fee_schedule),
+        "token_id": token_id,
+    }
+    return FeeEvidenceV1(
+        provenance="POLYMARKET_PUBLIC_FEE_SCHEDULE",
+        source_sha256=hashlib.sha256(_canonical_json(source).encode()).hexdigest(),
+        fee_per_share_usd_micros=int(fee * Decimal(1_000_000)),
+    )

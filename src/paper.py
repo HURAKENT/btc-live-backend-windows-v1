@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from datetime import date
+from typing import Any
+
+from src.current_input import CurrentExecutionEvidenceV1
 
 
 FIVE_SHARES_MICROS = 5_000_000
@@ -46,69 +50,6 @@ def _require_market_date(value: object) -> None:
 
 def _round_half_up_product(left: int, right: int) -> int:
     return (left * right + (_MICROS // 2)) // _MICROS
-
-
-@dataclass(frozen=True, slots=True)
-class CurrentExecutionEvidenceV1:
-    schema_version: str
-    evidence_key: str
-    market_id: str
-    market_date: str
-    token_id: str
-    checkpoint_minutes: int
-    candle_first_open_time_ms: int
-    candle_last_open_time_ms: int
-    closed_candle_count: int
-    candles_sha256: str
-    model_bundle_sha256: str
-    book_sha256: str
-    fee_provenance_sha256: str
-    bucket_index: int
-    model_probability_micros: int
-    market_q_micros: int
-    vwap5_micros: int
-    available_depth_shares_micros: int
-    fee_per_share_usd_micros: int
-    book_source_timestamp_ms: int
-    observed_at_ms: int
-    price_history_source_sha256: str
-
-    def __post_init__(self) -> None:
-        if self.schema_version != "CURRENT_EXECUTION_EVIDENCE_V1":
-            raise ValueError("INVALID_EVIDENCE_SCHEMA_VERSION")
-        _require_sha256("evidence_key", self.evidence_key)
-        for name in ("market_id", "token_id"):
-            _require_nonempty(name, getattr(self, name))
-        _require_market_date(self.market_date)
-        if self.checkpoint_minutes not in (30, 60):
-            raise ValueError("INVALID_CHECKPOINT_MINUTES")
-        for name in (
-            "candle_first_open_time_ms",
-            "candle_last_open_time_ms",
-            "available_depth_shares_micros",
-            "fee_per_share_usd_micros",
-            "book_source_timestamp_ms",
-            "observed_at_ms",
-        ):
-            _require_int(name, getattr(self, name))
-        if self.closed_candle_count != 181:
-            raise ValueError("MISSING_181_CLOSED_CANDLES")
-        if type(self.bucket_index) is not int or not 0 <= self.bucket_index <= 10:
-            raise ValueError("INVALID_BUCKET_INDEX")
-        for name in (
-            "model_probability_micros",
-            "market_q_micros",
-            "vwap5_micros",
-        ):
-            _require_probability(name, getattr(self, name))
-        for name in (
-            "candles_sha256",
-            "model_bundle_sha256",
-            "book_sha256",
-            "fee_provenance_sha256",
-            "price_history_source_sha256",
-        ):
-            _require_sha256(name, getattr(self, name))
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,13 +202,125 @@ class PaperExecutionResult:
 
 
 class PaperLedger:
-    def __init__(self, connection: sqlite3.Connection) -> None:
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        publisher: Any | None = None,
+        owns_connection: bool = True,
+    ) -> None:
         if not isinstance(connection, sqlite3.Connection):
             raise ValueError("INVALID_SQLITE_CONNECTION")
         self._connection = connection
+        self._publisher = publisher
+        self._owns_connection = owns_connection
 
     def close(self) -> None:
-        self._connection.close()
+        if self._owns_connection:
+            self._connection.close()
+
+    @staticmethod
+    def _canonical_payload(value: object) -> str:
+        return json.dumps(
+            asdict(value),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    def _insert_outbox(
+        self,
+        *,
+        identity_key: str,
+        topic: str,
+        value: object,
+        created_at_ms: int,
+    ) -> int | None:
+        payload_json = self._canonical_payload(value)
+        cursor = self._connection.execute(
+            """
+            INSERT INTO outbox_events(
+                signal_id, event_identity_key, topic, payload_json, created_at_ms
+            ) VALUES (NULL, ?, ?, ?, ?)
+            ON CONFLICT(event_identity_key) DO NOTHING
+            """,
+            (identity_key, topic, payload_json, created_at_ms),
+        )
+        row = self._connection.execute(
+            """
+            SELECT event_id, topic, payload_json, created_at_ms
+            FROM outbox_events WHERE event_identity_key = ?
+            """,
+            (identity_key,),
+        ).fetchone()
+        if row is None or tuple(row[1:]) != (topic, payload_json, created_at_ms):
+            raise ValueError("PAPER_OUTBOX_IDENTITY_CONFLICT")
+        return row[0] if cursor.rowcount == 1 else None
+
+    def _result_outbox_ids(self, result: PaperExecutionResult) -> list[int]:
+        values = [("paper.readiness", result.readiness)]
+        for topic, value in (
+            ("paper.intent", result.intent),
+            ("paper.fill", result.fill),
+            ("paper.position", result.position),
+            ("paper.account", result.account),
+        ):
+            if value is not None:
+                values.append((topic, value))
+        ids: list[int] = []
+        for topic, value in values:
+            updated_at_ms = getattr(
+                value,
+                "updated_at_ms",
+                getattr(value, "filled_at_ms", getattr(value, "checked_at_ms", 0)),
+            )
+            identity = getattr(
+                value,
+                "readiness_key",
+                getattr(
+                    value,
+                    "intent_key",
+                    getattr(
+                        value,
+                        "fill_key",
+                        getattr(value, "position_key", getattr(value, "account_key", "")),
+                    ),
+                ),
+            )
+            event_id = self._insert_outbox(
+                identity_key=f"{topic}:{identity}:{updated_at_ms}",
+                topic=topic,
+                value=value,
+                created_at_ms=updated_at_ms,
+            )
+            if event_id is not None:
+                ids.append(event_id)
+        return ids
+
+    def _notify(self, event_ids: list[int]) -> None:
+        if self._publisher is None:
+            return
+        for event_id in event_ids:
+            self._publisher.publish_committed(event_id)
+
+    def _state_outbox_ids(
+        self, position: PaperPositionV1, account: PaperAccountV1
+    ) -> list[int]:
+        ids: list[int] = []
+        for topic, identity, value in (
+            ("paper.position", position.position_key, position),
+            ("paper.account", account.account_key, account),
+        ):
+            event_id = self._insert_outbox(
+                identity_key=f"{topic}:{identity}:{value.updated_at_ms}",
+                topic=topic,
+                value=value,
+                created_at_ms=value.updated_at_ms,
+            )
+            if event_id is not None:
+                ids.append(event_id)
+        return ids
 
     def initialize_account(self, *, updated_at_ms: int) -> PaperAccountV1:
         _require_int("updated_at_ms", updated_at_ms)
@@ -313,10 +366,7 @@ class PaperLedger:
         if evidence is not None and type(evidence) is not CurrentExecutionEvidenceV1:
             raise ValueError("INVALID_CURRENT_EXECUTION_EVIDENCE")
         _require_int("checked_at_ms", checked_at_ms)
-        if (
-            type(max_fill_shares_micros) is not int
-            or not 0 < max_fill_shares_micros <= FIVE_SHARES_MICROS
-        ):
+        if max_fill_shares_micros != FIVE_SHARES_MICROS:
             raise ValueError("INVALID_FILL_SHARES")
 
         try:
@@ -338,7 +388,9 @@ class PaperLedger:
                     else "DUPLICATE_LOGICAL_EXECUTION"
                 )
                 result = self._blocked_result(signal, evidence, checked_at_ms, reason)
+                event_ids = self._result_outbox_ids(result)
                 self._connection.commit()
+                self._notify(event_ids)
                 return result
 
             reason = self._readiness_reason(signal, evidence)
@@ -368,7 +420,9 @@ class PaperLedger:
                     position=None,
                     account=self.get_account(),
                 )
+                event_ids = self._result_outbox_ids(result)
                 self._connection.commit()
+                self._notify(event_ids)
                 return result
 
             assert evidence is not None
@@ -379,7 +433,9 @@ class PaperLedger:
                 fill_shares_micros=max_fill_shares_micros,
                 created_at_ms=checked_at_ms,
             )
+            event_ids = self._result_outbox_ids(result)
             self._connection.commit()
+            self._notify(event_ids)
             return result
         except BaseException:
             if self._connection.in_transaction:
@@ -739,8 +795,10 @@ class PaperLedger:
             )
             position = self._position_for_date(market_date)
             account = self._recalculate_account(updated_at_ms)
-            self._connection.commit()
             assert position is not None
+            event_ids = self._state_outbox_ids(position, account)
+            self._connection.commit()
+            self._notify(event_ids)
             return position, account
         except BaseException:
             if self._connection.in_transaction:
@@ -796,8 +854,10 @@ class PaperLedger:
             )
             account = self._recalculate_account(settled_at_ms)
             position = self._position_for_date(market_date)
-            self._connection.commit()
             assert position is not None
+            event_ids = self._state_outbox_ids(position, account)
+            self._connection.commit()
+            self._notify(event_ids)
             return position, account
         except BaseException:
             if self._connection.in_transaction:

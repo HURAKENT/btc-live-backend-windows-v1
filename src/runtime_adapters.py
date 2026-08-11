@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
@@ -248,8 +249,12 @@ class PolymarketRuntimeAdapter:
         identity_json = json.dumps(
             {
                 "asset_ids": list(identity.asset_ids),
+                "bucket_bounds": [list(item) for item in identity.bucket_bounds],
+                "condition_ids": list(identity.condition_ids),
                 "event_id": identity.event_id,
                 "event_slug": identity.event_slug,
+                "fee_schedules": list(identity.fee_schedules),
+                "market_date": identity.market_date,
                 "market_ids": list(identity.market_ids),
                 "outcomes": list(identity.outcomes),
                 "resolution_utc": identity.resolution_utc.isoformat(),
@@ -324,6 +329,83 @@ class PolymarketRuntimeAdapter:
             raise RuntimeError(
                 "RUNTIME_POLYMARKET_DISCOVERY_FAILED"
             ) from (error.__cause__ or error)
+
+    async def load_current_strict_snapshot(
+        self, discovery: MarketDiscovery, *, observed_at_ms: int
+    ):
+        from src.fixed_point import ProbabilityMicros
+        from src.mvp_current_runtime import CurrentMarketSnapshotV1
+        from src.polymarket_provider import MarketBook
+
+        identity = json.loads(discovery.market_identity_json)
+        if (
+            identity.get("market_date") is None
+            or len(identity.get("bucket_bounds", [])) != 11
+            or len(identity.get("fee_schedules", [])) != 11
+        ):
+            raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+        reconciliation = await self.reconcile_current_books(discovery)
+        events_by_asset = {
+            json.loads(event.payload_json)["asset_id"]: event
+            for event in reconciliation.current_events
+        }
+        yes_token_ids = tuple(discovery.asset_ids[0::2])
+        no_token_ids = tuple(discovery.asset_ids[1::2])
+        books: list[MarketBook] = []
+        q_values: list[ProbabilityMicros] = []
+        history_payloads: list[dict[str, Any]] = []
+        latest_history_ms = 0
+        end_ts = observed_at_ms // 1000
+        start_ts = max(0, end_ts - 3600)
+        for index, asset_id in enumerate(yes_token_ids, start=1):
+            event = events_by_asset.get(asset_id)
+            if event is None:
+                raise ValueError("RUNTIME_POLYMARKET_INCOMPLETE_BOOK_SET")
+            book = MarketBook(asset_id)
+            book.apply(event, source_event_id=index)
+            books.append(book)
+            history_events = []
+            kwargs = {}
+            if self._clob_base_url is not None:
+                kwargs["clob_base_url"] = self._clob_base_url
+            async for history_event in self._history(
+                self._session,
+                asset_id=asset_id,
+                start_ts=start_ts,
+                end_ts=end_ts,
+                **kwargs,
+            ):
+                history_events.append(history_event)
+            if not history_events:
+                raise ValueError("MISSING_CURRENT_PRICE_HISTORY")
+            latest = history_events[-1]
+            payload = json.loads(latest.payload_json)
+            q_values.append(ProbabilityMicros(payload["price_micros"]))
+            history_payloads.append(payload)
+            latest_history_ms = max(latest_history_ms, latest.source_timestamp_ms)
+        history_hash = hashlib.sha256(
+            json.dumps(
+                history_payloads,
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        return CurrentMarketSnapshotV1(
+            market_id=discovery.market_id,
+            market_date=identity["market_date"],
+            bucket_bounds=tuple(
+                (item[0], item[1]) for item in identity["bucket_bounds"]
+            ),
+            yes_token_ids=yes_token_ids,
+            no_token_ids=no_token_ids,
+            yes_books=tuple(books),
+            market_q_yes=tuple(q_values),
+            fee_schedules=tuple(identity["fee_schedules"]),
+            price_history_source_sha256=history_hash,
+            price_history_observed_at_ms=latest_history_ms,
+        )
 
     async def recover(
         self,

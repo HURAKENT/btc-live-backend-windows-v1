@@ -121,6 +121,15 @@ class _CurrentCompleteWrite:
 
 
 @dataclass(frozen=True, slots=True)
+class _MvpPaperExecuteWrite:
+    evaluation_key: str
+    input_snapshot_hash: str
+    evaluation: Any
+    evidence: Any
+    evaluated_at_ms: int
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeStatus:
     state: str
     live_ready: bool
@@ -354,6 +363,11 @@ class C1RuntimeOrchestrator:
             checkpoint_poll_interval_seconds
         )
         self._checkpoint_input_unavailable_recorded = False
+        self._mvp_paper_runtime = None
+        if checkpoint_input_source is not None:
+            from src.mvp_paper_runtime import MvpPaperRuntime
+
+            self._mvp_paper_runtime = MvpPaperRuntime(store, broker)
         self._binance_end_resolver = binance_end_resolver
         self._stream_ready_timeout_seconds = float(
             stream_ready_timeout_seconds
@@ -990,6 +1004,38 @@ class C1RuntimeOrchestrator:
                     signal=signal,
                 ),
             )
+            if (
+                due.origin == "LIVE"
+                and due.schedule.strategy_id == "YES_STRICT_A_OPERATIONAL"
+            ):
+                evidence_for = getattr(
+                    self._checkpoint_input_source, "evidence_for", None
+                )
+                evidence = (
+                    None
+                    if not callable(evidence_for)
+                    else evidence_for(due.schedule.schedule_key)
+                )
+                selected = next(
+                    (
+                        item
+                        for item in results
+                        if item.checkpoint_minutes
+                        == due.schedule.checkpoint_minutes
+                    ),
+                    None,
+                )
+                if evidence is not None and selected is not None:
+                    await self._submit_write(
+                        "MVP_PAPER_EXECUTE",
+                        _MvpPaperExecuteWrite(
+                            evaluation_key=evaluation.evaluation_key,
+                            input_snapshot_hash=evaluation.input_snapshot_hash,
+                            evaluation=selected,
+                            evidence=evidence,
+                            evaluated_at_ms=evaluation.evaluated_at_ms,
+                        ),
+                    )
             completed += 1
         completed += await self._poll_current_reevaluations_once()
         return completed
@@ -1014,6 +1060,7 @@ class C1RuntimeOrchestrator:
             schedules = self._checkpoint_scheduler.current_reevaluation_schedules(
                 pending
             )
+            evidence_by_checkpoint: dict[int, Any] = {}
             for schedule in schedules:
                 due = DueCheckpoint(
                     schedule=schedule,
@@ -1026,6 +1073,11 @@ class C1RuntimeOrchestrator:
                     or not result.historical_depth_available
                 ):
                     continue
+                evidence_for = getattr(source, "evidence_for", None)
+                if callable(evidence_for):
+                    evidence = evidence_for(schedule.schedule_key)
+                    if evidence is not None:
+                        evidence_by_checkpoint[schedule.checkpoint_minutes] = evidence
                 payload_json, payload_sha256 = encode_executable_checkpoint_input(
                     result.executable_input
                 )
@@ -1091,6 +1143,36 @@ class C1RuntimeOrchestrator:
                 "C6_COMPLETE_CURRENT",
                 _CurrentCompleteWrite(pending=pending, evaluation=evaluation),
             )
+            if pending.strategy_id == "YES_STRICT_A_OPERATIONAL":
+                selected = next(
+                    (
+                        item
+                        for item in results
+                        if item.checkpoint_minutes in evidence_by_checkpoint
+                        and item.accepted
+                    ),
+                    next(
+                        (
+                            item
+                            for item in results
+                            if item.checkpoint_minutes in evidence_by_checkpoint
+                        ),
+                        None,
+                    ),
+                )
+                if selected is not None:
+                    await self._submit_write(
+                        "MVP_PAPER_EXECUTE",
+                        _MvpPaperExecuteWrite(
+                            evaluation_key=current_key,
+                            input_snapshot_hash=current_hash,
+                            evaluation=selected,
+                            evidence=evidence_by_checkpoint[
+                                selected.checkpoint_minutes
+                            ],
+                            evaluated_at_ms=evaluation.evaluated_at_ms,
+                        ),
+                    )
             completed += 1
         return completed
 
@@ -1813,6 +1895,19 @@ class C1RuntimeOrchestrator:
             )
             self._scheduler_writer_operation_count += 1
             return result
+        if operation == "MVP_PAPER_EXECUTE":
+            if type(payload) is not _MvpPaperExecuteWrite:
+                raise ValueError("INVALID_MVP_PAPER_EXECUTE_WRITE")
+            service = self._mvp_paper_runtime
+            if service is None:
+                raise ValueError("MVP_PAPER_RUNTIME_UNAVAILABLE")
+            return service.execute(
+                evaluation_key=payload.evaluation_key,
+                input_snapshot_hash=payload.input_snapshot_hash,
+                evaluation=payload.evaluation,
+                evidence=payload.evidence,
+                evaluated_at_ms=payload.evaluated_at_ms,
+            )
         if operation == "SET_MARKET":
             self._projector.set_market_identity(payload)
             return None
@@ -2149,6 +2244,7 @@ async def build_default_runtime_orchestrator(
     store: SqliteStore,
     broker: OutboxBroker,
     integration_endpoints: Any = None,
+    runtime_config: Any = None,
 ) -> C1RuntimeOrchestrator:
     session = aiohttp.ClientSession(
         cookie_jar=aiohttp.DummyCookieJar(),
@@ -2243,6 +2339,40 @@ async def build_default_runtime_orchestrator(
         ),
     )
     now_seconds = int(now.timestamp())
+    checkpoint_source = None
+    if (
+        runtime_config is not None
+        and runtime_config.paper_enabled is True
+        and runtime_config.strict_a_current_model_authorized is True
+    ):
+        from src.mvp_current_runtime import StrictACurrentInputSource
+
+        async def load_current_candles(observed_at_ms: int):
+            last_open_ms = observed_at_ms // MINUTE_MS * MINUTE_MS - MINUTE_MS
+            return tuple(
+                await binance.recover(
+                    start_ms=last_open_ms - 180 * MINUTE_MS,
+                    end_ms=last_open_ms,
+                )
+            )
+
+        async def load_current_market(observed_at_ms: int):
+            discovery = await polymarket.discover_market()
+            return await polymarket.load_current_strict_snapshot(
+                discovery, observed_at_ms=observed_at_ms
+            )
+
+        checkpoint_source = StrictACurrentInputSource(
+            candle_loader=load_current_candles,
+            market_loader=load_current_market,
+            prior_position_loader=store.has_paper_execution_for_date,
+            clock_ms=lambda: time.time_ns() // 1_000_000,
+            contract_path=(
+                Path(__file__).resolve().parent.parent
+                / "strategy_sources/frozen/contracts/STRICT_A_MODEL_FROZEN.json"
+            ),
+            paper_authorized=True,
+        )
     return C1RuntimeOrchestrator(
         run_id=f"runtime-{time.time_ns()}",
         store=store,
@@ -2256,4 +2386,5 @@ async def build_default_runtime_orchestrator(
         history_end_ts=now_seconds,
         binance_end_resolver=resolve_closed_minute_end_ms,
         enable_market_rollover=True,
+        checkpoint_input_source=checkpoint_source,
     )

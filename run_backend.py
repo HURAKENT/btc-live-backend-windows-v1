@@ -12,7 +12,7 @@ from src.runtime_orchestrator import build_default_runtime_orchestrator
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-CONFIG_PATH = PROJECT_ROOT / "config" / "c0_c1_frozen_config.json"
+CONFIG_PATH = PROJECT_ROOT / "config" / "mvp_runtime_v1.json"
 DATABASE_PATH = PROJECT_ROOT / "data" / "runtime" / "btc_live_backend.sqlite3"
 DEFAULT_DATABASE_PATH = DATABASE_PATH
 

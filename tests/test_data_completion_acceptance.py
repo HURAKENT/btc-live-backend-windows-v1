@@ -22,7 +22,7 @@ class DataCompletionAcceptanceTests(unittest.TestCase):
         report = verify_data_completion_acceptance(PROJECT_ROOT)
         self.assertEqual(report.status, "DATA_COMPLETION_CAPABILITY_ACCEPTANCE_PASS")
         self.assertTrue(report.acceptance_pass)
-        self.assertEqual(report.migration_version, 4)
+        self.assertEqual(report.migration_version, 5)
         self.assertEqual(report.unknown_range_count, 4)
         self.assertEqual(report.unknown_inventory_class_count, 0)
         self.assertEqual(report.source_range_count, 9)

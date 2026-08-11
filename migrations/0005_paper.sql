@@ -119,3 +119,27 @@ CREATE INDEX paper_readiness_market_date_idx
     ON paper_execution_readiness(market_date, checkpoint_minutes);
 CREATE INDEX paper_fills_intent_idx ON paper_fills(intent_key, fill_sequence);
 CREATE INDEX paper_positions_status_date_idx ON paper_positions(status, market_date);
+
+DROP INDEX outbox_events_created_idx;
+ALTER TABLE outbox_events RENAME TO outbox_events_signal_v4;
+
+CREATE TABLE outbox_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    signal_id INTEGER UNIQUE,
+    event_identity_key TEXT UNIQUE,
+    topic TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL,
+    CHECK (signal_id IS NOT NULL OR event_identity_key IS NOT NULL),
+    FOREIGN KEY (signal_id) REFERENCES signals(signal_id)
+);
+
+INSERT INTO outbox_events(
+    event_id, signal_id, event_identity_key, topic, payload_json, created_at_ms
+)
+SELECT
+    event_id, signal_id, 'signal:' || signal_id, topic, payload_json, created_at_ms
+FROM outbox_events_signal_v4;
+
+DROP TABLE outbox_events_signal_v4;
+CREATE INDEX outbox_events_created_idx ON outbox_events(created_at_ms);

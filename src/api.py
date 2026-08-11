@@ -10,6 +10,7 @@ from aiohttp import WSMsgType, web
 from src.models import OutboxEvent
 from src.outbox import OutboxBroker
 from src.storage import SqliteReadStore
+from src.dashboard import attach_dashboard_routes
 
 
 API_BIND_HOST = "127.0.0.1"
@@ -101,6 +102,7 @@ def create_api_app(
     app.router.add_get("/api/v1/signals", _signals)
     app.router.add_get("/api/v1/incidents", _incidents)
     app.router.add_get("/ws/v1/events", _websocket_events)
+    attach_dashboard_routes(app)
     return app
 
 
@@ -143,12 +145,18 @@ async def _bootstrap(request: web.Request) -> web.Response:
     )
     return _json_response(
         {
+            "interface_version": "BTC_DAILY_RANGE_MVP_V1",
             "current_market_identity": store.current_market_identity(),
+            "execution_readiness": store.paper_readiness(),
             "health": health,
             "incidents": store.incidents(limit=REST_RESULT_LIMIT),
             "last_event_id": store.last_event_id(),
+            "paper_account": store.paper_account(),
+            "paper_fills": store.paper_fills(),
+            "paper_positions": store.paper_positions(),
             "signals": store.signals(limit=REST_RESULT_LIMIT),
             "sources": store.sources(),
+            "strict_a_signal": store.latest_strict_a_signal(),
         }
     )
 

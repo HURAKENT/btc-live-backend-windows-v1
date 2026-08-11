@@ -9,7 +9,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.config import RuntimeConfig, load_runtime_config, validate_runtime_config
+from src.config import (
+    RuntimeConfig,
+    load_runtime_config,
+    load_versioned_runtime_config,
+    validate_runtime_config,
+)
 from src.registry_lock import build_executable_gap_report, verify_registry_lock
 
 
@@ -17,6 +22,14 @@ CONFIG_PATH = Path("config/c0_c1_frozen_config.json")
 
 
 class ConfigTests(unittest.TestCase):
+    def test_mvp_runtime_config_authorizes_only_local_paper_and_dashboard(self):
+        config = load_versioned_runtime_config(Path("config/mvp_runtime_v1.json"))
+        self.assertTrue(config.paper_enabled)
+        self.assertTrue(config.dashboard_enabled)
+        self.assertTrue(config.strict_a_current_model_authorized)
+        self.assertFalse(config.real_orders_enabled)
+        self.assertFalse(config.wallet_enabled)
+
     def test_bind_is_loopback_only(self):
         cfg = load_runtime_config(CONFIG_PATH)
         self.assertEqual(cfg.bind_host, "127.0.0.1")

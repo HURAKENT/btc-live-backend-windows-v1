@@ -1,0 +1,14 @@
+{
+  "schema_version": "BTC_DAILY_RANGE_MVP_RUNTIME_V1",
+  "bind_host": "127.0.0.1",
+  "bind_port": 8767,
+  "real_orders_enabled": false,
+  "wallet_enabled": false,
+  "paper_enabled": true,
+  "dashboard_enabled": true,
+  "database_writer_count": 1,
+  "strict_a_current_model_authorized": true,
+  "trading_approval": false,
+  "signing": false,
+  "authenticated_clob_writes": false
+}

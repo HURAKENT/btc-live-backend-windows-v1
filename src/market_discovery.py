@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 
@@ -15,6 +15,7 @@ _CURRENT_IDENTIFIER = re.compile(
     r")$"
 )
 _LEGACY_IDENTIFIER = re.compile(r"^BTC-DAILY-RANGE-\d{4}-\d{2}-\d{2}$")
+_ISO_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +27,10 @@ class MarketIdentity:
     market_ids: tuple[str, ...]
     outcomes: tuple[str, ...]
     asset_ids: tuple[str, ...]
+    market_date: str | None = None
+    condition_ids: tuple[str, ...] = ()
+    bucket_bounds: tuple[tuple[float | None, float | None], ...] = ()
+    fee_schedules: tuple[dict[str, Any], ...] = ()
 
 
 def _require_type(
@@ -69,6 +74,31 @@ def _has_btc_daily_range_identifier(*, ticker: str, slug: str) -> bool:
     )
 
 
+def _market_date(ticker: str, slug: str) -> str | None:
+    for candidate in (ticker, slug):
+        match = _ISO_DATE.search(candidate)
+        if match is not None:
+            try:
+                return date.fromisoformat(match.group(1)).isoformat()
+            except ValueError:
+                return None
+    return None
+
+
+def _optional_bound(value: Any, field: str) -> float | None:
+    if value is None or value == "":
+        return None
+    if type(value) not in (str, int, float) or type(value) is bool:
+        raise ValueError(f"INVALID_MARKET_DISCOVERY_TYPE: {field}")
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise ValueError(f"INVALID_MARKET_DISCOVERY_SHAPE: {field}") from None
+    if not parsed > 0:
+        raise ValueError(f"INVALID_MARKET_DISCOVERY_SHAPE: {field}")
+    return parsed
+
+
 def _candidate_identity(
     event: dict[str, Any],
     *,
@@ -104,6 +134,10 @@ def _candidate_identity(
     market_ids: list[str] = []
     bucket_outcomes: list[str] = []
     asset_ids: list[str] = []
+    condition_ids: list[str] = []
+    bucket_bounds: list[tuple[float | None, float | None]] = []
+    fee_schedules: list[dict[str, Any]] = []
+    structured_count = 0
     for index, market in enumerate(markets):
         _require_type(market, dict, f"event.markets[{index}]")
         if (
@@ -146,11 +180,39 @@ def _candidate_identity(
         if yes_no != ["Yes", "No"] or len(tokens) != 2:
             return None
         asset_ids.extend(tokens)
+        structured_fields = (
+            "conditionId" in market,
+            "lowerBound" in market,
+            "upperBound" in market,
+            "feeSchedule" in market,
+        )
+        if any(structured_fields):
+            if not all(structured_fields):
+                raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+            condition_id = _require_type(
+                market.get("conditionId"), str, f"event.markets[{index}].conditionId"
+            )
+            fee_schedule = _require_type(
+                market.get("feeSchedule"), dict, f"event.markets[{index}].feeSchedule"
+            )
+            if not condition_id:
+                raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+            condition_ids.append(condition_id)
+            bucket_bounds.append(
+                (
+                    _optional_bound(market.get("lowerBound"), f"event.markets[{index}].lowerBound"),
+                    _optional_bound(market.get("upperBound"), f"event.markets[{index}].upperBound"),
+                )
+            )
+            fee_schedules.append(dict(fee_schedule))
+            structured_count += 1
 
     if len(set(asset_ids)) != len(asset_ids):
         raise ValueError("DUPLICATE_MARKET_ASSET_ID")
     if len(set(market_ids)) != len(market_ids):
         raise ValueError("DUPLICATE_MARKET_ID")
+    if structured_count not in (0, 11):
+        raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
 
     return MarketIdentity(
         event_id=event_id,
@@ -160,6 +222,10 @@ def _candidate_identity(
         market_ids=tuple(market_ids),
         outcomes=tuple(bucket_outcomes),
         asset_ids=tuple(asset_ids),
+        market_date=_market_date(ticker, slug),
+        condition_ids=tuple(condition_ids),
+        bucket_bounds=tuple(bucket_bounds),
+        fee_schedules=tuple(fee_schedules),
     )
 
 

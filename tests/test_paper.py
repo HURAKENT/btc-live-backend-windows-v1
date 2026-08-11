@@ -7,11 +7,8 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from src.paper import (
-    CurrentExecutionEvidenceV1,
-    PaperLedger,
-    StrictASignalV1,
-)
+from src.current_input import CurrentExecutionEvidenceV1
+from src.paper import PaperLedger, StrictASignalV1
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -24,11 +21,8 @@ class PaperLedgerTests(unittest.TestCase):
         self.db_path = Path(self.directory.name) / "paper.sqlite3"
         self.connection = sqlite3.connect(self.db_path, isolation_level=None)
         self.connection.execute("PRAGMA foreign_keys = ON")
-        self.connection.executescript(
-            (PROJECT_ROOT / "migrations" / "0005_paper.sql").read_text(
-                encoding="utf-8"
-            )
-        )
+        for migration in sorted((PROJECT_ROOT / "migrations").glob("*.sql")):
+            self.connection.executescript(migration.read_text(encoding="utf-8"))
         self.ledger = PaperLedger(self.connection)
         self.ledger.initialize_account(updated_at_ms=1)
 
@@ -66,9 +60,10 @@ class PaperLedgerTests(unittest.TestCase):
             market_q_micros=500_000,
             vwap5_micros=600_000,
             fee_per_share_usd_micros=10_000,
-            evidence_key=PaperLedgerTests.evidence_key(
-                market_date, checkpoint_minutes
-            ),
+            evidence_key=PaperLedgerTests.evidence(
+                market_date=market_date,
+                checkpoint_minutes=checkpoint_minutes,
+            ).evidence_key,
             input_snapshot_hash="1" * 64,
             execution_eligible=True,
             reason_code="READY",
@@ -82,16 +77,13 @@ class PaperLedgerTests(unittest.TestCase):
         market_date: str = "2026-08-11",
         checkpoint_minutes: int = 60,
         available_depth_shares_micros: int = FIVE_SHARES,
+        token_id: str | None = None,
     ) -> CurrentExecutionEvidenceV1:
         suffix = f"{market_date}:{checkpoint_minutes}"
-        return CurrentExecutionEvidenceV1(
-            schema_version="CURRENT_EXECUTION_EVIDENCE_V1",
-            evidence_key=PaperLedgerTests.evidence_key(
-                market_date, checkpoint_minutes
-            ),
+        return CurrentExecutionEvidenceV1.create(
             market_id=f"market:{market_date}",
             market_date=market_date,
-            token_id=f"yes-token:{market_date}",
+            token_id=token_id or f"yes-token:{market_date}",
             checkpoint_minutes=checkpoint_minutes,
             candle_first_open_time_ms=1,
             candle_last_open_time_ms=181,
@@ -130,36 +122,21 @@ class PaperLedgerTests(unittest.TestCase):
         self.assertEqual(result.account.open_cost_basis_usd_micros, 3_050_000)
         self.assertEqual(result.account.equity_usd_micros, 999_950_000)
 
-    def test_partial_fill_uses_only_ready_contemporaneous_evidence(self):
-        result = self.ledger.execute(
-            self.signal(),
-            self.evidence(),
-            checked_at_ms=101,
-            max_fill_shares_micros=2_000_000,
-        )
+    def test_less_than_five_share_fill_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "INVALID_FILL_SHARES"):
+            self.ledger.execute(
+                self.signal(),
+                self.evidence(),
+                checked_at_ms=101,
+                max_fill_shares_micros=2_000_000,
+            )
 
-        self.assertEqual(result.intent.status, "PARTIAL")
-        self.assertEqual(result.fill.shares_micros, 2_000_000)
-        self.assertEqual(result.position.status, "PARTIAL")
-        self.assertEqual(result.position.cost_basis_usd_micros, 1_220_000)
-
-    def test_missing_or_insufficient_evidence_blocks_without_intent_or_fill(self):
+    def test_missing_evidence_blocks_without_intent_or_fill(self):
         missing = self.ledger.execute(self.signal(), None, checked_at_ms=101)
-        shallow = self.ledger.execute(
-            self.signal(market_date="2026-08-12"),
-            self.evidence(
-                market_date="2026-08-12",
-                available_depth_shares_micros=4_999_999,
-            ),
-            checked_at_ms=102,
-        )
 
         self.assertEqual(missing.readiness.reason_code, "MISSING_CURRENT_BOOK")
         self.assertIsNone(missing.intent)
         self.assertIsNone(missing.fill)
-        self.assertEqual(
-            shallow.readiness.reason_code, "INSUFFICIENT_FIVE_SHARE_DEPTH"
-        )
         self.assertEqual(self.ledger.row_count("paper_intents"), 0)
         self.assertEqual(self.ledger.row_count("paper_fills"), 0)
 
@@ -205,7 +182,7 @@ class PaperLedgerTests(unittest.TestCase):
         ):
             self.ledger.execute(
                 replace(signal, token_id="different-token"),
-                replace(evidence, token_id="different-token"),
+                self.evidence(token_id="different-token"),
                 checked_at_ms=102,
             )
 

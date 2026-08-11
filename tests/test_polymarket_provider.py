@@ -1191,6 +1191,29 @@ class PolymarketHistoryDuplicateNormalizationTests(
 
 
 class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
+    def test_discovery_preserves_machine_readable_mvp_market_metadata(self):
+        event = discovery_event(
+            event_id="legacy-2026-07-29",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=False,
+        )
+        for index, market in enumerate(event["markets"]):
+            market["conditionId"] = f"condition-{index}"
+            market["lowerBound"] = None if index == 0 else str(90_000 + index * 1_000)
+            market["upperBound"] = None if index == 10 else str(91_000 + index * 1_000)
+            market["feeSchedule"] = {"rate": 0.07, "exponent": 1, "takerOnly": True}
+
+        identity = discover_active_btc_daily_range(
+            [event],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.market_date, "2026-07-29")
+        self.assertEqual(identity.condition_ids[0], "condition-0")
+        self.assertEqual(identity.bucket_bounds[0], (None, 91_000.0))
+        self.assertEqual(identity.bucket_bounds[-1], (100_000.0, None))
+        self.assertEqual(identity.fee_schedules[0]["rate"], 0.07)
+
     def test_current_gamma_naming_is_accepted(self):
         event = discovery_event(
             event_id="current-2026-07-29",
