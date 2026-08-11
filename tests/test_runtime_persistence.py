@@ -24,6 +24,10 @@ REQUIRED_TABLES = {
     "signals",
     "outbox_events",
     "incidents",
+    "data_import_runs",
+    "data_source_ranges",
+    "data_source_range_assessments",
+    "data_import_run_events",
 }
 
 
@@ -483,11 +487,11 @@ class RuntimePersistenceTests(unittest.TestCase):
             reader.close()
         self.assertEqual(latest["state"], "BOOTING")
 
-    def test_migration_version_is_exactly_three(self):
-        self.assertEqual(self.store.count("schema_migrations"), 3)
-        self.assertEqual(self.store.integrity_report()["migration_version"], 3)
+    def test_migration_version_is_exactly_four(self):
+        self.assertEqual(self.store.count("schema_migrations"), 4)
+        self.assertEqual(self.store.integrity_report()["migration_version"], 4)
 
-    def test_required_table_set_is_unchanged(self):
+    def test_required_table_set_matches_migration_four(self):
         rows = self.store.rows(
             "SELECT name FROM sqlite_master WHERE type = 'table'"
         )
