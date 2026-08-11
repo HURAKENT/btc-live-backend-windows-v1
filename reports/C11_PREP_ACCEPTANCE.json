@@ -1,0 +1,34 @@
+{
+  "schema_version": "C11_PREP_ACCEPTANCE_V1",
+  "status": "C11_PREP_PASS",
+  "source_commit": "150b92c05e964c1bb1d93b2d22aa8b6fbe4411fb",
+  "command": ".venv/Scripts/python.exe -m unittest tests.test_c11_observation -v",
+  "native_windows": true,
+  "test_count": 4,
+  "pass_count": 4,
+  "fail_count": 0,
+  "exit_code": 0,
+  "elapsed_seconds": 7.068,
+  "dry_run": {
+    "canonical_c9_launcher": "run_windows_backend.py",
+    "backend_health_pass_observed": true,
+    "clean_restart_observed": true,
+    "post_restart_health_pass_observed": true,
+    "clean_finalize_observed": true,
+    "machine_readable_status_observed": true,
+    "machine_readable_report_generated": true,
+    "future_observation_report_status": "BLOCKED",
+    "future_pass_claimed": false,
+    "orphan_process_scan": "NO_C11_BACKEND_PROCESSES"
+  },
+  "real_48h_observation_started": false,
+  "real_48h_ready_candidate": true,
+  "future_protocol": "docs/release/C11_48H_ACCEPTANCE.md",
+  "security": {
+    "trading_approval": false,
+    "real_orders": false,
+    "wallet": false,
+    "signing": false,
+    "authenticated_clob_writes": false
+  }
+}

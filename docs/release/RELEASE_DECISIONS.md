@@ -36,3 +36,7 @@ approved bootstrap contract and `docs/release/HANDOFF_MVP_TO_C9_C11.md`.
 14. C9 Task Scheduler actions must run without `-ExecutionPolicy Bypass`, as
     required by the frozen C0/C1 contract. Integration removed that flag and
     added native registered-action verification; no shared MVP file changed.
+15. Future C11 acceptance requires 172,800 real seconds, one rollover, exactly
+    two planned clean backend restarts, and one 120-second controlled host
+    network disconnect. The exact schedule and manual boundary are frozen in
+    `docs/release/C11_48H_ACCEPTANCE.md`; PREP does not execute or claim them.
