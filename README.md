@@ -24,6 +24,17 @@ Current authority:
 - `docs/operation/OPERATIONAL_LAUNCH_DECISIONS.md`;
 - `docs/release/RELEASE_STATE.md`.
 
+Safe local entry points remain:
+
+```powershell
+.\scripts\RUN_TESTS_SAFE.ps1
+.\scripts\RUN_BACKEND_SAFE.ps1
+```
+
+Historical C0–C1 is `COMPLETE`; the accepted Tasks 13–14 evidence remains
+preserved. Registry 47 stays available to historical/research replay and is
+separate from the production operational scheduler projection.
+
 Historical C0-C11 evidence is retained. The historical 48-hour C11 protocol is
 `OPTIONAL / DEFERRED ENDURANCE TEST`, not a blocking operational gate. The next
 separate research task is `AUTONOMOUS HISTORICAL REVALIDATION`; it is not a
@@ -31,3 +42,4 @@ prerequisite for signal-only operation.
 
 Security is invariant: `trading_approval=false`, `real_orders=false`,
 `wallet=false`, `signing=false`, and `authenticated_CLOB_writes=false`.
+Trading approval remains false in every operating and research mode.

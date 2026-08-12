@@ -13,6 +13,8 @@ PowerShell 5.1.
 - Next research task after launch: `AUTONOMOUS HISTORICAL REVALIDATION`, also
   not a launch blocker.
 - Trading approval: `false`.
+- Historical C0–C1: `COMPLETE`; Registry 47 remains available for research and
+  historical replay.
 
 ## Operational entry points
 
@@ -27,6 +29,10 @@ Manual foreground startup remains available for incident diagnosis:
 ```powershell
 .\scripts\RUN_BACKEND_SAFE.ps1
 ```
+
+Stop a foreground diagnostic run with `Ctrl+C`. Launcher exit codes are `0`
+(clean stop), `20` (already running), `30` (configuration failure), and `40`
+(database integrity failure).
 
 API and Dashboard are loopback-only at `http://127.0.0.1:8767`. Runtime SQLite
 and rotating logs live under `data\runtime`.

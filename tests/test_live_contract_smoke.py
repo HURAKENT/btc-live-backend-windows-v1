@@ -272,9 +272,9 @@ class LiveContractSmokeTests(unittest.TestCase):
         for document in (readme, start_here):
             self.assertIn("C0–C1", document)
             self.assertIn("COMPLETE", document)
-            self.assertIn("C2", document)
-            self.assertIn("NOT_STARTED", document)
             self.assertIn("trading approval", document.lower())
+            self.assertIn("NORMAL OPERATION / SIGNAL ONLY", document)
+            self.assertIn("OPTIONAL / DEFERRED", document)
             self.assertNotIn("remain mandatory", document)
             self.assertNotIn("still mandatory", document)
 

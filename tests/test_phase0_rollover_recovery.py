@@ -188,14 +188,14 @@ class RecurringRolloverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runtime.status().market_id, "c-event")
         self.assertEqual(self.adapter.next_subscriptions, 2)
         self.assertEqual(self.store.count("market_catalog"), 3)
-        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 30)
+        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 12)
         self.assertEqual(
             self.store.rows(
                 "SELECT market_id, COUNT(*) "
                 "FROM strategy_checkpoint_schedules "
                 "GROUP BY market_id ORDER BY market_id"
             ),
-            [("a-event", 10), ("b-event", 10), ("c-event", 10)],
+            [("a-event", 4), ("b-event", 4), ("c-event", 4)],
         )
         self.assertEqual(
             self.store.scalar(

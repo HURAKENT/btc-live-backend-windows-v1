@@ -261,6 +261,7 @@ class C1RuntimeOrchestrator:
         source_freshness_threshold_seconds: float = (
             DEFAULT_SOURCE_FRESHNESS_THRESHOLD_SECONDS
         ),
+        checkpoint_schedule_projection: str = "OPERATIONAL",
     ) -> None:
         if type(run_id) is not str or not run_id:
             raise ValueError("INVALID_RUNTIME_RUN_ID")
@@ -297,6 +298,7 @@ class C1RuntimeOrchestrator:
         self._checkpoint_scheduler = CheckpointScheduler(
             project_root=Path(__file__).resolve().parent.parent,
             store=store,
+            schedule_projection=checkpoint_schedule_projection,
         )
         self._scheduler_writer_operation_count = 0
         self._broker = broker

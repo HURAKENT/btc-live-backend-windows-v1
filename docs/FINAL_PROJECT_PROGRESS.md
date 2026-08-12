@@ -17,6 +17,10 @@ Historical C0-C11 and Stage D evidence remains preserved. It is not reconstructe
 here. The 48-hour C11 protocol is `OPTIONAL / DEFERRED ENDURANCE TEST`, not the
 next gate and not required for normal operation.
 
+Preserved historical acceptance marker:
+
+- [x] C6 persistent scheduler/replay.
+
 ## Locked next path
 
 Complete the operational launch gate, leave the signal-only backend running,

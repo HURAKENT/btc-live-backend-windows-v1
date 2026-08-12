@@ -262,6 +262,7 @@ async def _verify_runtime(project_root: Path, store: SqliteStore) -> C6Acceptanc
         checkpoint_input_source=_ExecutableInputLoopback(),
         checkpoint_recovery_cutoff_ms=resolution_ms + 1,
         checkpoint_poll_interval_seconds=60.0,
+        checkpoint_schedule_projection="HISTORICAL_C5_ACCEPTANCE",
     )
     try:
         await runtime.start()
@@ -298,7 +299,11 @@ async def _verify_runtime(project_root: Path, store: SqliteStore) -> C6Acceptanc
             "WHERE current_reevaluation_evaluation_id IS NOT NULL"
         )
 
-        scheduler = CheckpointScheduler(project_root=project_root, store=store)
+        scheduler = CheckpointScheduler(
+            project_root=project_root,
+            store=store,
+            schedule_projection="HISTORICAL_C5_ACCEPTANCE",
+        )
         for index, market_id in enumerate(("market-b", "market-c"), start=1):
             market_resolution = resolution_ms + index * 86_400_000
             identity = _canonical_json(
