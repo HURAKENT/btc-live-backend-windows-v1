@@ -175,6 +175,29 @@ class C2RecoveryPlanTests(unittest.TestCase):
             {"asset-00": 180, "asset-01": 60},
         )
 
+    def test_multi_hour_cursor_is_not_truncated_by_operational_floor(self):
+        _, _, history_source, resolve = self._api()
+        cursor_source = history_source("asset-00")
+
+        starts = resolve(
+            asset_ids=("asset-00",),
+            read_cursor=lambda _source: {
+                "source": cursor_source,
+                "cursor": {
+                    "natural_key": (
+                        "polymarket:asset-00:price_history:120:"
+                        + "0" * 64
+                    ),
+                    "source_timestamp_ms": 120_000,
+                },
+                "updated_at_ms": 120_000,
+            },
+            floor_start_ts=7_200,
+            end_ts=10_800,
+        )
+
+        self.assertEqual(starts, {"asset-00": 180})
+
     def test_history_start_after_end_is_explicitly_none(self):
         _, _, history_source, resolve = self._api()
         cursors = {

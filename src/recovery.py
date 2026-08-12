@@ -281,7 +281,10 @@ def resolve_polymarket_history_starts(
                 raise ValueError("POLYMARKET_HISTORY_CURSOR_CONFLICT")
             if updated_at_ms // 1000 > end_ts:
                 raise ValueError("POLYMARKET_HISTORY_CURSOR_REGRESSION")
-            start = max(floor_start_ts, updated_at_ms // 1000 + 60)
+            # A persisted cursor is authoritative for recent operational gap
+            # recovery.  The floor is only a first-start bound; applying it to
+            # an older cursor would silently discard the recoverable interval.
+            start = updated_at_ms // 1000 + 60
         starts[asset_id] = None if start > end_ts else start
     return starts
 

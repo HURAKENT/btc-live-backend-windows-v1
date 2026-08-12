@@ -235,7 +235,7 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
         self,
         *,
         run_id: str = "run-1",
-        clock_ms: int = 1_000,
+        clock_ms=1_000,
         recovered: tuple[SourceEvent, ...] = (_binance(1), _binance(2)),
         binance_live: tuple[SourceEvent, ...] = (_binance(3, origin="LIVE"),),
         history: tuple[SourceEvent, ...] = (),
@@ -243,6 +243,7 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
         market_payload: dict | None = None,
         binance_returns: bool = False,
         polymarket_returns: bool = False,
+        source_freshness_threshold_seconds: float = 120.0,
     ) -> C1RuntimeOrchestrator:
         polymarket = FakePolymarket(
             market_payload=market_payload,
@@ -275,7 +276,10 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
             binance_end_ms=2 * MINUTE_MS,
             history_start_ts=1,
             history_end_ts=2,
-            clock_ms=lambda: clock_ms,
+            clock_ms=clock_ms if callable(clock_ms) else lambda: clock_ms,
+            source_freshness_threshold_seconds=(
+                source_freshness_threshold_seconds
+            ),
         )
 
     async def _start(self, runtime=None):
@@ -442,6 +446,28 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
                 await start
             await runtime.stop()
             self.runtime = None
+
+    async def test_accepted_source_becomes_non_live_when_stale(self):
+        now_ms = [1_000]
+        runtime = await self._start(
+            self._runtime(
+                clock_ms=lambda: now_ms[0],
+                source_freshness_threshold_seconds=5.0,
+            )
+        )
+        self.assertTrue(runtime.status().live_ready)
+
+        now_ms[0] = 6_001
+        status = runtime.status()
+
+        self.assertFalse(status.live_ready)
+        self.assertEqual(
+            dict(status.source_health),
+            {
+                "binance": "STALE:SOURCE_FRESHNESS_EXCEEDED",
+                "polymarket": "STALE:SOURCE_FRESHNESS_EXCEEDED",
+            },
+        )
 
     async def test_all_runtime_sqlite_writes_have_one_task_owner(self):
         owners: list[str | None] = []

@@ -65,6 +65,8 @@ class BinanceRuntimeAdapter:
         "_stream",
         "_stream_ready",
         "_rest_bases",
+        "_reconnect_recovery",
+        "_state_sink",
     )
 
     def __init__(
@@ -86,6 +88,17 @@ class BinanceRuntimeAdapter:
         self._closed = False
         self._stream_ready = asyncio.Event()
         self._rest_bases = rest_bases
+        self._reconnect_recovery = None
+        self._state_sink = None
+
+    def configure_runtime_callbacks(
+        self,
+        *,
+        state_sink: Callable[[str, str | None], Awaitable[None]],
+        reconnect_recovery: Callable[[], Awaitable[None]],
+    ) -> None:
+        self._state_sink = state_sink
+        self._reconnect_recovery = reconnect_recovery
 
     async def recover(
         self,
@@ -126,11 +139,16 @@ class BinanceRuntimeAdapter:
         queue: asyncio.Queue[SourceEvent],
     ) -> None:
         parameters = inspect.signature(self._stream.run).parameters
+        kwargs = {}
         if "ready_event" in parameters:
-            await self._stream.run(queue, ready_event=self._stream_ready)
+            kwargs["ready_event"] = self._stream_ready
         else:
             self._stream_ready.set()
-            await self._stream.run(queue)
+        if "state_sink" in parameters:
+            kwargs["state_sink"] = self._state_sink
+        if "reconnect_recovery" in parameters:
+            kwargs["reconnect_recovery"] = self._reconnect_recovery
+        await self._stream.run(queue, **kwargs)
 
     async def wait_stream_ready(self) -> None:
         await self._stream_ready.wait()
@@ -161,6 +179,8 @@ class PolymarketRuntimeAdapter:
         "_stream_factory",
         "_stream_ready",
         "_clob_base_url",
+        "_reconnect_recovery",
+        "_state_sink",
     )
 
     def __init__(
@@ -200,6 +220,17 @@ class PolymarketRuntimeAdapter:
         self._closed = False
         self._stream_ready = asyncio.Event()
         self._clob_base_url = clob_base_url
+        self._reconnect_recovery = None
+        self._state_sink = None
+
+    def configure_runtime_callbacks(
+        self,
+        *,
+        state_sink: Callable[[str, str | None], Awaitable[None]],
+        reconnect_recovery: Callable[[], Awaitable[None]],
+    ) -> None:
+        self._state_sink = state_sink
+        self._reconnect_recovery = reconnect_recovery
 
     async def discover_market(self) -> MarketDiscovery:
         try:
@@ -435,7 +466,7 @@ class PolymarketRuntimeAdapter:
         for value in starts.values():
             if value is not None and (
                 type(value) is not int
-                or value < start_ts
+                or value < 0
                 or value > end_ts
             ):
                 raise ValueError("INVALID_POLYMARKET_HISTORY_STARTS")
@@ -505,15 +536,16 @@ class PolymarketRuntimeAdapter:
         queue: asyncio.Queue[SourceEvent],
     ) -> None:
         parameters = inspect.signature(self._stream.run).parameters
+        kwargs = {}
         if "ready_event" in parameters:
-            await self._stream.run(
-                asset_ids,
-                queue,
-                ready_event=self._stream_ready,
-            )
+            kwargs["ready_event"] = self._stream_ready
         else:
             self._stream_ready.set()
-            await self._stream.run(asset_ids, queue)
+        if "state_sink" in parameters:
+            kwargs["state_sink"] = self._state_sink
+        if "reconnect_recovery" in parameters:
+            kwargs["reconnect_recovery"] = self._reconnect_recovery
+        await self._stream.run(asset_ids, queue, **kwargs)
 
     async def stream_next(
         self,

@@ -273,6 +273,55 @@ class BinanceProviderTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
+    async def test_reconnect_recovers_gap_before_reporting_live(self):
+        states = []
+        recovered = []
+        connections = 0
+
+        class EndingWebSocket:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise StopAsyncIteration
+
+        class EndingContext:
+            async def __aenter__(self):
+                return EndingWebSocket()
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        def connect(_url):
+            nonlocal connections
+            connections += 1
+            if connections > 2:
+                raise asyncio.CancelledError
+            return EndingContext()
+
+        async def state_sink(state, reason):
+            states.append((state, reason))
+
+        async def reconnect_recovery():
+            recovered.append("persisted-cursor-backfill")
+
+        async def sleep(_delay):
+            return None
+
+        stream = BinanceStream(connect=connect, sleep=sleep)
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(
+                asyncio.Queue(),
+                state_sink=state_sink,
+                reconnect_recovery=reconnect_recovery,
+            )
+
+        self.assertEqual(recovered, ["persisted-cursor-backfill"])
+        self.assertLess(
+            states.index(("RECOVERING", "BINANCE_STREAM_DISCONNECTED")),
+            states.index(("LIVE", None)),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

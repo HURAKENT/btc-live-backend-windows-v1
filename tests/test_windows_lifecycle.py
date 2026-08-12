@@ -22,7 +22,37 @@ class _Backend:
             raise self.stop_error
 
 
+class _FatalBackend(_Backend):
+    async def wait_runtime_termination(self):
+        await asyncio.sleep(0)
+        raise RuntimeError("RECOVERY_BLOCKED")
+
+
 class WindowsSignalLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_fatal_runtime_terminates_backend_without_os_signal(self):
+        backend = _FatalBackend()
+
+        async def never_signalled():
+            await asyncio.Event().wait()
+
+        with patch.object(
+            app,
+            "_wait_for_shutdown_signal",
+            new=never_signalled,
+        ):
+            task = asyncio.create_task(app.run_backend(backend))
+            done, pending = await asyncio.wait({task}, timeout=0.05)
+            try:
+                self.assertIn(task, done)
+            finally:
+                for item in pending:
+                    item.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+
+        exit_code = task.result()
+        self.assertEqual(exit_code, app.UNEXPECTED_FAILURE_EXIT)
+        self.assertEqual(backend.stop_calls, 1)
+
     async def test_sigint_requests_shutdown_and_restores_handler(self):
         await self._assert_signal_requests_shutdown(signal.SIGINT)
 

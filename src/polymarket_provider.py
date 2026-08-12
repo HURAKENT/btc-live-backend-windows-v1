@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+import inspect
 import json
 import random
 import time
@@ -807,6 +808,8 @@ class PolymarketStream:
         buffer: asyncio.Queue[SourceEvent],
         *,
         ready_event: asyncio.Event | None = None,
+        state_sink: Callable[[str, str | None], Any] | None = None,
+        reconnect_recovery: Callable[[], Any] | None = None,
     ) -> None:
         if len(set(asset_ids)) != len(asset_ids):
             raise ValueError("DUPLICATE_MARKET_ASSET_ID")
@@ -815,13 +818,36 @@ class PolymarketStream:
             "type": "market",
             "custom_feature_enabled": True,
         }
+        reconnecting = False
+        disconnect_reason = "POLYMARKET_STREAM_DISCONNECTED"
         while True:
+            if state_sink is not None:
+                result = state_sink(
+                    "CONNECTING",
+                    disconnect_reason if reconnecting else None,
+                )
+                if inspect.isawaitable(result):
+                    await result
             connected_at = self._monotonic()
             try:
                 async with self._session.ws_connect(
                     self._websocket_url
                 ) as websocket:
                     await websocket.send_json(subscription)
+                    if reconnecting:
+                        if state_sink is not None:
+                            result = state_sink("RECOVERING", disconnect_reason)
+                            if inspect.isawaitable(result):
+                                await result
+                        if reconnect_recovery is not None:
+                            result = reconnect_recovery()
+                            if inspect.isawaitable(result):
+                                await result
+                        if state_sink is not None:
+                            result = state_sink("LIVE", None)
+                            if inspect.isawaitable(result):
+                                await result
+                        reconnecting = False
                     if ready_event is not None:
                         ready_event.set()
                     heartbeat = asyncio.create_task(
@@ -881,4 +907,9 @@ class PolymarketStream:
                         "detail": str(error),
                     }
                 )
+            reconnecting = True
+            if state_sink is not None:
+                result = state_sink("DISCONNECTED", disconnect_reason)
+                if inspect.isawaitable(result):
+                    await result
             await self._sleep(self._policy.next_delay())

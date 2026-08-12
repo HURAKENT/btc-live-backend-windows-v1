@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import random
 import time
@@ -322,11 +323,36 @@ class BinanceStream:
         buffer: asyncio.Queue[SourceEvent],
         *,
         ready_event: asyncio.Event | None = None,
+        state_sink: Callable[[str, str | None], Any] | None = None,
+        reconnect_recovery: Callable[[], Any] | None = None,
     ) -> None:
+        reconnecting = False
+        disconnect_reason = "BINANCE_STREAM_DISCONNECTED"
         while True:
+            if state_sink is not None:
+                result = state_sink(
+                    "CONNECTING",
+                    disconnect_reason if reconnecting else None,
+                )
+                if inspect.isawaitable(result):
+                    await result
             connected_at = self._monotonic()
             try:
                 async with self._connect(BINANCE_WEBSOCKET_URL) as websocket:
+                    if reconnecting:
+                        if state_sink is not None:
+                            result = state_sink("RECOVERING", disconnect_reason)
+                            if inspect.isawaitable(result):
+                                await result
+                        if reconnect_recovery is not None:
+                            result = reconnect_recovery()
+                            if inspect.isawaitable(result):
+                                await result
+                        if state_sink is not None:
+                            result = state_sink("LIVE", None)
+                            if inspect.isawaitable(result):
+                                await result
+                        reconnecting = False
                     if ready_event is not None:
                         ready_event.set()
                     async for message in websocket:
@@ -345,6 +371,7 @@ class BinanceStream:
             except asyncio.CancelledError:
                 raise
             except Exception as error:
+                reconnecting = True
                 if self._incident_sink is not None:
                     self._incident_sink(
                         {
@@ -354,4 +381,8 @@ class BinanceStream:
                             "detail": str(error),
                         }
                     )
+                if state_sink is not None:
+                    result = state_sink("DISCONNECTED", disconnect_reason)
+                    if inspect.isawaitable(result):
+                        await result
                 await self._sleep(self._policy.next_delay())

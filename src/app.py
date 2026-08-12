@@ -65,6 +65,8 @@ class RuntimeLifecycle(Protocol):
 
     async def close_writer(self) -> None: ...
 
+    async def wait_runtime_termination(self) -> None: ...
+
 
 class BackendRuntime:
     def __init__(
@@ -171,6 +173,11 @@ class BackendRuntime:
                 return_exceptions=True,
             )
         self._provider_tasks.clear()
+
+    async def wait_runtime_termination(self) -> None:
+        if self._orchestrator is None:
+            await asyncio.Event().wait()
+        await self._orchestrator.wait_runtime_termination()
 
     async def drain_source_queue(self) -> None:
         if self._orchestrator is not None:
@@ -319,6 +326,12 @@ class LiveBackend:
         if errors:
             raise RuntimeError("BACKEND_SHUTDOWN_FAILED") from errors[0]
 
+    async def wait_runtime_termination(self) -> None:
+        wait_runtime = getattr(self._runtime, "wait_runtime_termination", None)
+        if not callable(wait_runtime):
+            await asyncio.Event().wait()
+        await wait_runtime()
+
     async def _shutdown_step(
         self,
         label: str,
@@ -340,7 +353,29 @@ async def run_backend(
     try:
         await backend.start()
         if wait_for_stop:
-            await _wait_for_shutdown_signal()
+            signal_wait = asyncio.create_task(_wait_for_shutdown_signal())
+            wait_runtime = getattr(backend, "wait_runtime_termination", None)
+            runtime_wait = (
+                asyncio.create_task(wait_runtime())
+                if callable(wait_runtime)
+                else None
+            )
+            waits = {signal_wait}
+            if runtime_wait is not None:
+                waits.add(runtime_wait)
+            done, pending = await asyncio.wait(
+                waits,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            try:
+                if runtime_wait is not None and runtime_wait in done:
+                    await runtime_wait
+                    raise RuntimeError("RUNTIME_TERMINATED_UNEXPECTEDLY")
+                await signal_wait
+            finally:
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
         await backend.stop()
         return CLEAN_STOP_EXIT
     except AlreadyRunningError:

@@ -62,6 +62,8 @@ MAX_BINANCE_BOUNDARY_REFRESHES = 4
 DEFAULT_STREAM_READY_TIMEOUT_SECONDS = 15.0
 DEFAULT_LIVE_EVIDENCE_TIMEOUT_SECONDS = 75.0
 DEFAULT_CHECKPOINT_POLL_INTERVAL_SECONDS = 1.0
+DEFAULT_SOURCE_FRESHNESS_THRESHOLD_SECONDS = 120.0
+MAX_SOURCE_FRESHNESS_THRESHOLD_SECONDS = 3600.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,6 +258,9 @@ class C1RuntimeOrchestrator:
         checkpoint_poll_interval_seconds: float = (
             DEFAULT_CHECKPOINT_POLL_INTERVAL_SECONDS
         ),
+        source_freshness_threshold_seconds: float = (
+            DEFAULT_SOURCE_FRESHNESS_THRESHOLD_SECONDS
+        ),
     ) -> None:
         if type(run_id) is not str or not run_id:
             raise ValueError("INVALID_RUNTIME_RUN_ID")
@@ -346,6 +351,14 @@ class C1RuntimeOrchestrator:
             or checkpoint_poll_interval_seconds <= 0
         ):
             raise ValueError("C6_INVALID_POLL_INTERVAL")
+        if (
+            type(source_freshness_threshold_seconds) not in (int, float)
+            or type(source_freshness_threshold_seconds) is bool
+            or source_freshness_threshold_seconds <= 0
+            or source_freshness_threshold_seconds
+            > MAX_SOURCE_FRESHNESS_THRESHOLD_SECONDS
+        ):
+            raise ValueError("INVALID_RUNTIME_SOURCE_FRESHNESS_THRESHOLD")
         self._history_end_ts = history_end_ts
         self._clock_ms = clock_ms
         self._checkpoint_input_source = checkpoint_input_source
@@ -363,6 +376,9 @@ class C1RuntimeOrchestrator:
             checkpoint_poll_interval_seconds
         )
         self._checkpoint_input_unavailable_recorded = False
+        self._source_freshness_threshold_ms = int(
+            float(source_freshness_threshold_seconds) * 1000
+        )
         self._mvp_paper_runtime = None
         if checkpoint_input_source is not None:
             from src.mvp_paper_runtime import MvpPaperRuntime
@@ -388,6 +404,7 @@ class C1RuntimeOrchestrator:
         self._progress = asyncio.Event()
         self._checkpoint_progress = asyncio.Event()
         self._failure_lock = asyncio.Lock()
+        self._runtime_terminated = asyncio.Event()
         self._started = False
         self._stopping = False
         self._stopped = False
@@ -396,6 +413,10 @@ class C1RuntimeOrchestrator:
         self._source_health = {
             "binance": "STARTING",
             "polymarket": "STARTING",
+        }
+        self._source_last_accepted_at_ms: dict[str, int | None] = {
+            "binance": None,
+            "polymarket": None,
         }
         self._last_event_id = 0
         self._providers_stopped = False
@@ -464,19 +485,38 @@ class C1RuntimeOrchestrator:
 
     def status(self) -> RuntimeStatus:
         market = self._market
+        source_health = self._effective_source_health()
         return RuntimeStatus(
             state=self._lifecycle.current_state or "BOOTING",
             live_ready=(
                 self._lifecycle.current_state == "LIVE_READY"
                 and self._failure is None
+                and all(
+                    source_health[source] == "LIVE"
+                    for source in ("binance", "polymarket")
+                )
             ),
-            source_health=tuple(sorted(self._source_health.items())),
+            source_health=tuple(sorted(source_health.items())),
             market_id=None if market is None else market.market_id,
             market_count=0 if market is None else len(market.market_ids),
             asset_count=0 if market is None else len(market.asset_ids),
             last_event_id=self._last_event_id,
             failure=self._failure,
         )
+
+    def _effective_source_health(self) -> dict[str, str]:
+        health = dict(self._source_health)
+        now_ms = self._clock_ms()
+        for source, state in tuple(health.items()):
+            accepted_at_ms = self._source_last_accepted_at_ms[source]
+            if (
+                state == "LIVE"
+                and accepted_at_ms is not None
+                and now_ms - accepted_at_ms
+                > self._source_freshness_threshold_ms
+            ):
+                health[source] = "STALE:SOURCE_FRESHNESS_EXCEEDED"
+        return health
 
     async def start(self) -> None:
         if self._started:
@@ -488,6 +528,7 @@ class C1RuntimeOrchestrator:
             name=f"{self._run_id}:writer",
         )
         try:
+            self._configure_runtime_callbacks()
             for state in STARTUP_SEQUENCE[:4]:
                 await self._transition(state)
                 self._ensure_running()
@@ -551,6 +592,7 @@ class C1RuntimeOrchestrator:
                 reconcile_current_books
             ):
                 discovery = await discover_market()
+                self._current_discovery = discovery
                 self._validate_market_discovery(discovery)
                 self._tasks["polymarket_stream"] = asyncio.create_task(
                     self._provider_stream(
@@ -648,12 +690,22 @@ class C1RuntimeOrchestrator:
                         end_ts=self._history_end_ts,
                     )
                 )
-            history = tuple(
-                await self._polymarket.recover(
-                    self._market,
-                    **history_kwargs,
+            try:
+                history = tuple(
+                    await self._polymarket.recover(
+                        self._market,
+                        **history_kwargs,
+                    )
                 )
-            )
+            except asyncio.CancelledError:
+                raise
+            except BaseException as error:
+                detail = (
+                    "UNRECOVERABLE_OPERATIONAL_GAP:polymarket:"
+                    f"{error}"
+                )[:500]
+                await self._record_unrecoverable_gap("polymarket", detail)
+                raise
             for event in history:
                 await self._submit_source(
                     event,
@@ -858,7 +910,7 @@ class C1RuntimeOrchestrator:
 
     async def poll_strategy_checkpoints_once(self) -> int:
         market = self._market
-        if market is None or self.status().state != "LIVE_READY":
+        if market is None or not self.status().live_ready:
             return 0
         if self._checkpoint_input_source is None:
             if not self._checkpoint_input_unavailable_recorded:
@@ -1264,6 +1316,10 @@ class C1RuntimeOrchestrator:
         await asyncio.sleep(0)
         await self._write_queue.join()
 
+    async def wait_runtime_termination(self) -> None:
+        await self._runtime_terminated.wait()
+        raise RuntimeError(self._failure or "RUNTIME_TERMINATED_UNEXPECTEDLY")
+
     async def drain_source_queue(self) -> None:
         await self._write_queue.join()
 
@@ -1314,6 +1370,167 @@ class C1RuntimeOrchestrator:
                     f"{source.upper()}_STREAM_FAILED: {error}",
                     source=source,
                 )
+
+    def _configure_runtime_callbacks(self) -> None:
+        for source, adapter in (
+            ("binance", self._binance),
+            ("polymarket", self._polymarket),
+        ):
+            configure = getattr(adapter, "configure_runtime_callbacks", None)
+            if not callable(configure):
+                continue
+            configure(
+                state_sink=lambda state, reason, source=source: (
+                    self._source_state_changed(source, state, reason)
+                ),
+                reconnect_recovery=lambda source=source: (
+                    self._recover_operational_gap(source)
+                ),
+            )
+
+    async def _source_state_changed(
+        self,
+        source: str,
+        state: str,
+        reason: str | None,
+    ) -> None:
+        if source not in self._source_health:
+            raise ValueError("INVALID_RUNTIME_HEALTH_SOURCE")
+        if state not in {"CONNECTING", "DISCONNECTED", "RECOVERING", "LIVE"}:
+            raise ValueError("INVALID_RUNTIME_HEALTH_STATE")
+        if reason is not None and (type(reason) is not str or not reason):
+            raise ValueError("INVALID_RUNTIME_HEALTH_REASON")
+        self._source_health[source] = (
+            state if reason is None else f"{state}:{reason}"
+        )
+        if state == "LIVE":
+            self._source_last_accepted_at_ms[source] = self._clock_ms()
+        self._progress.set()
+        if state == "DISCONNECTED":
+            await self._submit_write(
+                "INCIDENT",
+                {
+                    "incident_key": (
+                        f"runtime:{self._run_id}:{source}:disconnect:"
+                        f"{self._clock_ms()}"
+                    ),
+                    "severity": "WARNING",
+                    "status": reason or f"{source.upper()}_STREAM_DISCONNECTED",
+                    "payload_json": json.dumps(
+                        {
+                            "code": reason,
+                            "source": source,
+                            "state": state,
+                        },
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    "created_at_ms": self._clock_ms(),
+                },
+            )
+
+    async def _recover_operational_gap(self, source: str) -> None:
+        try:
+            if source == "binance":
+                await self._recover_binance_operational_gap()
+            elif source == "polymarket":
+                await self._recover_polymarket_operational_gap()
+            else:
+                raise ValueError("INVALID_OPERATIONAL_RECOVERY_SOURCE")
+        except asyncio.CancelledError:
+            raise
+        except BaseException as error:
+            detail = f"UNRECOVERABLE_OPERATIONAL_GAP:{source}:{error}"[:500]
+            await self._record_unrecoverable_gap(source, detail)
+            await self._fail(detail, source=source)
+            raise RuntimeError(detail) from error
+
+    async def _recover_binance_operational_gap(self) -> None:
+        end_ms = self._resolve_binance_end_ms()
+        plan = build_binance_recovery_plan(
+            cursor=self._store.read_source_cursor("binance"),
+            latest_closed_open_ms=end_ms,
+        )
+        recovered = tuple(
+            await self._binance.recover(
+                start_ms=plan.request_start_ms,
+                end_ms=plan.request_end_ms,
+            )
+        )
+        for event in recovered:
+            await self._submit_source(event, authoritative_replay=True)
+        continuity = reconcile_binance_minutes(
+            last_committed_open_ms=plan.last_committed_open_ms,
+            current_open_ms=end_ms + MINUTE_MS,
+            recovered_events=recovered,
+        )
+        if continuity.blocker:
+            raise RuntimeError(
+                "BINANCE_OPERATIONAL_GAP_INCOMPLETE:"
+                f"missing={continuity.missing_open_times}"
+            )
+
+    async def _recover_polymarket_operational_gap(self) -> None:
+        market = self._market
+        if market is None:
+            raise RuntimeError("POLYMARKET_OPERATIONAL_MARKET_UNAVAILABLE")
+        end_ts = self._clock_ms() // 1000
+        floor_start_ts = max(0, end_ts - 3600)
+        starts = resolve_polymarket_history_starts(
+            asset_ids=market.asset_ids,
+            read_cursor=self._store.read_source_cursor,
+            floor_start_ts=floor_start_ts,
+            end_ts=end_ts,
+        )
+        history = tuple(
+            await self._polymarket.recover(
+                market,
+                start_ts=floor_start_ts,
+                end_ts=end_ts,
+                start_ts_by_asset=starts,
+            )
+        )
+        for event in history:
+            await self._submit_source(event, authoritative_replay=True)
+
+        reconcile_books = getattr(
+            self._polymarket, "reconcile_current_books", None
+        )
+        if callable(reconcile_books) and self._current_discovery is not None:
+            current = await reconcile_books(self._current_discovery)
+            self._validate_market(current)
+            for event in current.current_events:
+                await self._submit_source(event, authoritative_replay=True)
+            self._market = current
+            await self._submit_write("SET_MARKET", current)
+
+    async def _record_unrecoverable_gap(
+        self,
+        source: str,
+        detail: str,
+    ) -> None:
+        digest = hashlib.sha256(detail.encode("utf-8")).hexdigest()[:16]
+        await self._submit_write(
+            "INCIDENT",
+            {
+                "incident_key": (
+                    f"runtime:{self._run_id}:{source}:unrecoverable-gap:{digest}"
+                ),
+                "severity": "CRITICAL",
+                "status": "UNRECOVERABLE_OPERATIONAL_GAP",
+                "payload_json": json.dumps(
+                    {
+                        "code": "UNRECOVERABLE_OPERATIONAL_GAP",
+                        "detail": detail,
+                        "source": source,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                "created_at_ms": self._clock_ms(),
+            },
+            allow_failed=True,
+        )
 
     async def _ingest_live(
         self,
@@ -1738,6 +1955,7 @@ class C1RuntimeOrchestrator:
         if type(result) is not _SourceWriteResult:
             raise ValueError("INVALID_RUNTIME_SOURCE_WRITE_RESULT")
         self._source_health[source] = "LIVE"
+        self._source_last_accepted_at_ms[source] = self._clock_ms()
         self._progress.set()
 
     async def _wait_for_live_evidence(self) -> None:
@@ -2120,6 +2338,7 @@ class C1RuntimeOrchestrator:
                     self._lifecycle.fail_closed(sanitized)
             self._ready.set()
             self._progress.set()
+            self._runtime_terminated.set()
             self._cancel_provider_tasks()
 
     def _writer_failed(self, error: BaseException) -> None:
@@ -2139,6 +2358,7 @@ class C1RuntimeOrchestrator:
             pass
         self._ready.set()
         self._progress.set()
+        self._runtime_terminated.set()
         self._cancel_provider_tasks()
 
     def _reject_pending_writes(self, error: BaseException) -> None:

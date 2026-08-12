@@ -615,6 +615,38 @@ class _ReconnectSession:
 
 
 class PolymarketReconnectTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reconnect_recovers_gap_before_reporting_live(self):
+        session = _ReconnectSession(
+            [_ReconnectWebSocket(), _ReconnectWebSocket()]
+        )
+        states = []
+        recovered = []
+
+        async def state_sink(state, reason):
+            states.append((state, reason))
+
+        async def reconnect_recovery():
+            recovered.append("persisted-cursor-backfill")
+
+        async def sleep(_delay):
+            if len(recovered) == 1:
+                raise asyncio.CancelledError
+
+        stream = PolymarketStream(session, sleep=sleep)
+        with self.assertRaises(asyncio.CancelledError):
+            await stream.run(
+                ["yes", "no"],
+                asyncio.Queue(),
+                state_sink=state_sink,
+                reconnect_recovery=reconnect_recovery,
+            )
+
+        self.assertEqual(recovered, ["persisted-cursor-backfill"])
+        self.assertLess(
+            states.index(("RECOVERING", "POLYMARKET_STREAM_DISCONNECTED")),
+            states.index(("LIVE", None)),
+        )
+
     async def test_normal_close_reconnects_and_reports_incident(self):
         first = _ReconnectWebSocket()
         second = _ReconnectWebSocket()
