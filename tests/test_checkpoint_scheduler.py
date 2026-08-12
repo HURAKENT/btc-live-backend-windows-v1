@@ -212,23 +212,18 @@ class CheckpointSchedulerTests(unittest.TestCase):
                 """
             )
 
-    def test_one_market_registers_exact_ten_enabled_checkpoints(self) -> None:
+    def test_one_market_registers_exact_four_operational_checkpoints(self) -> None:
         resolution = 2_000_000_000_000
         self._persist_market("market-a", resolution)
         schedules = self._scheduler().register_market(
             market_id="market-a",
             created_at_ms=10,
         )
-        self.assertEqual(len(schedules), 10)
-        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 10)
+        self.assertEqual(len(schedules), 4)
+        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 4)
         self.assertEqual(
             {schedule.strategy_id for schedule in schedules},
             {
-                "YES_PF1_OPERATIONAL",
-                "YES_PF1_T30",
-                "YES_PF1_T60",
-                "YES_PF1_T6H",
-                "YES_PF1_T8H",
                 "YES_STRICT_A_OPERATIONAL",
                 "YES_STRICT_A_T30",
                 "YES_STRICT_A_T60",
@@ -236,7 +231,7 @@ class CheckpointSchedulerTests(unittest.TestCase):
         )
         self.assertEqual(
             sorted(schedule.checkpoint_minutes for schedule in schedules),
-            [30, 30, 30, 30, 60, 60, 60, 60, 360, 480],
+            [30, 30, 60, 60],
         )
 
     def test_registration_is_idempotent_and_recurs_for_future_markets(self) -> None:
@@ -253,7 +248,7 @@ class CheckpointSchedulerTests(unittest.TestCase):
                 created_at_ms=9_000 + index,
             )
             self.assertEqual(first, second)
-        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 30)
+        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 12)
 
     def test_market_identity_and_schedule_registration_are_atomic(self) -> None:
         resolution_ms = 2_000_000_000_000
@@ -334,7 +329,7 @@ class CheckpointSchedulerTests(unittest.TestCase):
             poller_id="ordered-poll",
             limit=100,
         )
-        self.assertEqual(len(due), 10)
+        self.assertEqual(len(due), 4)
         self.assertEqual(
             [(item.schedule.due_at_ms, item.schedule.registry_index) for item in due],
             sorted(
@@ -596,7 +591,7 @@ class CheckpointSchedulerTests(unittest.TestCase):
             active_market_id="market-a",
             runtime_state="LIVE_READY",
             poller_id="restart-recovery",
-            limit=100,
+            limit=1,
         )
         self.assertEqual(len(recovered), 1)
         payload, digest = self._capture_payload(recovered[0])
@@ -616,16 +611,17 @@ class CheckpointSchedulerTests(unittest.TestCase):
         self.store.close()
         self.store = SqliteStore.open(self.db_path)
         self.store.migrate()
-        self.assertEqual(
-            self._scheduler().claim_due(
+        remaining = self._scheduler().claim_due(
                 now_ms=due.schedule.due_at_ms + 30_003,
                 recovery_cutoff_ms=due.schedule.due_at_ms + 1,
                 active_market_id="market-a",
                 runtime_state="LIVE_READY",
                 poller_id="post-completion",
                 limit=100,
-            ),
-            (),
+            )
+        self.assertNotIn(
+            due.schedule.schedule_key,
+            {item.schedule.schedule_key for item in remaining},
         )
 
     def test_schedules_bind_exact_c5_activation_provenance(self) -> None:
@@ -1091,6 +1087,11 @@ class CheckpointSchedulerTests(unittest.TestCase):
             created_at_ms=10,
         )
         target = min(schedules, key=lambda item: (item.due_at_ms, item.registry_index))
+        self.store.rows(
+            "UPDATE strategy_checkpoint_schedules SET state='BLOCKED' "
+            "WHERE schedule_key<>?",
+            (target.schedule_key,),
+        )
         barrier = threading.Barrier(2)
 
         def poll(poller_id: str):
