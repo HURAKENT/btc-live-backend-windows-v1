@@ -18,6 +18,43 @@ from tests.test_paper import PaperLedgerTests
 
 
 class MvpApiDashboardTests(unittest.IsolatedAsyncioTestCase):
+    async def test_latest_strict_a_signal_ignores_newer_generic_evaluation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteStore.open(Path(directory) / "runtime.sqlite3")
+            store.migrate()
+            for created_at_ms, signal_type in (
+                (1, "STRICT_A_SIGNAL_V1"),
+                (2, "STRATEGY_EVALUATION_SIGNAL"),
+            ):
+                payload_json = json.dumps(
+                    {
+                        "created_at_ms": created_at_ms,
+                        "signal_type": signal_type,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                store.commit_signal_and_outbox(
+                    SignalRecord(
+                        identity_key=f"signal-{created_at_ms}",
+                        evaluation_key=f"evaluation-{created_at_ms}",
+                        strategy_id="YES_STRICT_A_OPERATIONAL",
+                        signal_type=signal_type,
+                        payload_json=payload_json,
+                        created_at_ms=created_at_ms,
+                    ),
+                    topic="signal.strict_a",
+                )
+            read_store = store.open_read_store()
+            try:
+                selected = read_store.latest_strict_a_signal()
+                self.assertIsNotNone(selected)
+                self.assertEqual(selected["signal_type"], "STRICT_A_SIGNAL_V1")
+                self.assertEqual(selected["created_at_ms"], 1)
+            finally:
+                read_store.close()
+                store.close()
+
     async def test_clean_runtime_initializes_default_paper_account(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SqliteStore.open(Path(directory) / "runtime.sqlite3")

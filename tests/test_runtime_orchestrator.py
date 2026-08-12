@@ -365,7 +365,7 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
                 "WHERE current_reevaluation_required=1 "
                 "AND current_reevaluation_evaluation_id IS NOT NULL"
             ),
-            8,
+            3,
         )
         self.assertEqual(
             self.store.scalar(
@@ -373,7 +373,7 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
                 "WHERE checkpoint_group_key IS NULL "
                 "AND rule_spec_sha256 IS NOT NULL AND origin='LIVE'"
             ),
-            8,
+            3,
         )
 
     async def test_duplicate_source_event_is_not_projected_twice(self):

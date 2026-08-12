@@ -7,8 +7,7 @@
 - Current HEAD before bootstrap: `263c344dda6b90720b4fd390c7308d856bd8f398`.
 - Accepted functional commit: `4d6fe1897ced23035e7a8a50d9b6e2e561541998`.
 - Accepted MVP: `e097d9bb2ea2e03d0ca43fe7e9130cb10dbe1a90`.
-- Worker base: the bootstrap commit containing this control plane. Both worker
-  branches must be created from that exact commit.
+- Operational bootstrap: `d6593609bc9878469e5dbc1c5a960a074d4a0992`.
 - User-reported Codex budget remaining at bootstrap: `44%`.
 
 The historical 48-hour C11 contract is `OPTIONAL / DEFERRED ENDURANCE TEST`.
@@ -18,11 +17,11 @@ It is not a launch blocker and no timed observation is pending.
 
 | Stage | Weight | Progress | State |
 |---|---:|---:|---|
-| Scheduler + signal-time correctness | 35 | 0 | NOT_STARTED |
-| Offline recovery + runtime liveness | 40 | 0 | NOT_STARTED |
-| Dashboard/docs/deployment corrections | 10 | 0 | NOT_STARTED |
+| Scheduler + signal-time correctness | 35 | 35 | ACCEPTED_FOCUSED |
+| Offline recovery + runtime liveness | 40 | 40 | ACCEPTED_FOCUSED |
+| Dashboard/docs/deployment corrections | 10 | 10 | ACCEPTED_FOCUSED |
 | Final Windows gate + permanent launch | 15 | 0 | NOT_STARTED |
-| **OPERATIONAL LAUNCH** | **100** | **0/100** | **BOOTSTRAP_READY** |
+| **OPERATIONAL LAUNCH** | **100** | **85/100** | **FINAL_GATE_READY** |
 
 Calculation: `35 + 40 + 10 + 15 = 100`.
 
@@ -42,14 +41,29 @@ Calculation: `35 + 40 + 10 + 15 = 100`.
 - P0/P1 not reproduced: none.
 - Production implementation changes in bootstrap: none.
 
-## Worker staging
+## Integrated corrections
 
-- Worker A branch: `codex/operation-scheduler`.
-- Worker B branch: `codex/operation-recovery`.
-- Packets and exact ownership are frozen in
-  `docs/operation/OPERATIONAL_WORKER_HANDOFF_TEMPLATE.md`.
-- Neither worker starts until both branches are based on the same bootstrap
-  commit.
+- Worker A source commit `64392622273a6e6dcfd07409c562bd1bd9db6620`
+  was integrated as `f17ced72459db3e8698247c35eeedcd07868bfd9`;
+  focused result: `38/38 PASS`.
+- Worker B source commit `d9047ccb7dc2ce484d22e44bd1d11e38b30ab49a`
+  was integrated as `6c853c97938e7fadf0b9221a79c2ce11d47ee547`.
+  One bounded integration remediation updated two obsolete operational-count
+  assertions from the historical eight/ten projection to three/four. Expanded
+  focused result: `172/172 PASS`.
+- P1-G canonical Strict A selector completed by RED/GREEN; focused
+  storage/API/Dashboard result: `48/48 PASS`.
+- P1-H current authority now makes C11 optional/deferred and records
+  `AUTONOMOUS HISTORICAL REVALIDATION` as the next non-blocking research task.
+- Task Scheduler restart policy is bounded at `3` attempts with interval
+  `PT5M`; native registration/verifier acceptance passed.
+- Integrated offline semantics: `13/13 PASS`.
+- Historical registry/evaluator separation: `11/11 PASS`; all 47 historical
+  identities/evaluators remain available while the operational projection is
+  Strict A only.
+- Frozen C5 hashes remain
+  `ca05d61430047e6dad6774ae6243abed6dab1d2532641bc66977f0b5d349de9e` and
+  `1594ae25f3ce17d77eb200f088f7b6287a7745a95e6cc6d0e1babf03a1e40cd0`.
 
 ## Security invariants
 
@@ -61,9 +75,9 @@ may be added. Local paper accounting remains simulation only.
 
 ## Locked continuation
 
-Dispatch exactly Worker A and Worker B from the bootstrap commit. Each performs
-RED, root-cause confirmation, minimal GREEN, focused regression, self-review,
-commit, push, handoff, then stops. The Manager integrates once, resolves at
-most one normal P0/P1 remediation iteration, performs Manager-only corrections,
-runs focused integrated tests, then exactly one fresh full native Windows suite
-at the final release boundary.
+Commit and push the integrated release candidate, run focused final operational
+tests, then exactly one fresh full native Windows suite. If green, create and
+validate a production SQLite backup, register/verify the canonical user-level
+Task Scheduler task, launch the backend permanently, verify loopback API,
+Dashboard, source health, scheduler progress and security, then leave it
+running. Do not start C11 or Autonomous Historical Revalidation.

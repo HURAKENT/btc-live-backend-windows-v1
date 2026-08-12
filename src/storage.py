@@ -1531,6 +1531,7 @@ class SqliteReadStore:
             WHERE strategy_id IN (
                 'YES_STRICT_A_OPERATIONAL', 'YES_STRICT_A_T60', 'YES_STRICT_A_T30'
             )
+              AND signal_type='STRICT_A_SIGNAL_V1'
             ORDER BY created_at_ms DESC, signal_id DESC LIMIT 1
             """
         ).fetchone()

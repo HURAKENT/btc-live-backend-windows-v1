@@ -40,6 +40,8 @@ class C9TaskSchedulerAcceptanceTests(unittest.TestCase):
         self.assertEqual(verified["task_count"], 1)
         self.assertEqual(verified["run_level"], "Limited")
         self.assertEqual(verified["logon_type"], "Interactive")
+        self.assertEqual(verified["restart_count"], 3)
+        self.assertEqual(verified["restart_interval"], "PT5M")
         self.assertEqual(
             Path(verified["project_root"]),
             PROJECT_ROOT,

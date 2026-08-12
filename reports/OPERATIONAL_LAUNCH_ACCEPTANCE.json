@@ -1,0 +1,46 @@
+{
+  "schema_version": "OPERATIONAL_LAUNCH_ACCEPTANCE_V1",
+  "status": "PRE_FINAL_GATE_PASS",
+  "bootstrap_commit": "d6593609bc9878469e5dbc1c5a960a074d4a0992",
+  "integration_branch": "codex/final-project-completion",
+  "progress": {
+    "scheduler_signal_semantics": "35/35",
+    "recovery_liveness": "40/40",
+    "dashboard_docs_deployment": "10/10",
+    "final_windows_launch": "0/15",
+    "total": "85/100"
+  },
+  "worker_a": {
+    "source_commit": "64392622273a6e6dcfd07409c562bd1bd9db6620",
+    "integration_commit": "f17ced72459db3e8698247c35eeedcd07868bfd9",
+    "focused_tests": 38,
+    "failures": 0
+  },
+  "worker_b": {
+    "source_commit": "d9047ccb7dc2ce484d22e44bd1d11e38b30ab49a",
+    "integration_commit": "6c853c97938e7fadf0b9221a79c2ce11d47ee547",
+    "expanded_focused_tests": 172,
+    "failures": 0,
+    "bounded_integration_remediation": "UPDATE_OBSOLETE_OPERATIONAL_COUNTS"
+  },
+  "manager": {
+    "p1_g": "PASS",
+    "p1_g_focused_tests": 48,
+    "p1_h": "PASS",
+    "task_scheduler_restart_count": 3,
+    "task_scheduler_restart_interval": "PT5M",
+    "task_scheduler_native_test": "PASS",
+    "integrated_operational_tests": 13,
+    "historical_47_contract_tests": 11
+  },
+  "security": {
+    "trading_approval": false,
+    "real_orders": false,
+    "wallet": false,
+    "signing": false,
+    "authenticated_clob_writes": false
+  },
+  "p0_p1_open": [],
+  "c11_48h": "OPTIONAL_DEFERRED",
+  "next_research_task": "AUTONOMOUS_HISTORICAL_REVALIDATION"
+}

@@ -46,6 +46,8 @@ function Get-ExpectedDefinition {
         trigger = "AtLogOn"
         multiple_instances = "IgnoreNew"
         start_when_available = $true
+        restart_count = 3
+        restart_interval = "PT5M"
     }
 }
 
@@ -106,6 +108,8 @@ function Verify-Task([hashtable]$Expected) {
     if (-not [string]::Equals($Trigger.UserId, $Expected.user_id, [StringComparison]::OrdinalIgnoreCase)) { $Mismatches += "trigger_user=$($Trigger.UserId)" }
     if ($Task.Settings.MultipleInstances.ToString() -ne $Expected.multiple_instances) { $Mismatches += "multiple_instances=$($Task.Settings.MultipleInstances)" }
     if (-not $Task.Settings.StartWhenAvailable) { $Mismatches += "start_when_available=false" }
+    if ($Task.Settings.RestartCount -ne $Expected.restart_count) { $Mismatches += "restart_count=$($Task.Settings.RestartCount)" }
+    if ($Task.Settings.RestartInterval.ToString() -ne $Expected.restart_interval) { $Mismatches += "restart_interval=$($Task.Settings.RestartInterval)" }
     if ($Mismatches.Count -ne 0) {
         Fail ("TASK_DEFINITION_MISMATCH: " + ($Mismatches -join "; ")) 41
     }
@@ -141,6 +145,8 @@ try {
             -DontStopIfGoingOnBatteries `
             -StartWhenAvailable `
             -MultipleInstances IgnoreNew `
+            -RestartCount $Expected.restart_count `
+            -RestartInterval ([TimeSpan]::FromMinutes(5)) `
             -ExecutionTimeLimit ([TimeSpan]::Zero)
         $Definition = New-ScheduledTask `
             -Action $Action `
@@ -161,6 +167,8 @@ try {
             project_root = $Expected.working_directory
             run_level = $Expected.run_level
             logon_type = $Expected.logon_type
+            restart_count = $Expected.restart_count
+            restart_interval = $Expected.restart_interval
             definition_fingerprint = $Fingerprint
         }
         exit 0
@@ -176,6 +184,8 @@ try {
             project_root = $Expected.working_directory
             run_level = $Expected.run_level
             logon_type = $Expected.logon_type
+            restart_count = $Expected.restart_count
+            restart_interval = $Expected.restart_interval
             definition_fingerprint = $Fingerprint
         }
         exit 0
@@ -199,6 +209,8 @@ try {
         project_root = $Expected.working_directory
         run_level = $Expected.run_level
         logon_type = $Expected.logon_type
+        restart_count = $Expected.restart_count
+        restart_interval = $Expected.restart_interval
         definition_fingerprint = $Fingerprint
     }
     exit 0

@@ -298,7 +298,7 @@ class RuntimeCoreAdversarialTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(second.status().live_ready)
         self.assertEqual(self.store.count("market_catalog"), 1)
-        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 10)
+        self.assertEqual(self.store.count("strategy_checkpoint_schedules"), 4)
         self.assertEqual(second.scheduler_writer_operation_count, 1)
         self.assertNotIn("MARKET_IDENTITY_CONFLICT", second.status().failure or "")
 

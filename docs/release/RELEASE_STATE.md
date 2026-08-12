@@ -1,64 +1,39 @@
-# C9-C11 Release State
+# Windows V1 Current Release State
 
-## Authority and bases
+## Authority
 
 - Integration branch: `codex/final-project-completion`.
-- Audited handoff input base: `b448fcb10d264840e0f918048d4ec975555def7d`.
 - Accepted functional MVP: `e097d9bb2ea2e03d0ca43fe7e9130cb10dbe1a90`.
-- Worker release-hub base: `cb6699e433a86c151e3953da30bfa4618931ba85`.
-- Evidence: `docs/release/HANDOFF_MVP_TO_C9_C11.md` and the bootstrap Git
-  verification recorded in the release-manager handoff.
+- Accepted pre-operational functional commit:
+  `4d6fe1897ced23035e7a8a50d9b6e2e561541998`.
+- Operational bootstrap: `d6593609bc9878469e5dbc1c5a960a074d4a0992`.
+- Current mode: `NORMAL OPERATION / SIGNAL ONLY`.
+- Current progress and integration receipts:
+  `docs/operation/OPERATIONAL_LAUNCH_STATE.md`.
 
-## Sprint status
+## Preserved acceptance
 
-| Stage | Weight | Progress | State |
-|---|---:|---:|---|
-| C9 EXPRESS | 30 | 30 | ACCEPTED |
-| C10 EXPRESS | 40 | 40 | ACCEPTED |
-| C11 PREP | 20 | 20 | ACCEPTED |
-| FINAL COMBINED ACCEPTANCE | 10 | 10 | ACCEPTED |
-| **Total** | **100** | **100/100** | **COMPLETE** |
+C9, C10 and C11 PREP remain accepted. Their final native Windows receipt is
+`reports/C9_C11_PREP_FINAL_ACCEPTANCE.json`: `1009` tests, `1007 PASS`, `2`
+documented skips, `0 FAIL`, exit code `0`, tested commit
+`4d6fe1897ced23035e7a8a50d9b6e2e561541998`.
 
-The real 48-hour C11 observation is outside this sprint. Sprint completion
-means readiness to launch it, not completion of elapsed observation time.
+The historical C11 48-hour contract and evidence are retained. The protocol is
+now `OPTIONAL / DEFERRED ENDURANCE TEST`; it is not a blocking next stage and no
+timed observation is pending.
 
-## Control state
+## Current release path
 
-- ACTIVE: none.
-- BLOCKED: none.
-- Accepted C9 integration commit: `769c9eeb1aab4ac116a08acc6c1f79ae9b882f1d`.
-- Accepted C9 boundary remediation:
-  `83fb525435173958f6dc807822ac8688e6f77ff3` removes the forbidden scheduled
-  action policy bypass and makes its native acceptance path canonical-checkout
-  independent.
-- Accepted C10 integration commit: `35ffc4be6a381540ece6533568d394ef1c0bce63`.
-- Accepted C11 PREP implementation:
-  `150b92c05e964c1bb1d93b2d22aa8b6fbe4411fb`.
-- C11 PREP dry-run: 4 native Windows tests, 4 PASS, 0 FAIL; the real
-  48-hour observation was not started. Receipt:
-  `reports/C11_PREP_ACCEPTANCE.json`.
-- Final combined acceptance: 1009 native Windows tests, 1007 PASS, 2 documented
-  SKIP, 0 FAIL, exit code 0. Receipt:
-  `reports/C9_C11_PREP_FINAL_ACCEPTANCE.json`.
-- Next stage: launch the real C11 48-hour observation under
-  `docs/release/C11_48H_ACCEPTANCE.md`; it was not started during this sprint.
+Integrate operational corrections, run exactly one final native Windows suite,
+validate the production backup, register and verify the canonical user-level
+Task Scheduler task with bounded restart policy, launch the backend, verify
+loopback API/Dashboard/source/scheduler health, and leave it running.
 
-## Security state
+After launch, normal lifecycle is `NORMAL OPERATION -> INCIDENT -> NARROW FIX ->
+CONTINUE OPERATION`. The next separate non-blocking research task is
+`AUTONOMOUS HISTORICAL REVALIDATION`.
 
-- `trading_approval=false`
-- `real_orders=false`
-- `wallet=false`
-- `signing=false`
-- `authenticated_CLOB_writes=false`
+## Security
 
-These values are invariant for C9, C10, C11 PREP, and final acceptance.
-
-## Worker state
-
-| Worker | Proposed branch | Proposed worktree | Status | Accepted handoff |
-|---|---|---|---|---|
-| C9 Windows Operations | `codex/release-c9` | `.worktrees/release-c9` | INTEGRATED | `f7a1a3b0bc125fadfd5672b065b84618d1852da5` |
-| C10 Failure Coverage | `codex/release-c10` | `.worktrees/release-c10` | INTEGRATED | `14fdcad66bd98c8a88ba8b5a19240664e880fbe6` |
-
-C9 focused native Windows integration smoke: 16 tests, 16 PASS, 0 FAIL.
-C10 focused native Windows integration smoke: 3 tests, 3 PASS, 0 FAIL.
+`trading_approval=false`, `real_orders=false`, `wallet=false`, `signing=false`,
+and `authenticated_CLOB_writes=false`.
