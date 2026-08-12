@@ -46,7 +46,9 @@ class C9TaskSchedulerAcceptanceTests(unittest.TestCase):
             Path(verified["project_root"]),
             PROJECT_ROOT,
         )
-        self.assertNotIn("-ExecutionPolicy", self._registered_action_arguments())
+        action_arguments = self._registered_action_arguments()
+        self.assertIn("-ExecutionPolicy RemoteSigned", action_arguments)
+        self.assertNotIn("Bypass", action_arguments)
 
         removed = self._run("Unregister")
         self.assertEqual(removed["status"], "PASS")
@@ -61,7 +63,7 @@ class C9TaskSchedulerAcceptanceTests(unittest.TestCase):
                 "-NoProfile",
                 "-NonInteractive",
                 "-ExecutionPolicy",
-                "Bypass",
+                "RemoteSigned",
                 "-File",
                 str(TASK_SCRIPT),
                 "-Operation",
