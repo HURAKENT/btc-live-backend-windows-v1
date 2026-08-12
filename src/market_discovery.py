@@ -16,6 +16,38 @@ _CURRENT_IDENTIFIER = re.compile(
 )
 _LEGACY_IDENTIFIER = re.compile(r"^BTC-DAILY-RANGE-\d{4}-\d{2}-\d{2}$")
 _ISO_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+_MONTH_NAME_DATE = re.compile(
+    r"bitcoin-price-on-"
+    r"(january|february|march|april|may|june|july|august|"
+    r"september|october|november|december)-(\d{1,2})-(\d{4})",
+    re.IGNORECASE,
+)
+_MONTH_NUMBERS = {
+    name: index
+    for index, name in enumerate(
+        (
+            "january",
+            "february",
+            "march",
+            "april",
+            "may",
+            "june",
+            "july",
+            "august",
+            "september",
+            "october",
+            "november",
+            "december",
+        ),
+        start=1,
+    )
+}
+_LESS_THAN_BUCKET = re.compile(r"^<\s*([0-9][0-9,]*(?:\.[0-9]+)?)$")
+_GREATER_THAN_BUCKET = re.compile(r"^>\s*([0-9][0-9,]*(?:\.[0-9]+)?)$")
+_RANGE_BUCKET = re.compile(
+    r"^([0-9][0-9,]*(?:\.[0-9]+)?)\s*-\s*"
+    r"([0-9][0-9,]*(?:\.[0-9]+)?)$"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +114,16 @@ def _market_date(ticker: str, slug: str) -> str | None:
                 return date.fromisoformat(match.group(1)).isoformat()
             except ValueError:
                 return None
+        month_match = _MONTH_NAME_DATE.fullmatch(candidate)
+        if month_match is not None:
+            try:
+                return date(
+                    int(month_match.group(3)),
+                    _MONTH_NUMBERS[month_match.group(1).lower()],
+                    int(month_match.group(2)),
+                ).isoformat()
+            except ValueError:
+                return None
     return None
 
 
@@ -97,6 +139,40 @@ def _optional_bound(value: Any, field: str) -> float | None:
     if not parsed > 0:
         raise ValueError(f"INVALID_MARKET_DISCOVERY_SHAPE: {field}")
     return parsed
+
+
+def _label_number(value: str) -> float:
+    parsed = float(value.replace(",", ""))
+    if not parsed > 0:
+        raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+    return parsed
+
+
+def _bounds_from_canonical_labels(
+    labels: list[str],
+) -> list[tuple[float | None, float | None]]:
+    if len(labels) != 11:
+        raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+    first = _LESS_THAN_BUCKET.fullmatch(labels[0].strip())
+    last = _GREATER_THAN_BUCKET.fullmatch(labels[-1].strip())
+    if first is None or last is None:
+        raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+    bounds: list[tuple[float | None, float | None]] = [
+        (None, _label_number(first.group(1)))
+    ]
+    for label in labels[1:-1]:
+        match = _RANGE_BUCKET.fullmatch(label.strip())
+        if match is None:
+            raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+        lower = _label_number(match.group(1))
+        upper = _label_number(match.group(2))
+        if lower >= upper:
+            raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+        bounds.append((lower, upper))
+    bounds.append((_label_number(last.group(1)), None))
+    if any(bounds[index - 1][1] != bounds[index][0] for index in range(1, 11)):
+        raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+    return bounds
 
 
 def _candidate_identity(
@@ -137,7 +213,8 @@ def _candidate_identity(
     condition_ids: list[str] = []
     bucket_bounds: list[tuple[float | None, float | None]] = []
     fee_schedules: list[dict[str, Any]] = []
-    structured_count = 0
+    metadata_count = 0
+    bounds_count = 0
     for index, market in enumerate(markets):
         _require_type(market, dict, f"event.markets[{index}]")
         if (
@@ -180,14 +257,10 @@ def _candidate_identity(
         if yes_no != ["Yes", "No"] or len(tokens) != 2:
             return None
         asset_ids.extend(tokens)
-        structured_fields = (
-            "conditionId" in market,
-            "lowerBound" in market,
-            "upperBound" in market,
-            "feeSchedule" in market,
-        )
-        if any(structured_fields):
-            if not all(structured_fields):
+        metadata_fields = ("conditionId" in market, "feeSchedule" in market)
+        bound_fields = ("lowerBound" in market, "upperBound" in market)
+        if any(metadata_fields) or any(bound_fields):
+            if not all(metadata_fields) or any(bound_fields) != all(bound_fields):
                 raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
             condition_id = _require_type(
                 market.get("conditionId"), str, f"event.markets[{index}].conditionId"
@@ -198,21 +271,25 @@ def _candidate_identity(
             if not condition_id:
                 raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
             condition_ids.append(condition_id)
-            bucket_bounds.append(
-                (
-                    _optional_bound(market.get("lowerBound"), f"event.markets[{index}].lowerBound"),
-                    _optional_bound(market.get("upperBound"), f"event.markets[{index}].upperBound"),
-                )
-            )
             fee_schedules.append(dict(fee_schedule))
-            structured_count += 1
+            metadata_count += 1
+            if all(bound_fields):
+                bucket_bounds.append(
+                    (
+                        _optional_bound(market.get("lowerBound"), f"event.markets[{index}].lowerBound"),
+                        _optional_bound(market.get("upperBound"), f"event.markets[{index}].upperBound"),
+                    )
+                )
+                bounds_count += 1
 
     if len(set(asset_ids)) != len(asset_ids):
         raise ValueError("DUPLICATE_MARKET_ASSET_ID")
     if len(set(market_ids)) != len(market_ids):
         raise ValueError("DUPLICATE_MARKET_ID")
-    if structured_count not in (0, 11):
+    if metadata_count not in (0, 11) or bounds_count not in (0, 11):
         raise ValueError("INCOMPLETE_MACHINE_MARKET_METADATA")
+    if metadata_count == 11 and bounds_count == 0:
+        bucket_bounds = _bounds_from_canonical_labels(bucket_outcomes)
 
     return MarketIdentity(
         event_id=event_id,

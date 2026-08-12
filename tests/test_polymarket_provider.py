@@ -1246,6 +1246,66 @@ class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(identity.bucket_bounds[-1], (100_000.0, None))
         self.assertEqual(identity.fee_schedules[0]["rate"], 0.07)
 
+    def test_discovery_derives_missing_bounds_from_canonical_bucket_labels(self):
+        event = discovery_event(
+            event_id="current-2026-07-29",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=True,
+        )
+        titles = (
+            "<90,000",
+            "90,000-92,000",
+            "92,000-94,000",
+            "94,000-96,000",
+            "96,000-98,000",
+            "98,000-100,000",
+            "100,000-102,000",
+            "102,000-104,000",
+            "104,000-106,000",
+            "106,000-108,000",
+            ">108,000",
+        )
+        for index, market in enumerate(event["markets"]):
+            market["groupItemTitle"] = titles[index]
+            market["conditionId"] = f"condition-{index}"
+            market["feeSchedule"] = {
+                "rate": 0.07,
+                "exponent": 1,
+                "takerOnly": True,
+            }
+
+        identity = discover_active_btc_daily_range(
+            [event],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.bucket_bounds[0], (None, 90_000.0))
+        self.assertEqual(identity.bucket_bounds[5], (98_000.0, 100_000.0))
+        self.assertEqual(identity.bucket_bounds[-1], (108_000.0, None))
+
+    def test_discovery_rejects_non_contiguous_bucket_labels(self):
+        event = discovery_event(
+            event_id="current-2026-07-29",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=True,
+        )
+        for index, market in enumerate(event["markets"]):
+            market["conditionId"] = f"condition-{index}"
+            market["feeSchedule"] = {
+                "rate": 0.07,
+                "exponent": 1,
+                "takerOnly": True,
+            }
+        event["markets"][0]["groupItemTitle"] = "<100,000"
+
+        with self.assertRaisesRegex(
+            ValueError, "INCOMPLETE_MACHINE_MARKET_METADATA"
+        ):
+            discover_active_btc_daily_range(
+                [event],
+                now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+            )
+
     def test_current_gamma_naming_is_accepted(self):
         event = discovery_event(
             event_id="current-2026-07-29",
@@ -1259,6 +1319,22 @@ class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(identity.event_id, "current-2026-07-29")
+
+    def test_current_month_name_gamma_naming_has_machine_date(self):
+        event = discovery_event(
+            event_id="current-2026-07-29",
+            end_date="2026-07-29T16:00:00Z",
+            current_naming=True,
+        )
+        event["slug"] = "bitcoin-price-on-july-29-2026"
+        event["ticker"] = "bitcoin-price-on-july-29-2026"
+
+        identity = discover_active_btc_daily_range(
+            [event],
+            now_utc=datetime(2026, 7, 29, 12, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(identity.market_date, "2026-07-29")
 
     def test_legacy_gamma_naming_remains_accepted(self):
         event = discovery_event(
