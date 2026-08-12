@@ -1652,6 +1652,19 @@ class PolymarketProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(incidents[0]["severity"], "WARNING")
 
+    def test_market_scoped_passthrough_without_asset_id_is_preserved(self):
+        payload = {
+            "event_type": "market_resolved",
+            "market": "condition-00",
+            "timestamp": 1785556802000,
+        }
+
+        event = parse_market_ws_message(payload)[0]
+
+        self.assertEqual(event.event_type, "POLYMARKET_MARKET_RESOLVED")
+        self.assertIn("polymarket:market:condition-00:", event.natural_key)
+        self.assertEqual(json.loads(event.payload_json), payload)
+
     def test_malformed_schema_is_rejected(self):
         payload = load_fixture("polymarket_book.json")
         del payload["asset_id"]

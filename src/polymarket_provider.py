@@ -449,7 +449,14 @@ def parse_market_ws_message(
     if event_type == "price_change":
         return _parse_price_changes(payload)
 
-    asset_id = _require_type(payload.get("asset_id"), str, "asset_id")
+    asset_id = payload.get("asset_id")
+    if type(asset_id) is str and asset_id:
+        stream_identity = asset_id
+    else:
+        market = _require_type(payload.get("market"), str, "market")
+        if not market:
+            raise ValueError("POLYMARKET_INVALID_TYPE: market")
+        stream_identity = f"market:{market}"
     timestamp_ms = _normalize_timestamp_ms(payload.get("timestamp"), "timestamp")
     canonical = _canonical_json(payload)
     identity_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -470,7 +477,7 @@ def parse_market_ws_message(
         _source_event(
             event_type=canonical_event_type,
             natural_key=(
-                f"polymarket:{asset_id}:{event_type}:"
+                f"polymarket:{stream_identity}:{event_type}:"
                 f"{timestamp_ms}:{identity_hash}"
             ),
             timestamp_ms=timestamp_ms,
