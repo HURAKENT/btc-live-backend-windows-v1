@@ -39,6 +39,13 @@ _ACTIVE_RUNTIME_STATE = "LIVE_READY"
 _EXECUTABLE_INPUT = "BTC_STRATEGY_EXECUTABLE_CHECKPOINT_INPUT_V1"
 _MISSING_DEPTH_INPUT = "C6_MISSING_HISTORICAL_DEPTH_V1"
 _CLAIM_LEASE_MS = 30_000
+_OPERATIONAL_EVALUATOR_STRATEGY_IDS = frozenset(
+    {
+        "YES_STRICT_A_OPERATIONAL",
+        "YES_STRICT_A_T30",
+        "YES_STRICT_A_T60",
+    }
+)
 
 
 def _sha256(payload: bytes) -> str:
@@ -398,6 +405,15 @@ class CheckpointScheduler:
         self._store = store
         self._connection: sqlite3.Connection = store._connection
         self._activation = load_c5_scheduler_contract(self._project_root)
+        self._operational_bindings = tuple(
+            binding
+            for binding in self._activation.enabled
+            if binding.strategy_id in _OPERATIONAL_EVALUATOR_STRATEGY_IDS
+        )
+        if {
+            binding.strategy_id for binding in self._operational_bindings
+        } != _OPERATIONAL_EVALUATOR_STRATEGY_IDS:
+            raise ValueError("C6_OPERATIONAL_EVALUATOR_PROJECTION_MISMATCH")
 
     def register_market(
         self,
@@ -484,7 +500,7 @@ class CheckpointScheduler:
     ) -> tuple[tuple[object, ...], ...]:
         resolution_ms = _resolution_ms(payload_json, market_hash)
         expected_rows: list[tuple[object, ...]] = []
-        for binding in self._activation.enabled:
+        for binding in self._operational_bindings:
             policy = V1_IDENTITY_POLICIES.get(binding.strategy_id)
             if policy is None:
                 raise ValueError("C6_C5_PROVENANCE_MISMATCH")
@@ -574,10 +590,13 @@ class CheckpointScheduler:
     def _read_market_schedules(
         self, market_id: str
     ) -> tuple[CheckpointSchedule, ...]:
+        evaluator_ids = tuple(sorted(_OPERATIONAL_EVALUATOR_STRATEGY_IDS))
         rows = self._connection.execute(
             f"SELECT {_SCHEDULE_COLUMNS} FROM strategy_checkpoint_schedules "
-            "WHERE market_id=? ORDER BY due_at_ms,registry_index,checkpoint_minutes",
-            (market_id,),
+            "WHERE market_id=? "
+            f"AND strategy_id IN ({','.join('?' for _ in evaluator_ids)}) "
+            "ORDER BY due_at_ms,registry_index,checkpoint_minutes",
+            (market_id, *evaluator_ids),
         ).fetchall()
         return tuple(_schedule_from_row(tuple(row)) for row in rows)
 
@@ -628,6 +647,33 @@ class CheckpointScheduler:
                 """,
                 (now_ms, now_ms - _CLAIM_LEASE_MS),
             )
+            evaluator_ids = tuple(sorted(_OPERATIONAL_EVALUATOR_STRATEGY_IDS))
+            self._connection.execute(
+                f"""
+                UPDATE strategy_checkpoint_schedules
+                SET state='BLOCKED',claim_owner=NULL,claimed_at_ms=NULL,
+                    blocked_reason='UNSUPPORTED_OPERATIONAL_EVALUATOR',
+                    updated_at_ms=?
+                WHERE state IN ('PENDING','CAPTURED')
+                  AND strategy_id NOT IN ({','.join('?' for _ in evaluator_ids)})
+                """,
+                (now_ms, *evaluator_ids),
+            )
+            self._connection.execute(
+                """
+                UPDATE strategy_checkpoint_schedules
+                SET state='BLOCKED',claim_owner=NULL,claimed_at_ms=NULL,
+                    blocked_reason=CASE
+                        WHEN blocked_reason IS NULL
+                        THEN 'MISSED_CHECKPOINT_EXPIRED_MARKET'
+                        ELSE 'MISSED_CHECKPOINT:' || blocked_reason
+                    END,
+                    updated_at_ms=?
+                WHERE state='PENDING' AND market_id<>? AND due_at_ms<=?
+                  AND (resolution_ms<=? OR blocked_reason IS NOT NULL)
+                """,
+                (now_ms, active_market_id, now_ms, now_ms),
+            )
             stale = self._connection.execute(
                 """
                 SELECT 1 FROM strategy_checkpoint_schedules
@@ -668,7 +714,7 @@ class CheckpointScheduler:
                     raise RuntimeError("C6_CHECKPOINT_CLAIM_RACE")
             rows = tuple(
                 self._connection.execute(
-                    f"SELECT {_SCHEDULE_COLUMNS},capture_origin "
+                    f"SELECT {_SCHEDULE_COLUMNS},capture_origin,blocked_reason "
                     "FROM strategy_checkpoint_schedules "
                     f"WHERE schedule_key IN ({','.join('?' for _ in keys)}) "
                     "ORDER BY due_at_ms,registry_index,checkpoint_minutes",
@@ -691,7 +737,7 @@ class CheckpointScheduler:
                     and row[19] in {"LIVE", "RECOVERED_AFTER_DOWNTIME"}
                     else (
                         "RECOVERED_AFTER_DOWNTIME"
-                        if row[16] < recovery_cutoff_ms
+                        if row[20] is not None or row[16] < recovery_cutoff_ms
                         else "LIVE"
                     )
                 ),
