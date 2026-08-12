@@ -20,7 +20,9 @@ from src.strategy_v1 import (
     evaluate_favorite_only,
     evaluate_no_fade_historical,
     evaluate_pf1,
+    evaluate_pf1_historical,
     evaluate_strict_a,
+    evaluate_strict_historical,
 )
 from src.strategy_v2 import (
     ParentOverlayDecision,
@@ -219,6 +221,87 @@ class StrategyDispatcher:
             parent=request.parent,
             volatility_input=request.volatility_input,
         )
+
+    def dispatch_historical(
+        self,
+        *,
+        strategy_id: str,
+        request: object,
+    ) -> tuple[V1Evaluation, ...] | V2OverlayEvaluation:
+        binding = self.binding(strategy_id)
+        if binding.version == "V1":
+            if type(request) is not V1StrategyDispatchRequest:
+                raise ValueError("AHR_INVALID_V1_HISTORICAL_REQUEST_TYPE")
+            return _dispatch_v1_historical(binding=binding, request=request)
+        if type(request) is not V2StrategyDispatchRequest:
+            raise ValueError("AHR_INVALID_V2_HISTORICAL_REQUEST_TYPE")
+        return evaluate_volatility_overlay(
+            overlay_strategy_id=binding.strategy_id,
+            regime=binding.schedule["overlay_mode"],
+            parent=request.parent,
+            volatility_input=request.volatility_input,
+        )
+
+
+def _dispatch_v1_historical(
+    *,
+    binding: StrategyDispatchBinding,
+    request: V1StrategyDispatchRequest,
+) -> tuple[V1Evaluation, ...]:
+    policy = V1_IDENTITY_POLICIES.get(binding.strategy_id)
+    if policy is None:
+        raise ValueError("C4_DISPATCH_BINDING_DRIFT: V1 identity set")
+    observed_checkpoints = tuple(
+        item.checkpoint_minutes for item in request.checkpoints
+    )
+    if set(observed_checkpoints) != set(policy.checkpoints) or len(
+        observed_checkpoints
+    ) != len(policy.checkpoints):
+        raise ValueError("C4_V1_CHECKPOINT_SET_MISMATCH")
+    if any(
+        type(item) is not V1HistoricalCheckpointInput
+        for item in request.checkpoints
+    ):
+        raise ValueError("AHR_V1_HISTORICAL_INPUT_SCHEMA_MISMATCH")
+    by_checkpoint = {
+        item.checkpoint_minutes: item for item in request.checkpoints
+    }
+
+    if binding.evaluator_key == "NO_CONFIRMATION_V1":
+        t60 = by_checkpoint[60]
+        t30 = by_checkpoint.get(30)
+        result = evaluate_confirmation(
+            binding.strategy_id,
+            t60.buckets,
+            t30=None if t30 is None else t30.buckets,
+        )
+        return (result,)
+
+    evaluations: list[V1Evaluation] = []
+    for checkpoint in policy.checkpoints:
+        item = by_checkpoint[checkpoint]
+        if binding.evaluator_key == "FAVORITE_ONLY_V1":
+            result = evaluate_favorite_only(checkpoint, item.buckets)
+        elif binding.evaluator_key == "FAVORITE_NEIGHBOR_BASKET_V1":
+            result = evaluate_favorite_neighbor(checkpoint, item.buckets)
+        elif binding.evaluator_key in {"NO_FADE_P1_V1", "NO_FADE_P2_V1"}:
+            result = evaluate_no_fade_historical(
+                binding.strategy_id, checkpoint, item.buckets
+            )
+        elif binding.evaluator_key == "STRICT_A_COMPOSED_V1":
+            result = evaluate_strict_historical(
+                binding.strategy_id, checkpoint, item.buckets
+            )
+        elif binding.evaluator_key == "PF1_COMPOSED_V1":
+            result = evaluate_pf1_historical(
+                binding.strategy_id, checkpoint, item.buckets
+            )
+        else:
+            raise ValueError("C4_UNKNOWN_V1_EVALUATOR_KEY")
+        evaluations.append(result)
+    return apply_identity_checkpoint_policy(
+        binding.strategy_id, tuple(evaluations)
+    )
 
 
 def _dispatch_v1(

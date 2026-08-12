@@ -141,6 +141,23 @@ def _v1_request(strategy_id: str):
     return V1StrategyDispatchRequest(checkpoints=tuple(checkpoints))
 
 
+def _historical_v1_request(strategy_id: str):
+    from src.strategy_dispatch import (
+        V1HistoricalCheckpointInput,
+        V1StrategyDispatchRequest,
+    )
+
+    return V1StrategyDispatchRequest(
+        checkpoints=tuple(
+            V1HistoricalCheckpointInput(
+                checkpoint_minutes=checkpoint,
+                buckets=_buckets(),
+            )
+            for checkpoint in V1_IDENTITY_POLICIES[strategy_id].checkpoints
+        )
+    )
+
+
 class StrategyDispatchBindingTests(unittest.TestCase):
     def test_trusted_pack_builds_exact_ordered_forty_seven_bindings(self):
         from src.strategy_dispatch import load_strategy_dispatcher
@@ -280,6 +297,74 @@ class StrategyDispatchBindingTests(unittest.TestCase):
 
 
 class StrategyDispatcherEvaluationTests(unittest.TestCase):
+    def test_historical_strict_a_uses_historical_evaluator(self):
+        from src.strategy_dispatch import load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        result = dispatcher.dispatch_historical(
+            strategy_id="YES_STRICT_A_T60",
+            request=_historical_v1_request("YES_STRICT_A_T60"),
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0].historical_only)
+        self.assertNotEqual(result[0].reason, "STRICT_PRICE_HISTORY_EVIDENCE_REQUIRED")
+
+    def test_historical_pf1_uses_historical_evaluator(self):
+        from src.strategy_dispatch import load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        result = dispatcher.dispatch_historical(
+            strategy_id="YES_PF1_T6H",
+            request=_historical_v1_request("YES_PF1_T6H"),
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0].historical_only)
+        self.assertFalse(result[0].execution_eligible)
+
+    def test_historical_no_identity_uses_existing_historical_evaluator(self):
+        from src.strategy_dispatch import load_strategy_dispatcher
+
+        strategy_id = "NO_FADE_P1_U1_T18"
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        result = dispatcher.dispatch_historical(
+            strategy_id=strategy_id,
+            request=_historical_v1_request(strategy_id),
+        )
+
+        self.assertTrue(result)
+        self.assertTrue(all(item.historical_only for item in result))
+
+    def test_historical_dispatch_fails_closed_for_unknown_identity(self):
+        from src.strategy_dispatch import load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        with self.assertRaisesRegex(ValueError, "C4_UNKNOWN_STRATEGY_ID"):
+            dispatcher.dispatch_historical(strategy_id="UNKNOWN", request=object())
+
+    def test_historical_v2_uses_current_overlay_evaluator(self):
+        from src.strategy_dispatch import load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        result = dispatcher.dispatch_historical(
+            strategy_id="NO_A2_V2_VOL",
+            request=_request(),
+        )
+
+        self.assertEqual(result.overlay_strategy_id, "NO_A2_V2_VOL")
+        self.assertEqual(result.regime, "VOL_CONFIRMATION")
+
+    def test_normal_dispatch_still_rejects_historical_executable_input(self):
+        from src.strategy_dispatch import load_strategy_dispatcher
+
+        dispatcher = load_strategy_dispatcher(PROJECT_ROOT)
+        with self.assertRaisesRegex(ValueError, "C4_V1_INPUT_SCHEMA_MISMATCH"):
+            dispatcher.dispatch(
+                strategy_id="YES_STRICT_A_T60",
+                request=_historical_v1_request("YES_STRICT_A_T60"),
+            )
+
     def test_v2_dispatch_derives_regime_from_trusted_binding(self):
         from src.strategy_dispatch import load_strategy_dispatcher
 
