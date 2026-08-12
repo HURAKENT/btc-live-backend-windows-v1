@@ -22,12 +22,13 @@ The historical C11 48-hour contract and evidence are retained. The protocol is
 now `OPTIONAL / DEFERRED ENDURANCE TEST`; it is not a blocking next stage and no
 timed observation is pending.
 
-## Current release path
+## Current release state
 
-Integrate operational corrections, run exactly one final native Windows suite,
-validate the production backup, register and verify the canonical user-level
-Task Scheduler task with bounded restart policy, launch the backend, verify
-loopback API/Dashboard/source/scheduler health, and leave it running.
+Operational launch is `100/100 PASS`. The canonical user-level Task Scheduler
+task is registered with bounded restart policy and the signal-only backend is
+running. API, Dashboard, database, both sources and scheduler projection are
+observable; the exact receipt is
+`reports/OPERATIONAL_LAUNCH_ACCEPTANCE.json`.
 
 After launch, normal lifecycle is `NORMAL OPERATION -> INCIDENT -> NARROW FIX ->
 CONTINUE OPERATION`. The next separate non-blocking research task is

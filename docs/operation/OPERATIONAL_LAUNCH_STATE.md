@@ -20,8 +20,8 @@ It is not a launch blocker and no timed observation is pending.
 | Scheduler + signal-time correctness | 35 | 35 | ACCEPTED_FOCUSED |
 | Offline recovery + runtime liveness | 40 | 40 | ACCEPTED_FOCUSED |
 | Dashboard/docs/deployment corrections | 10 | 10 | ACCEPTED_FOCUSED |
-| Final Windows gate + permanent launch | 15 | 0 | NOT_STARTED |
-| **OPERATIONAL LAUNCH** | **100** | **85/100** | **FINAL_GATE_READY** |
+| Final Windows gate + permanent launch | 15 | 15 | RUNNING |
+| **OPERATIONAL LAUNCH** | **100** | **100/100** | **PASS** |
 
 Calculation: `35 + 40 + 10 + 15 = 100`.
 
@@ -73,11 +73,32 @@ Calculation: `35 + 40 + 10 + 15 = 100`.
 No wallet, signing, authenticated write, real order, or live-money authority
 may be added. Local paper accounting remains simulation only.
 
-## Locked continuation
+## Final gate and permanent operation
 
-Commit and push the integrated release candidate, run focused final operational
-tests, then exactly one fresh full native Windows suite. If green, create and
-validate a production SQLite backup, register/verify the canonical user-level
-Task Scheduler task, launch the backend permanently, verify loopback API,
-Dashboard, source health, scheduler progress and security, then leave it
-running. Do not start C11 or Autonomous Historical Revalidation.
+- Final native Windows gate: `1022` tests, `1020 PASS`, `2` documented skips,
+  `0 FAIL`, `0 ERROR`, exit code `0`, `191.490s`.
+- Earlier final-gate runs exposed operational projection, authority-doc and C10
+  fixture regressions. They were remediated with focused GREEN before the final
+  successful run; the failed results were not treated as acceptance.
+- Production backup:
+  `data/backups/btc_live_backend_prelaunch_20260812T095204Z.sqlite3`, SHA-256
+  `882feb1602c32c613baef39d897d37aa7b705eb9f7fbfff3521f4dbdc1abe362`,
+  `quick_check=ok`, schema PASS, migration `5`.
+- Task Scheduler: one canonical user-level task
+  `BTC Daily Range Backend V1`, Limited/Interactive, fingerprint
+  `acb279a28dd39b18a3ac4d747e7d9b1a9dfa9decb5693ce966d0181e71fbcce8`,
+  restart `3` at `PT5M`, state `Running`, no C11/test conflict.
+- Live startup produced two durable incidents. Narrow fixes accepted canonical
+  Gamma bucket/date metadata (`123/123 PASS`) and market-scoped WebSocket events
+  (`108/108 PASS`); both fixes were committed and pushed before restart.
+- Permanent runtime verification at `2026-08-12T10:12:09Z`: API and Dashboard
+  HTTP `200`, database health PASS, runtime `LIVE_READY`, Binance `LIVE`,
+  Polymarket `LIVE`, current market `11` markets / `22` assets.
+- Operational scheduler contains exactly four current Strict A checkpoints at
+  future T-60/T-30 boundaries. Duplicate source natural keys `0`, duplicate
+  signal keys `0`, paper fills `0`, recovered execution-eligible signals `0`,
+  and post-relaunch critical incidents `0`.
+
+The backend remains running in normal signal-only operation. C11 remains
+optional/deferred. The next separate research task is
+`AUTONOMOUS HISTORICAL REVALIDATION`; it has not started.

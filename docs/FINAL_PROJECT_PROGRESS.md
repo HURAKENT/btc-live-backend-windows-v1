@@ -5,10 +5,11 @@
 - Active mode: `NORMAL OPERATION / SIGNAL ONLY`.
 - Integration branch: `codex/final-project-completion`.
 - Operational bootstrap: `d6593609bc9878469e5dbc1c5a960a074d4a0992`.
-- Scheduler/signal semantics: integrated, focused acceptance pending final
-  release receipt.
-- Recovery/liveness: integrated, focused acceptance pending final release
-  receipt.
+- Scheduler/signal semantics: `35/35`, accepted.
+- Recovery/liveness: `40/40`, accepted.
+- Dashboard/docs/deployment corrections: `10/10`, accepted.
+- Final Windows gate and permanent launch: `15/15`, running.
+- Operational launch: `100/100 PASS`.
 - Operational launch progress is authoritative in
   `docs/operation/OPERATIONAL_LAUNCH_STATE.md`.
 - Trading approval: `false`.
@@ -23,8 +24,8 @@ Preserved historical acceptance marker:
 
 ## Locked next path
 
-Complete the operational launch gate, leave the signal-only backend running,
-then continue normal operation. The next separate research/revalidation task is
+Continue normal signal-only operation using `NORMAL OPERATION -> INCIDENT ->
+NARROW FIX -> CONTINUE OPERATION`. The next separate research/revalidation task is
 `AUTONOMOUS HISTORICAL REVALIDATION`; it is non-blocking and must not start as
 part of this launch.
 

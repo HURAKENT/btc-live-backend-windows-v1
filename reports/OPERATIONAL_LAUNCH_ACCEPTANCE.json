@@ -1,14 +1,14 @@
 {
   "schema_version": "OPERATIONAL_LAUNCH_ACCEPTANCE_V1",
-  "status": "PRE_FINAL_GATE_PASS",
+  "status": "OPERATIONAL_LAUNCH_PASS",
   "bootstrap_commit": "d6593609bc9878469e5dbc1c5a960a074d4a0992",
   "integration_branch": "codex/final-project-completion",
   "progress": {
     "scheduler_signal_semantics": "35/35",
     "recovery_liveness": "40/40",
     "dashboard_docs_deployment": "10/10",
-    "final_windows_launch": "0/15",
-    "total": "85/100"
+    "final_windows_launch": "15/15",
+    "total": "100/100"
   },
   "worker_a": {
     "source_commit": "64392622273a6e6dcfd07409c562bd1bd9db6620",
@@ -32,6 +32,41 @@
     "task_scheduler_native_test": "PASS",
     "integrated_operational_tests": 13,
     "historical_47_contract_tests": 11
+  },
+  "final_gate": {
+    "tested_commit": "3da779a05effcbbb5b5cf42f177c39d55554cd35",
+    "tests": 1022,
+    "passed": 1020,
+    "documented_skips": 2,
+    "failures": 0,
+    "errors": 0,
+    "exit_code": 0,
+    "elapsed_seconds": "191.490"
+  },
+  "deployment": {
+    "functional_head": "1160a22711d429a517c0fe7aa4ba6445ed8b4605",
+    "backup_path": "data/backups/btc_live_backend_prelaunch_20260812T095204Z.sqlite3",
+    "backup_sha256": "882feb1602c32c613baef39d897d37aa7b705eb9f7fbfff3521f4dbdc1abe362",
+    "backup_quick_check": "ok",
+    "backup_schema_status": "PASS",
+    "backup_migration_version": 5,
+    "task_name": "BTC Daily Range Backend V1",
+    "task_fingerprint": "acb279a28dd39b18a3ac4d747e7d9b1a9dfa9decb5693ce966d0181e71fbcce8",
+    "task_state": "Running",
+    "task_restart_count": 3,
+    "task_restart_interval": "PT5M",
+    "api_http_status": 200,
+    "dashboard_http_status": 200,
+    "runtime_state": "LIVE_READY",
+    "binance_health": "LIVE",
+    "polymarket_health": "LIVE",
+    "operational_schedule_count": 4,
+    "duplicate_source_natural_keys": 0,
+    "duplicate_signal_keys": 0,
+    "paper_fill_count": 0,
+    "recovered_execution_eligible_signal_count": 0,
+    "post_relaunch_critical_incident_count": 0,
+    "verified_at_utc": "2026-08-12T10:12:09Z"
   },
   "security": {
     "trading_approval": false,
