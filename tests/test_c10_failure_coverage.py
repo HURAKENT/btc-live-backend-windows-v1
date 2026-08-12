@@ -79,6 +79,9 @@ class C10ProviderOutageTests(unittest.IsolatedAsyncioTestCase):
                 baseline_outbox = store.count("outbox_events")
 
                 now_ms[0] = 2_000_000_000_000
+                runtime._source_last_accepted_at_ms.update(
+                    {"binance": now_ms[0], "polymarket": now_ms[0]}
+                )
                 self.assertEqual(await runtime.poll_strategy_checkpoints_once(), 0)
                 self.assertEqual(store.count("signals"), baseline_signals)
                 self.assertEqual(store.count("outbox_events"), baseline_outbox)
@@ -102,11 +105,11 @@ class C10ProviderOutageTests(unittest.IsolatedAsyncioTestCase):
                         "SELECT COUNT(*) FROM incidents "
                         "WHERE status='CURRENT_PROVIDER_UNAVAILABLE'"
                     ),
-                    10,
+                    4,
                 )
 
                 source.available = True
-                self.assertEqual(await runtime.poll_strategy_checkpoints_once(), 8)
+                self.assertEqual(await runtime.poll_strategy_checkpoints_once(), 6)
                 recovered_counts = (
                     store.count("strategy_evaluations"),
                     store.count("signals"),
@@ -119,7 +122,7 @@ class C10ProviderOutageTests(unittest.IsolatedAsyncioTestCase):
                         "SELECT COUNT(*) FROM strategy_checkpoint_schedules "
                         "WHERE state='COMPLETED'"
                     ),
-                    10,
+                    4,
                 )
                 self.assertEqual(store.count("paper_fills"), 0)
 
@@ -240,16 +243,16 @@ class C10TransactionalRestartTests(unittest.TestCase):
                 market_id="c10-crash-market", created_at_ms=1
             )
             target = next(
-                item for item in schedules if item.strategy_id == "YES_PF1_T8H"
+                item for item in schedules if item.strategy_id == "YES_STRICT_A_T60"
             )
-            self.assertEqual(target.checkpoint_minutes, 480)
+            self.assertEqual(target.checkpoint_minutes, 60)
             self.assertEqual(target.state, "PENDING")
             payload = json.dumps(
                 {
-                    "checkpoint_minutes": 480,
+                    "checkpoint_minutes": 60,
                     "market_id": "c10-crash-market",
                     "schema_version": "C6_MISSING_HISTORICAL_DEPTH_V1",
-                    "strategy_id": "YES_PF1_T8H",
+                    "strategy_id": "YES_STRICT_A_T60",
                 },
                 sort_keys=True,
                 separators=(",", ":"),
@@ -315,7 +318,7 @@ class C10TransactionalRestartTests(unittest.TestCase):
                 )
                 evaluation_payload = json.dumps(
                     {
-                        "checkpoint_minutes": 480,
+                        "checkpoint_minutes": 60,
                         "market_id": "c10-crash-market",
                         "origin": "LIVE",
                         "status": "SIGNAL",
