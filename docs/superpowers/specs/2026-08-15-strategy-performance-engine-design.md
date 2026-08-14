@@ -89,7 +89,12 @@ tables are caches, never primary truth.
   totals.
 - `HISTORICAL`, `FORWARD`, and `COMBINED` are explicit query dimensions.
 - Historical and forward observations remain independently filterable forever.
-- `COMBINED` is a deterministic composition, not a destructive merge.
+- Every observation has a source-independent `logical_decision_key` in addition
+  to its source-specific observation identity.
+- `COMBINED` is a deterministic cross-layer composition, not a destructive
+  merge and not a blind concatenation.
+- The same logical decision may remain present in both raw layers for audit, but
+  it can contribute at most once to `COMBINED`.
 - Five shares (`5_000_000` share-micros) is the canonical reporting unit.
 - A rejected evaluation is an opportunity but is not an accepted signal or a
   trade/performance observation.
@@ -270,7 +275,9 @@ One immutable row per evaluator result:
 
 | Field | Contract |
 | --- | --- |
-| `observation_key` | Deterministic primary key; source-independent logical identity plus source layer |
+| `observation_key` | Deterministic source-specific primary key |
+| `logical_decision_key` | Deterministic source-independent strategy-decision identity used for cross-layer composition |
+| `decision_semantic_sha256` | Hash of source-independent canonical decision semantics used for overlap equality |
 | `schema_version` | Exact performance observation schema version |
 | `source_layer` | `HISTORICAL` or `FORWARD` |
 | `strategy_id`, `strategy_version`, `family` | Reused from current registry/dispatcher conventions |
@@ -284,9 +291,9 @@ One immutable row per evaluator result:
 | `selected_buckets_json`, `selected_bucket_identity_sha256` | Ordered canonical selection and hash |
 | `accepted`, `emitted` | Independent exact booleans |
 | `reason_code` | Evaluator reason, including rejection |
-| `reference_price_micros` | Nullable raw decision reference price |
+| `reference_price_micros` | Nullable raw decision reference price; provenance only when a stressed performance price exists |
 | `performance_price_micros` | Nullable contract price used for five-share analytics |
-| `performance_price_basis` | Exact enum such as `CONTRACT_STRESSED_REFERENCE` or `CONTRACT_REFERENCE`; never unlabeled |
+| `performance_price_basis` | Exact enum defined in section 11.1; never unlabeled |
 | `shares_micros` | Exactly `5_000_000` for accepted performance observations; rejected rows carry zero economics |
 | `scoring_status`, `scoring_reason_code` | `REJECTED`, `RESOLUTION_PENDING`, or `UNSCORABLE` before effective resolution |
 | `observed_at_ms`, `source_created_at_ms` | Engine and source timestamps |
@@ -314,7 +321,18 @@ One row per observation and settlement revision:
 - `shares_micros = 5_000_000`;
 - `cost_usd_micros`, `gross_payout_usd_micros`, `pnl_usd_micros`, and
   `turnover_usd_micros`;
-- `resolved_at_ms`, settlement provenance, canonical payload, and SHA-256.
+- required `resolution_date`, taken from the canonical settlement market/date
+  identity;
+- nullable `resolved_at_ms`, settlement provenance, canonical payload, and
+  SHA-256.
+
+`resolved_at_ms` is audit metadata and is present only when canonical settlement
+evidence supplies a trustworthy timestamp. Historical resolution must not
+manufacture a millisecond timestamp from `market_date`, event-end assumptions,
+ingest time, or file metadata.
+
+For BTC Daily Range, `resolution_date` is the canonical settlement's market
+date. It is a date identity, not a timestamp reconstructed at an assumed hour.
 
 Only one valid terminal revision may be effective for an observation. Exact
 replay is a no-op. A different result under the same key is a conflict. A
@@ -379,9 +397,23 @@ Forward observation identity is derived from:
 
 `FORWARD + evaluation_key + evaluator-result/checkpoint identity`.
 
+The source-independent `logical_decision_key` is derived from canonical logical
+coordinates shared by both layers:
+
+`strategy_id + strategy_version + canonical market identity/date + checkpoint/horizon + side + canonical parent/source-decision lineage where applicable`.
+
+It excludes source layer, AHR/runtime run ID, ingest/evaluation timestamp,
+source-specific observation key, and source-result hash. The canonical semantic
+decision payload used for overlap comparison includes strategy/version, market,
+checkpoint/horizon, side, ordered selected bucket set, accepted/reason,
+reference/performance prices and basis, and parent/source-decision semantics. A
+SHA-256 of that canonical payload is stored as `decision_semantic_sha256`.
+
 `signal_identity_key` is linked separately and cannot be reused by another
 observation. Including `source_layer` prevents historical and forward facts from
-colliding while preserving their independent audit trails.
+colliding while preserving their independent audit trails. The repository
+enforces at most one observation per `(source_layer, logical_decision_key)`;
+the same logical key may exist once in each layer.
 
 For every natural key:
 
@@ -392,6 +424,23 @@ For every natural key:
 
 Duplicate AHR rows, duplicate signals, repeated reconciliation, process restart,
 or aggregate refresh cannot double-count observations, wins, turnover, or PnL.
+
+Cross-layer duplicates are deliberately not rejected at raw-ledger ingest. They
+remain independently queryable under their original `source_layer`. During
+`COMBINED` composition:
+
+1. a `logical_decision_key` present in only one layer contributes that
+   observation;
+2. the same key in both layers with identical `decision_semantic_sha256`
+   contributes exactly once, using `FORWARD` as the effective/preferred
+   observation;
+3. the same key with differing canonical semantic content aborts the aggregate
+   refresh with `COMBINED_CROSS_LAYER_CONFLICT`;
+4. no tie-break, latest-write rule, or silent double-count is permitted.
+
+Any future expanded historical baseline must run this overlap check against all
+already accumulated forward observations before a new `COMBINED` revision can
+become current.
 
 ## 9. Historical bootstrap
 
@@ -455,16 +504,47 @@ according to whether the missing fact is optional or contract-required.
 ### 11.1 Price basis
 
 The canonical performance basis is signal-contract/reference analytics, not a
-claim of actual historical execution:
+claim of actual historical execution.
 
-- V1 uses `stressed_reference_cost_micros` when the evaluator contract defines
-  it; otherwise it uses the validated reference price explicitly labeled
-  `CONTRACT_REFERENCE`;
-- V2 uses its contract-defined stressed/reference field and retains the V1
-  source-decision lineage;
-- forward observations use the equivalent captured evaluator contract price;
-- paper fills and real execution are separate ledgers and are not substituted
-  into combined strategy performance.
+For every **accepted V1 historical AHR observation**:
+
+```text
+if stressed_reference_cost_micros is not null:
+    performance_price_micros = stressed_reference_cost_micros
+    performance_price_basis = CONTRACT_STRESSED_REFERENCE_EXPLICIT
+else:
+    require market_probability_micros
+    require selected_leg_count >= 1
+    performance_price_micros = min(
+        1_000_000,
+        market_probability_micros + 30_000 * selected_leg_count,
+    )
+    performance_price_basis = CONTRACT_STRESSED_REFERENCE_RECONSTRUCTED
+```
+
+`selected_leg_count` is the length of the validated canonical selected bucket
+set. It is never inferred from a strategy name. Raw
+`market_probability_micros` is not a performance price when reconstruction is
+required.
+
+The authoritative example `NO_A0 / 2026-01-03` has raw market probability
+`665_000`, one selected leg, and null explicit stressed cost. Its performance
+price is therefore `min(1_000_000, 665_000 + 30_000) = 695_000`, matching frozen
+parity evidence.
+
+For every canonical **V2 performance observation**:
+
+```text
+performance_price_micros = stressed_q_3c_micros
+performance_price_basis = CONTRACT_V2_STRESSED_Q_3C
+```
+
+V2 `actual_price_micros` remains provenance/reference only and cannot silently
+replace `stressed_q_3c_micros`. V2 retains its V1 source-decision lineage.
+
+Forward observations use the equivalent captured evaluator contract price and
+basis. Paper fills and real execution are separate ledgers and are not
+substituted into combined strategy performance.
 
 Every observation exposes `performance_price_basis`. Historical depth
 `UNAVAILABLE` remains visible in provenance. No slippage, depth, or fee is
@@ -472,18 +552,27 @@ fabricated.
 
 ### 11.2 Economics
 
-For a priced accepted observation with performance price `q` in micros and
-canonical shares `S = 5_000_000` share-micros, fixed-point multiplication uses
-the project's declared deterministic rounding rule:
+For a priced accepted observation with integer
+`performance_price_micros` and exactly five whole shares:
 
-- `cost = q * 5 shares`;
-- `gross_payout = 5 USD` when the selected side wins, otherwise `0`;
-- `pnl = gross_payout - cost`;
-- `turnover = cost`;
-- per-observation return is `pnl / cost` only when `cost > 0`.
+```text
+cost_usd_micros = performance_price_micros * 5
+gross_payout_usd_micros = 5_000_000 if won else 0
+pnl_usd_micros = gross_payout_usd_micros - cost_usd_micros
+turnover_usd_micros = cost_usd_micros
+```
+
+This multiplication is exact integer arithmetic. It uses no binary floating
+point and requires no rounding. For the authoritative `NO_A0 / 2026-01-03`
+winning example, cost is `695_000 * 5 = 3_475_000`, payout is `5_000_000`, and
+PnL is `1_525_000` USD micros.
+
+Per-observation return is `pnl_usd_micros / cost_usd_micros` only when cost is
+positive.
 
 Stored monetary values are USD micros. Ratios are derived deterministically from
-integer numerators/denominators and serialized in one declared decimal format.
+integer numerators/denominators using fixed-point/decimal arithmetic and
+serialized in one declared decimal format.
 Zero-cost accepted observations are unscorable for ROI and must not create an
 infinite or fabricated ratio.
 
@@ -527,15 +616,25 @@ Each payload includes raw numerator/denominator counts as well as ratios.
 | Monthly performance | Resolved counts/economics grouped by UTC `market_date` calendar month |
 | Rolling performance | Same resolved metrics over trailing 30, 90, and 365 UTC calendar days ending at explicit `as_of_date` |
 | First/last signal date | Min/max `market_date` over accepted observations |
-| Last resolved date | Max effective resolution date over resolved observations |
+| Last resolved date | Maximum `resolution_date` over effective resolved observations; independent of `resolved_at_ms` |
 | Decision coverage | `accepted_signal_count / opportunity_count` |
 | Resolution coverage | `resolved_signal_count / accepted_signal_count` |
 | Price coverage | `priced_signal_count / accepted_signal_count` |
 
-Streak and cumulative-PnL order is
-`resolved_at_ms, market_date, checkpoint_minutes, observation_key`. This makes
-ties deterministic. Ratio values are null, not zero, when their denominator is
-zero.
+The canonical financial sequence for cumulative PnL, max/current drawdown, and
+win/loss streaks is:
+
+```text
+market_date ASC
+checkpoint_minutes DESC
+observation_key ASC
+```
+
+This order uses causal fields available in both layers. `resolved_at_ms` is not
+part of financial ordering. An actual forward resolution timestamp remains
+audit metadata and may be displayed by the API. Historical observations with
+null `resolved_at_ms` remain fully scoreable and deterministically rebuildable.
+Ratio values are null, not zero, when their denominator is zero.
 
 ## 13. Historical, forward, and combined views
 
@@ -552,14 +651,17 @@ zero-opportunity forward views, not synthetic observations.
 
 ### COMBINED
 
-Uses the union of historical and forward observations and recomputes all ratios,
-drawdowns, streaks, rolling windows, and dates over that union. Additive fields
-equal historical plus forward. Non-additive fields are recomputed, never added
-or averaged from precomputed ratios.
+Groups the union of historical and forward observations by
+`logical_decision_key`, applies the cross-layer overlap rule in section 8, and
+recomputes all ratios, drawdowns, streaks, rolling windows, and dates over the
+effective deduplicated set. Additive fields equal historical plus forward only
+after subtracting identical cross-layer duplicates. Non-additive fields are
+recomputed, never added or averaged from precomputed ratios.
 
-Every combined response includes the historical and forward input revision/hash
-and component counts, so it is fully decomposable. No row loses its original
-source layer.
+Every combined response includes the historical and forward input revision/hash,
+raw component counts, identical-overlap count, effective observation count, and
+preferred-source rule, so it is fully auditable and decomposable. No raw row
+loses its original source layer.
 
 ## 14. Identity overlap and portfolio boundary
 
@@ -646,6 +748,8 @@ calculate PnL, ROI, WR, drawdown, streaks, coverage, or combined statistics.
 | Ambiguous bucket/settlement mapping | Unscorable/fail closed; never choose a winner arbitrarily |
 | Duplicate identical source identity | Idempotent replay |
 | Duplicate identity with different content | Conflict; no overwrite |
+| Identical cross-layer logical decision | Keep both raw rows; count FORWARD once in `COMBINED` |
+| Conflicting cross-layer logical decision | `COMBINED_CROSS_LAYER_CONFLICT`; retain prior complete aggregate revision |
 | Corrected settlement | Append explicit superseding revision and rebuild |
 | Partial aggregate refresh | Roll back; previous complete revision stays current |
 | Missing current materialization | API returns `NOT_READY`, not fabricated zero metrics |
@@ -675,36 +779,53 @@ Future implementation is accepted only when tests prove:
 3. all 4,994 result records are classified deterministically and rejected AHR
    records are never counted as trades;
 4. historical and forward observations remain separately queryable;
-5. combined additive metrics equal the two layers and non-additive metrics equal
-   deterministic recomputation over their union;
-6. all cost, payout, turnover, PnL, and ROI calculations use the exact
-   five-share contract and fixed-point rounding;
-7. repeated settlement reconciliation is idempotent;
-8. a duplicate evaluation or signal cannot double-count a signal, trade,
+5. an identical `logical_decision_key` and semantic payload in both layers is
+   retained in each raw view, counted once in combined, and uses FORWARD as the
+   effective combined observation;
+6. a cross-layer duplicate with different semantic content fails closed with
+   `COMBINED_CROSS_LAYER_CONFLICT` and cannot publish a new combined revision;
+7. combined additive metrics equal the deduplicated effective set and
+   non-additive metrics equal deterministic recomputation over that set;
+8. an accepted V1 row with explicit stress preserves
+   `stressed_reference_cost_micros` and the explicit basis enum;
+9. an accepted V1 row with null stress reconstructs
+   `min(1_000_000, market_probability_micros + 30_000 * selected_leg_count)`,
+   including multi-leg coverage and the `NO_A0 / 2026-01-03 = 695_000` case;
+10. V2 uses `stressed_q_3c_micros` with
+    `CONTRACT_V2_STRESSED_Q_3C`, never `actual_price_micros` as its performance
+    price;
+11. cost, payout, turnover, and PnL use the exact five-whole-share integer
+    formulas with no binary floating point or multiplication rounding;
+12. a historical resolved observation with null `resolved_at_ms` remains fully
+    scoreable and produces byte-identical rebuilds under
+    `market_date ASC, checkpoint_minutes DESC, observation_key ASC`;
+13. `last_resolved_date` is derived without a synthetic millisecond timestamp;
+14. repeated settlement reconciliation is idempotent;
+15. a duplicate evaluation or signal cannot double-count a signal, trade,
    turnover, payout, or PnL;
-9. unresolved and unscorable observations are excluded from resolved WR, ROI,
+16. unresolved and unscorable observations are excluded from resolved WR, ROI,
    drawdown, and streak denominators;
-10. deleting materializations and rebuilding produces identical canonical
+17. deleting materializations and rebuilding produces identical canonical
     payloads and hashes;
-11. V2 statistics preserve `RESEARCH_ONLY`/`NOT_ROBUST` status and never imply
+18. V2 statistics preserve `RESEARCH_ONLY`/`NOT_ROBUST` status and never imply
     operational eligibility;
-12. historical bootstrap makes zero network requests;
-13. static and behavioral safety checks prove no wallet, order, signing,
+19. historical bootstrap makes zero network requests;
+20. static and behavioral safety checks prove no wallet, order, signing,
     authenticated-write, or trading-approval path was introduced;
-14. API and dashboard layers return/format engine results without independently
+21. API and dashboard layers return/format engine results without independently
     recalculating economics;
-15. old Registry47 metrics are consumed only by an optional secondary parity
+22. old Registry47 metrics are consumed only by an optional secondary parity
     check after new calculation;
-16. same-key/same-payload replay is a no-op and same-key/different-payload is a
+23. same-key/same-payload replay is a no-op and same-key/different-payload is a
     fail-closed conflict;
-17. settlement correction retains the original revision, selects one explicit
+24. settlement correction retains the original revision, selects one explicit
     successor, and deterministically changes affected aggregates;
-18. crash/restart at each ingest or refresh transaction boundary produces no
+25. crash/restart at each ingest or refresh transaction boundary produces no
     partial current state;
-19. `wins + losses = resolved`, resolved and unresolved observations form an
+26. `wins + losses = resolved`, resolved and unresolved observations form an
     exact partition of accepted observations, and every published ratio includes
     its denominator;
-20. overlapping identities cannot be queried as an implicit portfolio total.
+27. overlapping identities cannot be queried as an implicit portfolio total.
 
 ## 21. Non-goals
 
