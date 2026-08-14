@@ -802,9 +802,11 @@ def evaluate_no_fade_historical(
     p_no = 1.0 - selected.model_p
     q_no_proxy = 1.0 - selected.market_q_yes
     raw_edge = p_no - q_no_proxy
-    stressed_cost = q_no_proxy + _STRESS
-    gate_edge = p_no - stressed_cost if partition == "P1" else raw_edge
-    if stressed_cost >= 1.0 - _STRICT_TOL:
+    stressed_proxy = q_no_proxy + _STRESS
+    actual_q_no = _actual_no(selected)
+    stressed_cost = min(1.0, actual_q_no + _STRESS)
+    gate_edge = p_no - stressed_proxy if partition == "P1" else raw_edge
+    if stressed_proxy >= 1.0 - _STRICT_TOL:
         reason = "REJECTED_NONPOSITIVE_WIN_PAYOUT_AFTER_STRESS"
     elif gate_edge < _EDGE_MINIMUM - _STRICT_TOL:
         reason = (
@@ -823,7 +825,7 @@ def evaluate_no_fade_historical(
             (selected.bucket_index,),
             favorite.bucket_index,
             p_no,
-            q_no_proxy,
+            actual_q_no,
             stressed_cost,
             gate_edge,
         )

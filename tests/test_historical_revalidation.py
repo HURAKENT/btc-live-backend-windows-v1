@@ -38,6 +38,38 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class HistoricalRevalidationTests(unittest.TestCase):
+    def test_no_fade_t18_caps_actual_no_stress_for_failed_full_run_unit(self) -> None:
+        builder = HistoricalInputBuilder(
+            project_root=PROJECT_ROOT,
+            artifacts=default_artifacts(),
+        )
+        unit = builder.build_v1_unit(
+            strategy_id="NO_FADE_P1_U2_T18",
+            market_date="2026-02-19",
+        )
+
+        result = builder.dispatcher.dispatch_historical(
+            strategy_id="NO_FADE_P1_U2_T18",
+            request=unit.request,
+        )[0]
+        record = _v1_result_record(
+            "NO_FADE_P1_U2_T18",
+            "2026-02-19",
+            unit.input_sha256,
+            result,
+            "V1|NO_FADE_P1_U2_T18|2026-02-19",
+            unit.request,
+        )
+
+        self.assertEqual(unit.input_sha256, "211947bda67d5427dc90ba1738f460af17843de6e100ccbf91bf8efb5c7dec07")
+        self.assertEqual(record["market_probability_micros"], 982_000)
+        self.assertEqual(record["stressed_reference_cost_micros"], 1_000_000)
+        self.assertFalse(record["accepted"])
+        self.assertEqual(
+            record["reason"],
+            "REJECTED_NONPOSITIVE_WIN_PAYOUT_AFTER_STRESS",
+        )
+
     def test_smoke_dates_are_selected_from_current_contract_opportunities(self) -> None:
         builder = HistoricalInputBuilder(
             project_root=PROJECT_ROOT,
