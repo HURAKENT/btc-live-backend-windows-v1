@@ -13,6 +13,7 @@ from typing import Any
 from src.current_input import _student_t_cdf
 from src.historical_opportunity import HistoricalOpportunityMap
 from src.strategy_dispatch import (
+    StrategyDispatchBinding,
     V1HistoricalCheckpointInput,
     V1StrategyDispatchRequest,
     V2StrategyDispatchRequest,
@@ -235,22 +236,14 @@ class HistoricalInputBuilder:
         market_date: str,
         parent_result: object,
     ) -> HistoricalEvaluationUnit:
-        if type(parent_result) is not NewHistoricalParentResult:
-            raise ValueError("AHR_NEW_PARENT_RESULT_REQUIRED")
-        binding = self.dispatcher.binding(strategy_id)
-        if binding.version != "V2":
-            raise ValueError("AHR_V2_STRATEGY_REQUIRED")
-        if (
-            parent_result.market_date != market_date
-            or parent_result.strategy_id != binding.parent_strategy_id
-            or parent_result.side != binding.schedule["side"]
-        ):
-            raise ValueError("AHR_NEW_PARENT_RESULT_MISMATCH")
+        binding, forecast_key = self._v2_context(
+            strategy_id=strategy_id,
+            market_date=market_date,
+            parent_result=parent_result,
+        )
         self._load_forecasts()
         assert self._forecasts is not None
-        forecast = self._forecasts.get(
-            (market_date, parent_result.checkpoint_minutes)
-        )
+        forecast = self._forecasts.get(forecast_key)
         if forecast is None:
             raise ValueError("AHR_VOL_FORECAST_MISSING")
         source_rows = self._bucket_source_rows(
@@ -310,6 +303,42 @@ class HistoricalInputBuilder:
             request=request,
             input_sha256=_payload_sha256(_request_payload(request)),
         )
+
+    def is_v2_contract_opportunity(
+        self,
+        *,
+        strategy_id: str,
+        market_date: str,
+        parent_result: object,
+    ) -> bool:
+        _, forecast_key = self._v2_context(
+            strategy_id=strategy_id,
+            market_date=market_date,
+            parent_result=parent_result,
+        )
+        self._load_forecasts()
+        assert self._forecasts is not None
+        return forecast_key in self._forecasts
+
+    def _v2_context(
+        self,
+        *,
+        strategy_id: str,
+        market_date: str,
+        parent_result: object,
+    ) -> tuple[StrategyDispatchBinding, tuple[str, int]]:
+        if type(parent_result) is not NewHistoricalParentResult:
+            raise ValueError("AHR_NEW_PARENT_RESULT_REQUIRED")
+        binding = self.dispatcher.binding(strategy_id)
+        if binding.version != "V2":
+            raise ValueError("AHR_V2_STRATEGY_REQUIRED")
+        if (
+            parent_result.market_date != market_date
+            or parent_result.strategy_id != binding.parent_strategy_id
+            or parent_result.side != binding.schedule["side"]
+        ):
+            raise ValueError("AHR_NEW_PARENT_RESULT_MISMATCH")
+        return binding, (market_date, parent_result.checkpoint_minutes)
 
     def _load_matrix(self) -> None:
         if self._matrix is not None:

@@ -293,6 +293,13 @@ class HistoricalInputBuilderTests(unittest.TestCase):
             actual_price_micros=700_000,
             source_decision_sha256=source_sha,
         )
+        self.assertTrue(
+            builder.is_v2_contract_opportunity(
+                strategy_id="NO_A2_V2_VOL",
+                market_date="2026-01-01",
+                parent_result=parent,
+            )
+        )
         unit = builder.build_v2_unit(
             strategy_id="NO_A2_V2_VOL",
             market_date="2026-01-01",

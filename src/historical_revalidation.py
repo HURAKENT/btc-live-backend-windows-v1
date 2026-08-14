@@ -15,6 +15,7 @@ from typing import Any, Callable, Iterator, Mapping
 
 from src.historical_input_builder import (
     HistoricalArtifactPaths,
+    HistoricalEvaluationUnit,
     HistoricalInputBuilder,
     NewHistoricalParentResult,
 )
@@ -128,6 +129,26 @@ def evaluate_persist_compare(
     expected = load_expected()
     compare(result, expected)
     return result
+
+
+def _build_v2_contract_unit(
+    *,
+    builder: HistoricalInputBuilder,
+    strategy_id: str,
+    market_date: str,
+    parent_result: NewHistoricalParentResult,
+) -> HistoricalEvaluationUnit | None:
+    if not builder.is_v2_contract_opportunity(
+        strategy_id=strategy_id,
+        market_date=market_date,
+        parent_result=parent_result,
+    ):
+        return None
+    return builder.build_v2_unit(
+        strategy_id=strategy_id,
+        market_date=market_date,
+        parent_result=parent_result,
+    )
 
 
 def compare_semantic(*, actual: Mapping[str, Any], expected: Mapping[str, Any]) -> None:
@@ -369,6 +390,15 @@ def run_baseline(
                     for parent in parent_results.get(
                         (str(binding.parent_strategy_id), market_date), []
                     ):
+                        stage = "INPUT_CONSTRUCTION"
+                        unit = _build_v2_contract_unit(
+                            builder=builder,
+                            strategy_id=binding.strategy_id,
+                            market_date=market_date,
+                            parent_result=parent,
+                        )
+                        if unit is None:
+                            continue
                         opportunity_count += 1
                         unit_key = (
                             f"V2|{binding.strategy_id}|{market_date}|"
@@ -376,12 +406,6 @@ def run_baseline(
                         )
                         if unit_key in completed:
                             continue
-                        stage = "INPUT_CONSTRUCTION"
-                        unit = builder.build_v2_unit(
-                            strategy_id=binding.strategy_id,
-                            market_date=market_date,
-                            parent_result=parent,
-                        )
                         stage = "DISPATCH"
                         progress.units_dispatched += 1
                         progress.identity_ids_dispatched.add(binding.strategy_id)

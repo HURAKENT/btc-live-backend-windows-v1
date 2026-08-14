@@ -7,7 +7,11 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from src.historical_input_builder import HistoricalArtifactPaths, HistoricalInputBuilder
+from src.historical_input_builder import (
+    HistoricalArtifactPaths,
+    HistoricalInputBuilder,
+    NewHistoricalParentResult,
+)
 from src.historical_revalidation import (
     EXIT_PARITY,
     EXIT_SOURCE_INTEGRITY,
@@ -15,6 +19,7 @@ from src.historical_revalidation import (
     AhrRunProgress,
     AhrRunConfig,
     AhrSafetyError,
+    _build_v2_contract_unit,
     _compare_v1_expected_components,
     _apply_progress_to_acceptance,
     _select_smoke_dates,
@@ -38,6 +43,44 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class HistoricalRevalidationTests(unittest.TestCase):
+    def test_no_a0_v2_january_3_is_not_applicable_before_forecast_lookup(self) -> None:
+        builder = HistoricalInputBuilder(
+            project_root=PROJECT_ROOT,
+            artifacts=default_artifacts(),
+        )
+        parent = NewHistoricalParentResult(
+            market_date="2026-01-03",
+            strategy_id="NO_A0",
+            decision_identity="new:NO_A0:2026-01-03:T-30m",
+            side="NO",
+            checkpoint_minutes=30,
+            selected_bucket_indices=(6,),
+            selected_buckets=(
+                "2af0f3317b8bb0be393d7243253d477d2365188d52158300161405871f87cf53",
+            ),
+            horizon="T-30m",
+            accepted=True,
+            actual_price_micros=665_000,
+            source_decision_sha256=(
+                "fb8199b39b04f65cbff62fdf434b1f3c9946a82701b492c4cca4ba49eefe6f0b"
+            ),
+        )
+
+        self.assertIsNone(
+            _build_v2_contract_unit(
+                builder=builder,
+                strategy_id="NO_A0_V2_VOL",
+                market_date="2026-01-03",
+                parent_result=parent,
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "AHR_VOL_FORECAST_MISSING"):
+            builder.build_v2_unit(
+                strategy_id="NO_A0_V2_VOL",
+                market_date="2026-01-03",
+                parent_result=parent,
+            )
+
     def test_no_fade_t18_caps_actual_no_stress_for_failed_full_run_unit(self) -> None:
         builder = HistoricalInputBuilder(
             project_root=PROJECT_ROOT,
