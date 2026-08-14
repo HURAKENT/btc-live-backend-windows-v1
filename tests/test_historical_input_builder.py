@@ -240,6 +240,25 @@ class HistoricalInputBuilderTests(unittest.TestCase):
                     )
                 )
 
+    def test_early_confidence_identity_requires_canonical_cohort_membership(self) -> None:
+        builder = self._builder()
+
+        self.assertTrue(
+            builder.is_contract_opportunity(
+                strategy_id="YES_PF1_T60", market_date="2026-01-01"
+            )
+        )
+        self.assertFalse(
+            builder.is_contract_opportunity(
+                strategy_id="YES_PF1_T60", market_date="2026-01-02"
+            )
+        )
+        self.assertFalse(
+            builder.is_contract_opportunity(
+                strategy_id="YES_STRICT_A_T60", market_date="2026-01-02"
+            )
+        )
+
     def test_confirmation_uses_canonical_actual_no_coverage(self) -> None:
         builder = self._builder()
         unit = builder.build_v1_unit(

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from src.current_input import _student_t_cdf
+from src.historical_opportunity import HistoricalOpportunityMap
 from src.strategy_dispatch import (
     V1HistoricalCheckpointInput,
     V1StrategyDispatchRequest,
@@ -121,6 +122,7 @@ class HistoricalInputBuilder:
         self._coverage: dict[tuple[str, str, int], float] | None = None
         self._confirmation: frozenset[str] | None = None
         self._forecasts: dict[tuple[str, int], dict[str, Any]] | None = None
+        self._opportunities: HistoricalOpportunityMap | None = None
 
     def strategy_ids(self) -> tuple[str, ...]:
         return tuple(binding.strategy_id for binding in self.dispatcher.bindings)
@@ -148,13 +150,43 @@ class HistoricalInputBuilder:
         assert self._matrix is not None
         return tuple(sorted({market_date for market_date, _ in self._matrix}))
 
-    def is_contract_opportunity(self, *, strategy_id: str, market_date: str) -> bool:
-        binding = self.dispatcher.binding(strategy_id)
-        if binding.evaluator_key != "NO_CONFIRMATION_V1":
-            return True
-        self._load_confirmation_dates()
-        assert self._confirmation is not None
-        return market_date in self._confirmation
+    def opportunity_map(self) -> HistoricalOpportunityMap:
+        if self._opportunities is None:
+            self._load_matrix()
+            self._load_confirmation_dates()
+            assert self._matrix is not None
+            assert self._confirmation is not None
+            self._opportunities = HistoricalOpportunityMap.reproduce(
+                dispatcher=self.dispatcher,
+                matrix=self._matrix,
+                confirmation_dates=self._confirmation,
+            )
+        return self._opportunities
+
+    def is_contract_opportunity(
+        self,
+        *,
+        strategy_id: str,
+        market_date: str,
+        checkpoint_minutes: int | None = None,
+    ) -> bool:
+        policy = V1_IDENTITY_POLICIES.get(strategy_id)
+        if policy is None:
+            return False
+        checkpoints = (
+            policy.checkpoints
+            if checkpoint_minutes is None
+            else (checkpoint_minutes,)
+        )
+        opportunities = self.opportunity_map()
+        return any(
+            opportunities.is_applicable(
+                strategy_id=strategy_id,
+                market_date=market_date,
+                checkpoint_minutes=checkpoint,
+            )
+            for checkpoint in checkpoints
+        )
 
     def build_v1_unit(
         self, *, strategy_id: str, market_date: str

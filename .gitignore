@@ -27,6 +27,7 @@ artifacts/*.zip
 artifacts/*.parquet
 reports/runtime/
 reports/raw/
+reports/historical_revalidation/
 
 Thumbs.db
 Desktop.ini

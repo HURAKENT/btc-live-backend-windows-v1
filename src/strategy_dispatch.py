@@ -75,6 +75,7 @@ class StrategyDispatchBinding:
     evaluator_key: str
     input_schema_version: str
     parent_strategy_id: str | None
+    parity_artifact_id: str
     _schedule_json: str = field(repr=False)
 
     @property
@@ -482,6 +483,7 @@ def _build_strategy_dispatch_bindings(
             evaluator_key=rule.evaluator_key,
             input_schema_version=rule.input_schema_version,
             parent_strategy_id=rule.parent_strategy_id,
+            parity_artifact_id=rule.parity_artifact_id,
             _schedule_json=_canonical_json(rule.schedule),
         )
         for rule in rule_pack.rules

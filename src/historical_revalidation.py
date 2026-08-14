@@ -7,7 +7,7 @@ import json
 import os
 import socket
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_EVEN
 from pathlib import Path
@@ -22,8 +22,8 @@ from src.strategy_dispatch import StrategyDispatcher, load_strategy_dispatcher
 from src.strategy_v1 import V1Evaluation
 from src.strategy_v1_parity import (
     historical_identity_bindings,
-    historical_population_identities,
 )
+from src.historical_opportunity import HistoricalOpportunityMap
 from src.strategy_v2 import V2OverlayEvaluation
 
 
@@ -54,6 +54,40 @@ class AhrRunConfig:
     artifacts: HistoricalArtifactPaths
     pyarrow_path: Path | None = None
     smoke_dates: tuple[str, ...] = ()
+    smoke: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ExpectedV1Component:
+    universe: str
+    semantic: Mapping[str, Any]
+
+
+@dataclass(slots=True)
+class AhrRunProgress:
+    identities_discovered: int = 0
+    identity_ids_dispatched: set[str] = field(default_factory=set)
+    identity_ids_completed: set[str] = field(default_factory=set)
+    dates_processed: set[str] = field(default_factory=set)
+    families_touched: set[str] = field(default_factory=set)
+    units_dispatched: int = 0
+    units_completed: int = 0
+
+
+def _apply_progress_to_acceptance(
+    acceptance: dict[str, Any], progress: AhrRunProgress
+) -> None:
+    acceptance.update(
+        {
+            "strategies_discovered": progress.identities_discovered,
+            "strategies_dispatched": len(progress.identity_ids_dispatched),
+            "strategies_completed": len(progress.identity_ids_completed),
+            "units_dispatched": progress.units_dispatched,
+            "units_completed": progress.units_completed,
+            "dates_processed": len(progress.dates_processed),
+            "strategy_families": len(progress.families_touched),
+        }
+    )
 
 
 class AhrError(RuntimeError):
@@ -164,13 +198,15 @@ def run_baseline(
     run_dir.mkdir(parents=True, exist_ok=resume_run_id is not None)
     paths = _run_paths(run_dir)
     _initialize_artifacts(paths, run_id)
-    acceptance = _base_acceptance(run_id, smoke=bool(config.smoke_dates))
+    smoke_mode = config.smoke or bool(config.smoke_dates)
+    acceptance = _base_acceptance(run_id, smoke=smoke_mode)
     stage = "SOURCE_INTEGRITY"
     failed_strategy_id: str | None = None
     failed_market_date: str | None = None
     production_snapshot: dict[str, str | None] = {}
     results: list[dict[str, Any]] = []
     completed: set[str] = set()
+    progress = AhrRunProgress()
     input_manifest_sha256 = ""
     try:
         dispatcher = load_strategy_dispatcher(project_root)
@@ -185,10 +221,16 @@ def run_baseline(
         all_dates = builder.market_dates()
         if len(all_dates) != 170:
             raise ValueError(f"AHR_DATE_COUNT_MISMATCH:{len(all_dates)}")
-        dates = config.smoke_dates or all_dates
+        opportunities = builder.opportunity_map()
+        opportunity_counts = opportunities.validate_canonical_counts()
+        dates = (
+            config.smoke_dates
+            or (_select_smoke_dates(builder) if config.smoke else all_dates)
+        )
         if any(date not in all_dates for date in dates) or len(set(dates)) != len(dates):
             raise ValueError("AHR_SMOKE_DATE_SET_INVALID")
-        selected_bindings = _selected_bindings(bindings, smoke=bool(config.smoke_dates))
+        selected_bindings = _selected_bindings(bindings, smoke=smoke_mode)
+        progress.identities_discovered = len(selected_bindings)
         manifest = {
             "schema_version": "AHR_1_INPUT_MANIFEST_V1",
             "mode": _MODE,
@@ -196,6 +238,7 @@ def run_baseline(
             "source_sha256": dict(sorted(source_hashes.items())),
             "market_dates": list(dates),
             "strategy_ids": [row.strategy_id for row in selected_bindings],
+            "opportunity_counts": opportunity_counts,
         }
         input_manifest_sha256 = _payload_sha256(manifest)
         manifest["input_manifest_sha256"] = input_manifest_sha256
@@ -212,6 +255,17 @@ def run_baseline(
             if type(raw_results) is not list or any(type(row) is not dict for row in raw_results):
                 raise ValueError("AHR_RESUME_STATE_INVALID")
             results = list(raw_results)
+            progress.units_completed = len(completed)
+            progress.units_dispatched = len(completed)
+            for unit_key in completed:
+                parts = unit_key.split("|")
+                if len(parts) >= 3:
+                    strategy_id = parts[1]
+                    progress.identity_ids_dispatched.add(strategy_id)
+                    progress.dates_processed.add(parts[2])
+                    progress.families_touched.add(
+                        _family_label(dispatcher.binding(strategy_id))
+                    )
         else:
             _write_state(paths["state"], run_id, input_manifest_sha256, completed, results)
 
@@ -252,6 +306,10 @@ def run_baseline(
                         market_date=market_date,
                     )
                     stage = "DISPATCH"
+                    progress.units_dispatched += 1
+                    progress.identity_ids_dispatched.add(binding.strategy_id)
+                    progress.dates_processed.add(market_date)
+                    progress.families_touched.add(_family_label(binding))
                     evaluations = dispatcher.dispatch_historical(
                         strategy_id=binding.strategy_id,
                         request=unit.request,
@@ -266,27 +324,29 @@ def run_baseline(
                             unit.input_sha256,
                             evaluation,
                             unit_key,
+                            unit.request,
                         )
+                        comparison_counts: list[int] = []
                         evaluate_persist_compare(
                             evaluate=lambda row=record: row,
                             persist=lambda row: _persist_result(
                                 row, results, paths["results"]
                             ),
                             load_expected=lambda row=record: _load_expected_v1(
-                                project_root, row
+                                project_root, row, opportunities
                             ),
-                            compare=lambda actual, expected: compare_semantic(
-                                actual=_semantic_actual_v1(actual, expected),
-                                expected=expected,
+                            compare=lambda actual, expected: comparison_counts.append(
+                                _compare_v1_expected_components(actual, expected)
                             ),
                         )
-                        parity_count += 1
+                        parity_count += comparison_counts[0]
                         if evaluation.accepted:
                             parent = _new_parent_result(builder, record)
                             parent_results.setdefault(
                                 (binding.strategy_id, market_date), []
                             ).append(parent)
                     completed.add(unit_key)
+                    progress.units_completed += 1
                     _write_state(
                         paths["state"],
                         run_id,
@@ -296,6 +356,7 @@ def run_baseline(
                     )
                     stage = "INPUT_CONSTRUCTION"
                 completed_ids.add(binding.strategy_id)
+                progress.identity_ids_completed.add(binding.strategy_id)
 
             for binding in selected_bindings:
                 if binding.version != "V2":
@@ -322,6 +383,10 @@ def run_baseline(
                             parent_result=parent,
                         )
                         stage = "DISPATCH"
+                        progress.units_dispatched += 1
+                        progress.identity_ids_dispatched.add(binding.strategy_id)
+                        progress.dates_processed.add(market_date)
+                        progress.families_touched.add(_family_label(binding))
                         evaluation = dispatcher.dispatch_historical(
                             strategy_id=binding.strategy_id,
                             request=unit.request,
@@ -350,6 +415,7 @@ def run_baseline(
                         )
                         parity_count += 1
                         completed.add(unit_key)
+                        progress.units_completed += 1
                         _write_state(
                             paths["state"],
                             run_id,
@@ -362,10 +428,11 @@ def run_baseline(
                         f"AHR_V2_CONTRACT_OPPORTUNITY_MISSING:{binding.strategy_id}"
                     )
                 completed_ids.add(binding.strategy_id)
+                progress.identity_ids_completed.add(binding.strategy_id)
 
         stage = "SAFETY"
         assert_files_unchanged(production_snapshot)
-        expected_strategy_count = 4 if config.smoke_dates else 47
+        expected_strategy_count = 4 if smoke_mode else 47
         if len(dispatched_ids) != expected_strategy_count or len(completed_ids) != expected_strategy_count:
             raise ValueError(
                 f"AHR_STRATEGY_COMPLETION_MISMATCH:{len(dispatched_ids)}:{len(completed_ids)}"
@@ -375,16 +442,12 @@ def run_baseline(
                 "status": "PASS",
                 "exit_code": EXIT_PASS,
                 "earliest_failed_gate": None,
-                "dates_processed": len(dates),
                 "strategies_expected": expected_strategy_count,
-                "strategies_discovered": expected_strategy_count,
-                "strategies_dispatched": len(dispatched_ids),
-                "strategies_completed": len(completed_ids),
                 "semantic_parity": "PASS",
                 "parity_comparisons": parity_count,
-                "strategy_families": 4 if config.smoke_dates else 47,
             }
         )
+        _apply_progress_to_acceptance(acceptance, progress)
         _write_json_atomic(
             paths["parity"],
             {
@@ -414,12 +477,18 @@ def run_baseline(
                 "failed_market_date": failed_market_date,
                 "error_class": type(exc).__name__,
                 "error_message": str(exc),
-                "dates_processed": len(
-                    {str(row.get("market_date")) for row in results}
-                ),
                 "semantic_parity": "BLOCKED",
             }
         )
+        if gate == "INPUT_CONSTRUCTION":
+            acceptance["input_construction_failures"] = int(
+                acceptance.get("input_construction_failures", 0)
+            ) + 1
+        elif gate == "DISPATCH":
+            acceptance["dispatch_failures"] = int(
+                acceptance.get("dispatch_failures", 0)
+            ) + 1
+        _apply_progress_to_acceptance(acceptance, progress)
         _write_json_atomic(
             paths["parity"],
             {
@@ -439,6 +508,47 @@ def _selected_bindings(bindings: tuple[Any, ...], *, smoke: bool) -> tuple[Any, 
         return bindings
     selected = set(_SMOKE_V1_IDS + _SMOKE_V2_IDS)
     return tuple(binding for binding in bindings if binding.strategy_id in selected)
+
+
+def _family_label(binding: Any) -> str:
+    if binding.version == "V2":
+        return "VOLATILITY_V2"
+    if binding.evaluator_key == "STRICT_A_COMPOSED_V1":
+        return "STRICT_A"
+    if binding.evaluator_key == "PF1_COMPOSED_V1":
+        return "PF1"
+    return "HISTORICAL_V1"
+
+
+def _select_smoke_dates(builder: HistoricalInputBuilder) -> tuple[str, ...]:
+    opportunities = builder.opportunity_map()
+    opportunities.validate_canonical_counts()
+    selected: list[str] = []
+    with offline_network_guard():
+        for market_date in opportunities.historical_dates:
+            if not all(
+                builder.is_contract_opportunity(
+                    strategy_id=strategy_id,
+                    market_date=market_date,
+                )
+                for strategy_id in _SMOKE_V1_IDS
+            ):
+                continue
+            unit = builder.build_v1_unit(
+                strategy_id="YES_STRICT_A_T60",
+                market_date=market_date,
+            )
+            evaluations = builder.dispatcher.dispatch_historical(
+                strategy_id="YES_STRICT_A_T60",
+                request=unit.request,
+            )
+            if type(evaluations) is not tuple or len(evaluations) != 1:
+                raise ValueError("AHR_SMOKE_PARENT_SELECTION_RESULT")
+            if evaluations[0].accepted:
+                selected.append(market_date)
+                if len(selected) == 3:
+                    return tuple(selected)
+    raise ValueError("AHR_SMOKE_PARENT_OPPORTUNITIES_MISSING")
 
 
 def _verify_c4_receipt(project_root: Path, bindings: tuple[Any, ...]) -> None:
@@ -462,7 +572,13 @@ def _v1_result_record(
     input_sha256: str,
     result: V1Evaluation,
     unit_key: str,
+    request: Any,
 ) -> dict[str, Any]:
+    favorite_bucket_index = result.favorite_bucket_index
+    if favorite_bucket_index is None:
+        favorite_bucket_index = _reference_favorite_bucket_index(
+            request, result.checkpoint_minutes
+        )
     payload = {
         "unit_key": unit_key,
         "version": "V1",
@@ -473,7 +589,7 @@ def _v1_result_record(
         "reason": result.reason,
         "side": result.side,
         "selected_bucket_indices": list(result.selected_bucket_indices),
-        "favorite_bucket_index": result.favorite_bucket_index,
+        "favorite_bucket_index": favorite_bucket_index,
         "model_probability_micros": _optional_micros(result.model_probability),
         "market_probability_micros": _optional_micros(result.market_probability),
         "stressed_reference_cost_micros": _optional_micros(
@@ -484,6 +600,20 @@ def _v1_result_record(
     }
     payload["result_sha256"] = _payload_sha256(payload)
     return payload
+
+
+def _reference_favorite_bucket_index(request: Any, checkpoint_minutes: int) -> int | None:
+    checkpoints = tuple(
+        checkpoint
+        for checkpoint in request.checkpoints
+        if checkpoint.checkpoint_minutes == checkpoint_minutes
+    )
+    if len(checkpoints) != 1:
+        raise ValueError("AHR_V1_RESULT_CHECKPOINT_MISSING")
+    buckets = checkpoints[0].buckets
+    maximum = max(row.market_q_yes for row in buckets)
+    tied = [row for row in buckets if abs(row.market_q_yes - maximum) <= 1e-9]
+    return tied[0].bucket_index if len(tied) == 1 else None
 
 
 def _v2_result_record(
@@ -573,20 +703,24 @@ def _parent_from_record(
     return _new_parent_result(builder, record)
 
 
-def _load_expected_v1(project_root: Path, actual: Mapping[str, Any]) -> dict[str, Any]:
+def _load_expected_v1(
+    project_root: Path,
+    actual: Mapping[str, Any],
+    opportunities: HistoricalOpportunityMap,
+) -> tuple[ExpectedV1Component, ...]:
     strategy_id = str(actual["strategy_id"])
     market_date = str(actual["market_date"])
     checkpoint = int(actual["checkpoint_minutes"])
     parity_root = project_root / "strategy_sources" / "frozen" / "parity"
+    market_hash = _payload_sha256(["market", market_date])
     if strategy_id in historical_identity_bindings():
-        populations = historical_population_identities()
-        name = (
-            "V1_EARLY_CONFIDENCE_FULL_DECISION_PARITY.jsonl"
-            if strategy_id in populations["EARLY_CONFIDENCE"]
-            else "V1_EARLY_HORIZON_FULL_DECISION_PARITY.jsonl"
-        )
         binding = historical_identity_bindings()[strategy_id]
-        market_hash = _payload_sha256(["market", market_date])
+        universes = opportunities.component_universes(
+            strategy_id=strategy_id,
+            market_date=market_date,
+            checkpoint_minutes=checkpoint,
+        )
+        name = opportunities.parity_fixture_name(strategy_id)
         for row in _jsonl(parity_root / name):
             if (
                 row.get("record_type") != "decision"
@@ -594,55 +728,115 @@ def _load_expected_v1(project_root: Path, actual: Mapping[str, Any]) -> dict[str
                 or row.get("checkpoint_minutes") != checkpoint
             ):
                 continue
-            expectations = row.get("expectations", [])
-            for expected in expectations:
-                universe_match = expected.get("universe") == binding.universe or (
-                    binding.policy == "EQUALITY" and expected.get("universe") == "U1"
-                )
-                if (
-                    expected.get("family") == binding.family
+            components: list[ExpectedV1Component] = []
+            for universe in universes:
+                matches = [
+                    expected
+                    for expected in row.get("expectations", [])
+                    if expected.get("family") == binding.family
                     and expected.get("partition") == binding.partition
-                    and universe_match
-                ):
-                    selected_index = expected.get("expected_selected_bucket_index")
-                    buckets = row["buckets"]
-                    model_micros = None
-                    if type(selected_index) is int:
-                        yes_model = int(buckets[selected_index]["model_p_micros"])
-                        model_micros = yes_model if expected["side"] == "YES" else 1_000_000 - yes_model
-                    return {
-                        "strategy_id": strategy_id,
-                        "checkpoint_minutes": checkpoint,
-                        "accepted": bool(expected["expected_accept"]),
-                        "reason": "SIGNAL_ACCEPTED" if expected["expected_accept"] else expected["expected_reason"],
-                        "selected_bucket_indices": [] if selected_index is None else [selected_index],
-                        "favorite_bucket_index": expected["expected_favorite_bucket_index"],
-                        "model_probability_micros": model_micros,
-                        "market_probability_micros": int(expected["expected_raw_q_micros"]) if selected_index is not None else None,
-                        "stressed_reference_cost_micros": int(expected["expected_stressed_q_micros"]) if selected_index is not None else None,
-                    }
+                    and expected.get("universe") == universe
+                ]
+                if len(matches) != 1:
+                    break
+                components.append(
+                    ExpectedV1Component(
+                        universe=universe,
+                        semantic=_historical_expected_semantic(
+                            strategy_id, checkpoint, row, matches[0]
+                        ),
+                    )
+                )
+            if len(components) == len(universes) and components:
+                return tuple(components)
         raise AhrParityError(
             f"AHR_EXPECTED_V1_EVIDENCE_MISSING:{strategy_id}:{market_date}:{checkpoint}"
         )
 
-    market_hash = _payload_sha256(["market", market_date])
-    path = parity_root / "V1_CONFIRMATION_BASKET_FULL_DECISION_PARITY.jsonl"
+    path = parity_root / opportunities.parity_fixture_name(strategy_id)
     for row in _jsonl(path):
         if row.get("market_identity_sha256") != market_hash:
             continue
         for expected in row.get("expectations", []):
             if expected.get("strategy_id") == strategy_id:
                 accepted = bool(expected["expected_accept"])
-                return {
-                    "strategy_id": strategy_id,
-                    "accepted": accepted,
-                    "checkpoint_minutes": expected["expected_checkpoint_minutes"] if accepted else None,
-                    "selected_bucket_indices": expected["expected_selected_bucket_indices"] if accepted else [],
-                    "stressed_reference_cost_micros": int(expected["expected_stressed_cost_micros"]) if accepted else 0,
-                }
+                return (
+                    ExpectedV1Component(
+                        universe="ALL",
+                        semantic={
+                            "strategy_id": strategy_id,
+                            "accepted": accepted,
+                            "checkpoint_minutes": expected[
+                                "expected_checkpoint_minutes"
+                            ]
+                            if accepted
+                            else None,
+                            "selected_bucket_indices": expected[
+                                "expected_selected_bucket_indices"
+                            ]
+                            if accepted
+                            else [],
+                            "stressed_reference_cost_micros": int(
+                                expected["expected_stressed_cost_micros"]
+                            )
+                            if accepted
+                            else 0,
+                        },
+                    ),
+                )
     raise AhrParityError(
         f"AHR_EXPECTED_V1_EVIDENCE_MISSING:{strategy_id}:{market_date}:{checkpoint}"
     )
+
+
+def _historical_expected_semantic(
+    strategy_id: str,
+    checkpoint: int,
+    row: Mapping[str, Any],
+    expected: Mapping[str, Any],
+) -> dict[str, Any]:
+    selected_index = expected.get("expected_selected_bucket_index")
+    model_micros = None
+    if type(selected_index) is int:
+        yes_model = int(row["buckets"][selected_index]["model_p_micros"])
+        model_micros = (
+            yes_model if expected["side"] == "YES" else 1_000_000 - yes_model
+        )
+    return {
+        "strategy_id": strategy_id,
+        "checkpoint_minutes": checkpoint,
+        "accepted": bool(expected["expected_accept"]),
+        "reason": "SIGNAL_ACCEPTED"
+        if expected["expected_accept"]
+        else expected["expected_reason"],
+        "selected_bucket_indices": []
+        if selected_index is None
+        else [selected_index],
+        "favorite_bucket_index": expected["expected_favorite_bucket_index"],
+        "model_probability_micros": model_micros,
+        "market_probability_micros": int(expected["expected_raw_q_micros"])
+        if selected_index is not None
+        else None,
+        "stressed_reference_cost_micros": int(
+            expected["expected_stressed_q_micros"]
+        )
+        if selected_index is not None
+        else None,
+    }
+
+
+def _compare_v1_expected_components(
+    actual: Mapping[str, Any],
+    expected_components: tuple[ExpectedV1Component, ...],
+) -> int:
+    if not expected_components:
+        raise AhrParityError("AHR_EXPECTED_V1_COMPONENTS_EMPTY")
+    for component in expected_components:
+        compare_semantic(
+            actual=_semantic_actual_v1(actual, component.semantic),
+            expected=component.semantic,
+        )
+    return len(expected_components)
 
 
 def _semantic_actual_v1(
@@ -998,13 +1192,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pyarrow-path", type=Path)
     args = parser.parse_args(argv)
     project_root = Path(__file__).resolve().parents[1]
-    smoke_dates = ("2026-01-01", "2026-01-02", "2026-01-03") if args.smoke else ()
     config = AhrRunConfig(
         project_root=project_root,
         run_root=project_root / "reports" / "historical_revalidation",
         artifacts=default_artifacts(),
         pyarrow_path=args.pyarrow_path,
-        smoke_dates=smoke_dates,
+        smoke=args.smoke,
     )
     code = run_baseline(config, resume_run_id=args.resume)
     run_dirs = sorted(config.run_root.glob("*"), key=lambda path: path.name)
