@@ -3,7 +3,7 @@
   "branch": "codex/final-live-system-cycle",
   "base_commit": "be9401a45babbcc38d3540cb540a366b46dcf842",
   "origin_commit": "be9401a45babbcc38d3540cb540a366b46dcf842",
-  "handoff_commit": null,
+  "handoff_commit": "2fca545fdb378dd3da36d9dab6a569be3f0d6a5e",
   "approved_spec_path": "docs/superpowers/specs/2026-08-15-strategy-performance-engine-design.md",
   "approved_spec_commit": "be9401a45babbcc38d3540cb540a366b46dcf842",
   "ahr_run_id": "20260814T205244105513Z",
