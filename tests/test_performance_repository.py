@@ -333,6 +333,26 @@ class PerformanceRepositoryTests(unittest.TestCase):
             [classification],
         )
 
+        resolved = dataclasses.replace(
+            classification,
+            catchup_key="catchup:2026-08-01:2",
+            revision=2,
+            supersedes_catchup_key=classification.catchup_key,
+            classification="RESOLVED",
+            reason_code="CANONICAL_SETTLEMENT_AVAILABLE",
+            market_id="btc-range-2026-08-01",
+            classified_at_ms=4,
+        )
+        self.repository.append_catchup_classification(resolved)
+        self.assertEqual(
+            self.repository.read_effective_catchup_classifications(),
+            [resolved],
+        )
+        self.assertEqual(
+            self.store.count("strategy_performance_catchup"),
+            2,
+        )
+
     def test_materialization_publication_is_atomic_and_keeps_prior_current(self) -> None:
         revision1 = AggregateRevision.create(
             revision_key="materialization:NO_A0:HISTORICAL:1",

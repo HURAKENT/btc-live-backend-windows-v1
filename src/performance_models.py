@@ -522,6 +522,8 @@ class CatchupClassification:
     source_event_identity: str | None
     classified_at_ms: int
     provenance: Mapping[str, object]
+    revision: int = 1
+    supersedes_catchup_key: str | None = None
     schema_version: str = "PERFORMANCE_CATCHUP_V1"
     provenance_json: str = field(init=False, default="")
     payload_json: str = field(init=False, default="")
@@ -534,6 +536,13 @@ class CatchupClassification:
     def __post_init__(self) -> None:
         _require_nonempty(self.catchup_key, "INVALID_CATCHUP_KEY")
         _require_date(self.market_date, "INVALID_CATCHUP_MARKET_DATE")
+        _require_positive_int(self.revision, "INVALID_CATCHUP_REVISION")
+        _require_optional_nonempty(
+            self.supersedes_catchup_key,
+            "INVALID_CATCHUP_SUPERSEDES_KEY",
+        )
+        if (self.revision == 1) != (self.supersedes_catchup_key is None):
+            raise ValueError("INVALID_CATCHUP_SUPERSESSION")
         if self.schema_version != "PERFORMANCE_CATCHUP_V1" or self.classification not in _CATCHUP_CLASSIFICATIONS:
             raise ValueError("INVALID_CATCHUP_CLASSIFICATION")
         _require_nonempty(self.reason_code, "INVALID_CATCHUP_REASON_CODE")
@@ -546,6 +555,8 @@ class CatchupClassification:
         payload = {
             "schema_version": self.schema_version,
             "catchup_key": self.catchup_key,
+            "revision": self.revision,
+            "supersedes_catchup_key": self.supersedes_catchup_key,
             "market_date": self.market_date,
             "classification": self.classification,
             "reason_code": self.reason_code,

@@ -139,7 +139,9 @@ CREATE TABLE strategy_performance_cursors (
 CREATE TABLE strategy_performance_catchup (
     catchup_key TEXT PRIMARY KEY,
     schema_version TEXT NOT NULL CHECK (schema_version = 'PERFORMANCE_CATCHUP_V1'),
-    market_date TEXT NOT NULL UNIQUE,
+    revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+    supersedes_catchup_key TEXT UNIQUE,
+    market_date TEXT NOT NULL,
     classification TEXT NOT NULL CHECK (
         classification IN ('RESOLVED', 'PENDING', 'EXPECTED_ABSENT', 'DATA_GAP')
     ),
@@ -149,7 +151,12 @@ CREATE TABLE strategy_performance_catchup (
     classified_at_ms INTEGER NOT NULL CHECK (classified_at_ms >= 0),
     provenance_json TEXT NOT NULL,
     payload_json TEXT NOT NULL,
-    payload_sha256 TEXT NOT NULL CHECK (length(payload_sha256) = 64)
+    payload_sha256 TEXT NOT NULL CHECK (length(payload_sha256) = 64),
+    UNIQUE (market_date, revision),
+    CHECK ((revision = 1 AND supersedes_catchup_key IS NULL)
+        OR (revision > 1 AND supersedes_catchup_key IS NOT NULL)),
+    FOREIGN KEY (supersedes_catchup_key)
+        REFERENCES strategy_performance_catchup(catchup_key)
 );
 
 CREATE TABLE strategy_performance_materialization_revisions (

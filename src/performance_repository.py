@@ -408,16 +408,45 @@ class PerformanceRepository:
                     raise ValueError("PERFORMANCE_CATCHUP_CONFLICT")
                 self._connection.commit()
                 return RepositoryWriteResult(classification.catchup_key, "REPLAYED")
+            previous = self._connection.execute(
+                """
+                SELECT current.catchup_key, current.revision
+                FROM strategy_performance_catchup AS current
+                WHERE current.market_date = ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM strategy_performance_catchup AS successor
+                      WHERE successor.supersedes_catchup_key = current.catchup_key
+                  )
+                """,
+                (classification.market_date,),
+            ).fetchall()
+            if not previous:
+                sequence_valid = (
+                    classification.revision == 1
+                    and classification.supersedes_catchup_key is None
+                )
+            else:
+                sequence_valid = (
+                    len(previous) == 1
+                    and classification.revision == previous[0][1] + 1
+                    and classification.supersedes_catchup_key == previous[0][0]
+                )
+            if not sequence_valid:
+                raise ValueError("PERFORMANCE_CATCHUP_SEQUENCE_CONFLICT")
             self._connection.execute(
                 """
                 INSERT INTO strategy_performance_catchup(
-                    catchup_key, schema_version, market_date, classification,
-                    reason_code, market_id, source_event_identity, classified_at_ms,
-                    provenance_json, payload_json, payload_sha256
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    catchup_key, schema_version, revision,
+                    supersedes_catchup_key, market_date, classification,
+                    reason_code, market_id, source_event_identity,
+                    classified_at_ms, provenance_json, payload_json,
+                    payload_sha256
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     classification.catchup_key, classification.schema_version,
+                    classification.revision,
+                    classification.supersedes_catchup_key,
                     classification.market_date, classification.classification,
                     classification.reason_code, classification.market_id,
                     classification.source_event_identity, classification.classified_at_ms,
@@ -449,7 +478,7 @@ class PerformanceRepository:
         rows = self._connection.execute(
             """
             SELECT payload_json FROM strategy_performance_catchup
-            ORDER BY market_date ASC, catchup_key ASC
+            ORDER BY market_date ASC, revision ASC, catchup_key ASC
             """
         ).fetchall()
         values: list[CatchupClassification] = []
@@ -457,6 +486,25 @@ class PerformanceRepository:
             payload = json.loads(row[0])
             values.append(CatchupClassification.create(**payload))
         return values
+
+    def read_effective_catchup_classifications(
+        self,
+    ) -> list[CatchupClassification]:
+        rows = self._connection.execute(
+            """
+            SELECT current.payload_json
+            FROM strategy_performance_catchup AS current
+            WHERE NOT EXISTS (
+                SELECT 1 FROM strategy_performance_catchup AS successor
+                WHERE successor.supersedes_catchup_key = current.catchup_key
+            )
+            ORDER BY current.market_date ASC, current.catchup_key ASC
+            """
+        ).fetchall()
+        return [
+            CatchupClassification.create(**json.loads(row[0]))
+            for row in rows
+        ]
 
     def read_cursor(self, cursor_name: str) -> PerformanceCursor | None:
         if type(cursor_name) is not str or not cursor_name:

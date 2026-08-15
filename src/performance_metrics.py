@@ -26,6 +26,9 @@ def build_metrics(
     as_of = _parse_date(as_of_date, "INVALID_PERFORMANCE_AS_OF_DATE")
     raw = _deduplicate_observations(observations)
     resolutions = _deduplicate_resolutions(effective_resolutions)
+    raw_keys = {observation.observation_key for observation in raw}
+    if any(observation_key not in raw_keys for observation_key in resolutions):
+        raise ValueError("PERFORMANCE_RESOLUTION_OBSERVATION_MISSING")
     strategy_ids = {observation.strategy_id for observation in raw}
     if len(strategy_ids) > 1:
         raise ValueError("MULTIPLE_PERFORMANCE_STRATEGIES")

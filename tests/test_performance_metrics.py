@@ -297,6 +297,21 @@ class PerformanceMetricsTests(unittest.TestCase):
             self.assertIsNone(metrics[key])
         self.assertEqual(metrics["annualized_return_reason_code"], "NO_RESOLVED_SIGNALS")
 
+        orphan = self.observation(
+            "orphan", "orphan-decision", "2026-04-01", 60,
+            accepted=True, price=500_000,
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "PERFORMANCE_RESOLUTION_OBSERVATION_MISSING",
+        ):
+            build_metrics(
+                [],
+                [self.resolution(orphan, won=True)],
+                source_view="HISTORICAL",
+                as_of_date="2026-04-01",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
