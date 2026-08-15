@@ -14,15 +14,30 @@
     paper_fills: [],
     incidents: [],
     last_event_id: 0,
+    performanceStatus: null,
+    performanceStrategies: [],
+    performanceView: "HISTORICAL",
+    selectedStrategyId: null,
+    selectedStrategyDetail: null,
+    performanceTimeseries: null,
+    performanceObservations: [],
+    performanceTransportStatus: "CONNECTING",
   };
 
   let socket = null;
   let reconnectTimer = null;
   let reconnectAttempt = 0;
+  let performanceRequestSequence = 0;
 
   const element = (id) => document.getElementById(id);
   const value = (candidate) => candidate === null || candidate === undefined || candidate === "" ? NO_DATA : String(candidate);
   const firstDefined = (...candidates) => candidates.find((candidate) => candidate !== null && candidate !== undefined && candidate !== "");
+
+  function displayValue(candidate) {
+    if (candidate === null || candidate === undefined || candidate === "") return NO_DATA;
+    if (typeof candidate === "object") return JSON.stringify(candidate);
+    return String(candidate);
+  }
 
   function money(candidate) {
     if (!Number.isFinite(Number(candidate))) return NO_DATA;
@@ -42,6 +57,17 @@
   function shares(candidate) {
     if (!Number.isFinite(Number(candidate))) return NO_DATA;
     return (Number(candidate) / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
+  }
+
+  function ratio(candidate) {
+    if (candidate === null || candidate === undefined || candidate === "") return NO_DATA;
+    if (!Number.isFinite(Number(candidate))) return value(candidate);
+    return `${(Number(candidate) * 100).toFixed(2)}%`;
+  }
+
+  function timestamp(candidate) {
+    if (!Number.isFinite(Number(candidate))) return NO_DATA;
+    return new Date(Number(candidate)).toISOString();
   }
 
   function setStatus(text, tone) {
@@ -187,6 +213,219 @@
     replaceRows("incidents", rows);
   }
 
+  function setPerformanceTransport(status, tone) {
+    state.performanceTransportStatus = status;
+    const node = element("performance-transport-status");
+    node.textContent = status;
+    node.className = `status status-${tone}`;
+  }
+
+  function renderPerformanceSystem() {
+    const status = state.performanceStatus;
+    const health = status && status.database_health;
+    const blockingReason = status && status.blocking_reason;
+    const revisions = status && status.performance;
+    const freshness = status && status.source_freshness;
+    const healthValue = health && health.status === "PASS" && !blockingReason ? "READY" : (blockingReason || (health && health.status) || "NOT_READY");
+    const healthNode = element("performance-health-status");
+    healthNode.textContent = healthValue;
+    healthNode.className = `status status-${healthValue === "READY" ? "ok" : (healthValue === "NOT_READY" ? "warn" : "bad")}`;
+    element("performance-blocking-reason").textContent = value(blockingReason || "NONE");
+    element("performance-freshness").textContent = freshness
+      ? `source ${timestamp(freshness.latest_source_timestamp_ms)} · received ${timestamp(freshness.latest_received_timestamp_ms)}`
+      : NO_DATA;
+    const counts = status && status.catchup && status.catchup.counts;
+    element("performance-catchup").textContent = counts && Object.keys(counts).length
+      ? Object.keys(counts).sort().map((key) => `${key} ${counts[key]}`).join(" · ")
+      : NO_DATA;
+    if (revisions && Number.isInteger(revisions.current_revision_count)) {
+      element("performance-freshness").title = `${revisions.current_revision_count} current revisions · generated ${timestamp(revisions.latest_generated_at_ms)}`;
+    }
+  }
+
+  function metricText(metrics, key, formatter = displayValue) {
+    if (!metrics || !Object.prototype.hasOwnProperty.call(metrics, key)) return NO_DATA;
+    return formatter(metrics[key]);
+  }
+
+  function renderStrategies() {
+    const tbody = element("strategies-body");
+    tbody.replaceChildren();
+    const strategies = Array.isArray(state.performanceStrategies) ? state.performanceStrategies : [];
+    element("strategy-count").textContent = strategies.length ? `${strategies.length} canonical identities` : NO_DATA;
+    if (!strategies.length) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 8;
+      cell.className = "empty-cell";
+      cell.textContent = NO_DATA;
+      row.append(cell);
+      tbody.append(row);
+      return;
+    }
+    strategies.forEach((strategy) => {
+      const view = strategy.views && strategy.views[state.performanceView];
+      const ready = view && view.status === "READY";
+      const metrics = ready ? view.metrics : null;
+      const row = document.createElement("tr");
+      if (strategy.strategy_id === state.selectedStrategyId) row.classList.add("selected");
+      const identity = document.createElement("td");
+      const choose = document.createElement("button");
+      choose.type = "button";
+      choose.textContent = value(strategy.strategy_id);
+      choose.addEventListener("click", () => void selectStrategy(strategy.strategy_id, true));
+      const family = document.createElement("small");
+      family.textContent = `${value(strategy.version)} · ${value(strategy.family)}`;
+      identity.append(choose, family);
+      const cells = [
+        identity,
+        tableCell(`${ready ? "READY" : "NOT_READY"} · ${value(strategy.activation_status)}`),
+        tableCell(metricText(metrics, "opportunity_count")),
+        tableCell(metricText(metrics, "accepted_signal_count")),
+        tableCell(metricText(metrics, "resolved_signal_count")),
+        tableCell(metricText(metrics, "win_rate_ratio", ratio)),
+        tableCell(metricText(metrics, "pnl_usd_micros", money)),
+        tableCell(metricText(metrics, "roi_ratio", ratio)),
+      ];
+      row.append(...cells);
+      row.addEventListener("dblclick", () => void selectStrategy(strategy.strategy_id, true));
+      tbody.append(row);
+    });
+  }
+
+  function tableCell(content) {
+    const cell = document.createElement("td");
+    cell.textContent = displayValue(content);
+    return cell;
+  }
+
+  function addMetricCard(container, label, result, note) {
+    const card = document.createElement("div");
+    card.className = "metric-card";
+    const name = document.createElement("span");
+    const amount = document.createElement("strong");
+    name.textContent = label;
+    amount.textContent = displayValue(result);
+    card.append(name, amount);
+    if (note) {
+      const detail = document.createElement("small");
+      detail.textContent = note;
+      card.append(detail);
+    }
+    container.append(card);
+  }
+
+  function renderStrategyMetrics(metrics) {
+    const container = element("strategy-metrics");
+    container.replaceChildren();
+    if (!metrics) {
+      container.textContent = "NOT_READY";
+      container.classList.add("muted");
+      return;
+    }
+    container.classList.remove("muted");
+    addMetricCard(container, "Opportunities", metricText(metrics, "opportunity_count"), `effective ${metricText(metrics, "effective_observation_count")}`);
+    addMetricCard(container, "Accepted signals", metricText(metrics, "accepted_signal_count"), `emitted ${metricText(metrics, "emitted_signal_count")}`);
+    addMetricCard(container, "Resolved / unresolved", `${metricText(metrics, "resolved_signal_count")} / ${metricText(metrics, "unresolved_signal_count")}`, `unscorable ${metricText(metrics, "unscorable_signal_count")}`);
+    addMetricCard(container, "Wins / losses", `${metricText(metrics, "wins")} / ${metricText(metrics, "losses")}`, `resolved denominator ${metricText(metrics, "win_rate_denominator")}`);
+    addMetricCard(container, "Win rate", metricText(metrics, "win_rate_ratio", ratio), `${metricText(metrics, "win_rate_numerator")} / ${metricText(metrics, "win_rate_denominator")}`);
+    addMetricCard(container, "PnL @ 5 shares", metricText(metrics, "pnl_usd_micros", money), `turnover ${metricText(metrics, "turnover_usd_micros", money)}`);
+    addMetricCard(container, "ROI", metricText(metrics, "roi_ratio", ratio), `${metricText(metrics, "roi_numerator_usd_micros", money)} / ${metricText(metrics, "roi_denominator_usd_micros", money)}`);
+    addMetricCard(container, "Average price", metricText(metrics, "average_price_micros", probability), `priced ${metricText(metrics, "average_price_denominator")}`);
+    addMetricCard(container, "Max / current drawdown", `${metricText(metrics, "max_drawdown_usd_micros", money)} / ${metricText(metrics, "current_drawdown_usd_micros", money)}`);
+    addMetricCard(container, "Longest win / loss streak", `${metricText(metrics, "longest_win_streak")} / ${metricText(metrics, "longest_loss_streak")}`);
+    addMetricCard(container, "Decision coverage", metricText(metrics, "decision_coverage_ratio", ratio), `${metricText(metrics, "decision_coverage_numerator")} / ${metricText(metrics, "decision_coverage_denominator")}`);
+    addMetricCard(container, "Resolution coverage", metricText(metrics, "resolution_coverage_ratio", ratio), `${metricText(metrics, "resolution_coverage_numerator")} / ${metricText(metrics, "resolution_coverage_denominator")}`);
+    addMetricCard(container, "Price coverage", metricText(metrics, "price_coverage_ratio", ratio), `${metricText(metrics, "price_coverage_numerator")} / ${metricText(metrics, "price_coverage_denominator")}`);
+    const annualized = metricText(metrics, "annualized_return_ratio", ratio);
+    addMetricCard(container, "Annualized return", annualized, `reason ${metricText(metrics, "annualized_return_reason_code")}`);
+  }
+
+  function rowSummary(point) {
+    if (!point || typeof point !== "object") return displayValue(point);
+    const fields = [];
+    [
+      ["resolved", "resolved_signal_count"], ["wins", "wins"], ["losses", "losses"],
+      ["PnL", "pnl_usd_micros"], ["cumulative", "cumulative_pnl_usd_micros"],
+      ["WR", "win_rate_ratio"], ["ROI", "roi_ratio"],
+    ].forEach(([label, key]) => {
+      if (!Object.prototype.hasOwnProperty.call(point, key)) return;
+      const formatted = key.endsWith("_usd_micros") ? money(point[key]) : (key.endsWith("_ratio") ? ratio(point[key]) : displayValue(point[key]));
+      fields.push(`${label} ${formatted}`);
+    });
+    return fields.length ? fields.join(" · ") : JSON.stringify(point);
+  }
+
+  function seriesRows(points, labelKeys) {
+    return (Array.isArray(points) ? points : []).slice(-12).reverse().map((point) => {
+      const label = labelKeys.map((key) => point && point[key]).find((item) => item !== null && item !== undefined) || NO_DATA;
+      return [label, rowSummary(point)];
+    });
+  }
+
+  function renderPerformanceSeries() {
+    const payload = state.performanceTimeseries;
+    const series = payload && payload.status === "READY" && payload.timeseries ? payload.timeseries : {};
+    const cumulative = series.CUMULATIVE || [];
+    replaceRows("cumulative-series", seriesRows(cumulative, ["market_date", "as_of_date", "observation_key"]));
+    replaceRows("recent-resolutions", seriesRows(cumulative.slice(-10), ["market_date", "observation_key"]));
+    replaceRows("monthly-series", seriesRows(series.MONTHLY || [], ["month", "period_key"]));
+    const rolling = ["ROLLING_30D", "ROLLING_90D", "ROLLING_365D"].flatMap((kind) =>
+      (Array.isArray(series[kind]) ? series[kind] : []).slice(-4).map((point) => ({ ...point, window_kind: kind }))
+    );
+    replaceRows("rolling-series", seriesRows(rolling, ["window_kind", "as_of_date", "observation_key"]));
+  }
+
+  function renderRecentDecisions() {
+    const observations = Array.isArray(state.performanceObservations) ? state.performanceObservations : [];
+    replaceRows("recent-decisions", observations.map((observation) => [
+      `${displayValue(observation.market_date)} · T-${displayValue(observation.checkpoint_minutes)}m`,
+      `${displayValue(observation.source_layer)} · ${observation.accepted === true ? "ACCEPTED" : "REJECTED"} · ${displayValue(observation.scoring_status)} · ${displayValue(observation.scoring_reason_code || observation.reason_code)}`,
+    ]));
+  }
+
+  function renderStrategyDetail() {
+    const detail = state.selectedStrategyDetail;
+    if (!detail) {
+      element("strategy-detail-title").textContent = NO_DATA;
+      element("strategy-detail-labels").textContent = NO_DATA;
+      element("performance-provenance").textContent = NO_DATA;
+      renderStrategyMetrics(null);
+      renderPerformanceSeries();
+      renderRecentDecisions();
+      return;
+    }
+    element("strategy-detail-title").textContent = detail.strategy_id;
+    const labels = element("strategy-detail-labels");
+    labels.replaceChildren();
+    [detail.version, detail.family, detail.activation_status, ...(detail.eligibility_labels || [])].filter(Boolean).forEach((label) => {
+      const badge = document.createElement("span");
+      badge.className = `badge${String(label).includes("RESEARCH") || String(label).includes("NOT_ROBUST") ? " badge-research" : ""}`;
+      badge.textContent = label;
+      labels.append(badge);
+    });
+    if (detail.parent_strategy_id) {
+      const parent = document.createElement("span");
+      parent.className = "badge";
+      parent.textContent = `PARENT ${detail.parent_strategy_id}`;
+      labels.append(parent);
+    }
+    const view = detail.views && detail.views[state.performanceView];
+    const ready = view && view.status === "READY";
+    renderStrategyMetrics(ready ? view.metrics : null);
+    element("performance-provenance").textContent = ready
+      ? `view ${state.performanceView} · revision ${displayValue(view.revision && view.revision.revision_key)} · generated ${timestamp(view.revision && view.revision.generated_at_ms)} · ledger ${displayValue(view.revision && view.revision.source_ledger_sha256)} · contract ${displayValue(view.provenance && view.provenance.calculation_contract)}`
+      : `${state.performanceView} · NOT_READY · no zero metrics fabricated`;
+    renderPerformanceSeries();
+    renderRecentDecisions();
+  }
+
+  function renderPerformance() {
+    renderPerformanceSystem();
+    renderStrategies();
+    renderStrategyDetail();
+  }
+
   function render() {
     const identity = identityParts(state.current_market_identity);
     element("market-id").textContent = value(identity.market_id);
@@ -198,6 +437,7 @@
     renderPositions();
     renderFills();
     renderIncidents();
+    renderPerformance();
   }
 
   function applyBootstrap(payload) {
@@ -246,6 +486,7 @@
     }
     state.last_event_id = event.event_id;
     render();
+    void refreshPerformance(false);
   }
 
   async function refreshBootstrap(showUnavailable) {
@@ -259,6 +500,84 @@
       render();
       return false;
     }
+  }
+
+  async function fetchPerformanceJson(path) {
+    const response = await fetch(path, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`PERFORMANCE_HTTP_${response.status}`);
+    return response.json();
+  }
+
+  async function selectStrategy(strategyId, scrollIntoView) {
+    if (!strategyId) return;
+    state.selectedStrategyId = strategyId;
+    state.selectedStrategyDetail = null;
+    state.performanceTimeseries = null;
+    state.performanceObservations = [];
+    renderPerformance();
+    const requestSequence = ++performanceRequestSequence;
+    const base = `/api/v1/performance/strategies/${encodeURIComponent(strategyId)}`;
+    try {
+      const [detail, timeseries, observations] = await Promise.all([
+        fetchPerformanceJson(base),
+        fetchPerformanceJson(`${base}/timeseries?view=${encodeURIComponent(state.performanceView)}`),
+        fetchPerformanceJson(`${base}/observations?limit=25`),
+      ]);
+      if (requestSequence !== performanceRequestSequence || strategyId !== state.selectedStrategyId) return;
+      state.selectedStrategyDetail = detail;
+      state.performanceTimeseries = timeseries;
+      state.performanceObservations = Array.isArray(observations.observations) ? observations.observations : [];
+      setPerformanceTransport("LIVE", "ok");
+      renderPerformance();
+      if (scrollIntoView) element("strategy-detail").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (_error) {
+      if (requestSequence !== performanceRequestSequence) return;
+      setPerformanceTransport("BACKEND_UNAVAILABLE", "bad");
+      renderPerformance();
+    }
+  }
+
+  async function refreshPerformance(showUnavailable) {
+    setPerformanceTransport("REFRESHING", "warn");
+    try {
+      const [status, strategies] = await Promise.all([
+        fetchPerformanceJson("/api/v1/performance/status"),
+        fetchPerformanceJson("/api/v1/performance/strategies"),
+      ]);
+      state.performanceStatus = status;
+      state.performanceStrategies = Array.isArray(strategies.strategies) ? strategies.strategies : [];
+      const selectedExists = state.performanceStrategies.some((strategy) => strategy.strategy_id === state.selectedStrategyId);
+      if (!selectedExists) {
+        const preferred = state.performanceStrategies.find((strategy) => strategy.strategy_id === "YES_STRICT_A_OPERATIONAL") || state.performanceStrategies[0];
+        state.selectedStrategyId = preferred ? preferred.strategy_id : null;
+      }
+      setPerformanceTransport("LIVE", "ok");
+      renderPerformance();
+      if (state.selectedStrategyId) await selectStrategy(state.selectedStrategyId, false);
+      return true;
+    } catch (_error) {
+      if (showUnavailable) setPerformanceTransport("BACKEND_UNAVAILABLE", "bad");
+      renderPerformance();
+      return false;
+    }
+  }
+
+  function bindPerformanceControls() {
+    element("performance-view-selector").querySelectorAll("[data-source-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.performanceView = button.dataset.sourceView;
+        element("performance-view-selector").querySelectorAll("[data-source-view]").forEach((candidate) => {
+          const active = candidate.dataset.sourceView === state.performanceView;
+          candidate.classList.toggle("active", active);
+          candidate.setAttribute("aria-pressed", String(active));
+        });
+        renderStrategies();
+        void selectStrategy(state.selectedStrategyId, false);
+      });
+    });
   }
 
   function connect() {
@@ -293,5 +612,7 @@
   }
 
   render();
-  void refreshBootstrap(true).finally(connect);
+  bindPerformanceControls();
+  void Promise.all([refreshBootstrap(true), refreshPerformance(true)]).finally(connect);
+  window.setInterval(() => void refreshPerformance(false), 30_000);
 })();

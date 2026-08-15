@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BTC Daily Range · Paper Dashboard</title>
+  <title>BTC Daily Range · Performance Dashboard</title>
   <link rel="stylesheet" href="/dashboard/styles.css">
 </head>
 <body>
   <header class="topbar">
     <div>
       <p class="eyebrow">BTC DAILY RANGE · LOCAL PAPER</p>
-      <h1>Execution console</h1>
+      <h1>Operations &amp; performance</h1>
     </div>
     <div id="connection-status" class="status status-warn" role="status" aria-live="polite">CONNECTING</div>
   </header>
@@ -71,6 +71,108 @@
         <h2>Incidents</h2>
         <div id="incidents" class="list muted">NO_DATA</div>
       </article>
+    </section>
+
+    <section class="performance" aria-labelledby="performance-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">BACKEND-COMPUTED · FIVE-SHARE CANONICAL UNIT</p>
+          <h2 id="performance-heading">Strategy performance</h2>
+        </div>
+        <div class="status-pair" aria-label="Performance states">
+          <span class="label">Transport</span>
+          <strong id="performance-transport-status" class="status status-warn" role="status" aria-live="polite">CONNECTING</strong>
+          <span class="label">Health</span>
+          <strong id="performance-health-status" class="status status-warn">NOT_READY</strong>
+        </div>
+      </div>
+
+      <section class="performance-system" aria-label="Performance system status">
+        <article class="panel compact-panel">
+          <span class="label">Blocking reason</span>
+          <strong id="performance-blocking-reason">NO_DATA</strong>
+        </article>
+        <article class="panel compact-panel">
+          <span class="label">Source freshness</span>
+          <strong id="performance-freshness">NO_DATA</strong>
+        </article>
+        <article class="panel compact-panel">
+          <span class="label">Catch-up classifications</span>
+          <strong id="performance-catchup">NO_DATA</strong>
+        </article>
+      </section>
+
+      <div class="performance-toolbar">
+        <div id="performance-view-selector" class="segmented" role="group" aria-label="Performance source view">
+          <button type="button" class="view-button active" data-source-view="HISTORICAL" aria-pressed="true">Historical</button>
+          <button type="button" class="view-button" data-source-view="FORWARD" aria-pressed="false">Forward</button>
+          <button type="button" class="view-button" data-source-view="COMBINED" aria-pressed="false">Combined</button>
+        </div>
+        <p class="muted">Views are independent backend materializations. No portfolio total is shown.</p>
+      </div>
+
+      <section class="panel strategy-list-panel" aria-labelledby="strategies-heading">
+        <div class="panel-heading">
+          <h2 id="strategies-heading">Strategies</h2>
+          <span id="strategy-count" class="muted">47 canonical identities</span>
+        </div>
+        <div class="table-scroll">
+          <table class="strategy-table">
+            <thead>
+              <tr>
+                <th scope="col">Strategy</th>
+                <th scope="col">Status</th>
+                <th scope="col">Opportunities</th>
+                <th scope="col">Accepted</th>
+                <th scope="col">Resolved</th>
+                <th scope="col">Win rate</th>
+                <th scope="col">PnL @ 5</th>
+                <th scope="col">ROI</th>
+              </tr>
+            </thead>
+            <tbody id="strategies-body">
+              <tr><td colspan="8" class="empty-cell">NO_DATA</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="strategy-detail" class="strategy-detail" aria-labelledby="strategy-detail-title">
+        <div class="panel detail-heading">
+          <div>
+            <span class="label">Selected strategy</span>
+            <h2 id="strategy-detail-title">NO_DATA</h2>
+            <div id="strategy-detail-labels" class="badge-row muted">NO_DATA</div>
+          </div>
+          <div id="performance-provenance" class="provenance muted">NO_DATA</div>
+        </div>
+
+        <article class="panel">
+          <h2>Metrics and explicit denominators</h2>
+          <div id="strategy-metrics" class="metric-cards muted">NO_DATA</div>
+        </article>
+
+        <div class="series-grid">
+          <article class="panel">
+            <h2>Cumulative &amp; recent resolutions</h2>
+            <div id="cumulative-series" class="list muted">NO_DATA</div>
+            <h3>Recent resolution evidence</h3>
+            <div id="recent-resolutions" class="list muted">NO_DATA</div>
+          </article>
+          <article class="panel">
+            <h2>Monthly</h2>
+            <div id="monthly-series" class="list muted">NO_DATA</div>
+          </article>
+          <article class="panel">
+            <h2>Rolling 30 / 90 / 365 days</h2>
+            <div id="rolling-series" class="list muted">NO_DATA</div>
+          </article>
+          <article class="panel">
+            <h2>Recent decisions · pending · unscorable</h2>
+            <div id="recent-decisions" class="list muted">NO_DATA</div>
+          </article>
+        </div>
+      </section>
     </section>
   </main>
 
