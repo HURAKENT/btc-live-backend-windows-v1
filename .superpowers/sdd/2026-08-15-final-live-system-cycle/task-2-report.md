@@ -2,7 +2,7 @@
 
 ## Status
 
-DONE, pending final report-metadata commit.
+DONE.
 
 ## Scope
 
@@ -10,8 +10,9 @@ DONE, pending final report-metadata commit.
 - Branch: `codex/final-live-system-cycle`
 - Base commit: `88a4d93aced91b1e458d6e6fd3005225022fde76`
 - Implementation commit: `cf0dd01`
-- Post-review correction/report commit: recorded by the follow-up commit after
-  this report update.
+- Post-review correction/report commit: `3198d4a`
+- Report metadata finalization commit: recorded by the follow-up commit after
+  this exact-hash update.
 - Requirement source: `.superpowers/sdd/2026-08-15-final-live-system-cycle/task-2-brief.md`
 - Approved design: `docs/superpowers/specs/2026-08-15-strategy-performance-engine-design.md`
 
