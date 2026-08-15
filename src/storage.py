@@ -41,6 +41,14 @@ _COUNTABLE_TABLES = frozenset(
         "paper_fills",
         "paper_positions",
         "paper_accounts",
+        "strategy_performance_observations",
+        "strategy_performance_resolutions",
+        "strategy_performance_ingest_runs",
+        "strategy_performance_cursors",
+        "strategy_performance_catchup",
+        "strategy_performance_materialization_revisions",
+        "strategy_performance_aggregates",
+        "strategy_performance_timeseries",
     }
 )
 
@@ -1131,6 +1139,11 @@ class SqliteStore:
             owns_connection=False,
         )
 
+    def performance_repository(self):
+        from src.performance_repository import PerformanceRepository
+
+        return PerformanceRepository(self)
+
     def has_paper_execution_for_date(self, market_date: str) -> bool:
         _require_nonempty_string(market_date, "INVALID_PAPER_MARKET_DATE")
         return self.scalar(
@@ -1217,6 +1230,11 @@ class SqliteReadStore:
         parameters: tuple[Any, ...] = (),
     ) -> list[tuple[Any, ...]]:
         return self._connection.execute(sql, parameters).fetchall()
+
+    def performance_repository(self):
+        from src.performance_repository import PerformanceRepository
+
+        return PerformanceRepository(self)
 
     def health(self) -> dict[str, Any]:
         quick_check = self.scalar("PRAGMA quick_check")

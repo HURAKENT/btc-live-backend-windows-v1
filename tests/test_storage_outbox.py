@@ -199,8 +199,8 @@ class StorageTests(unittest.TestCase):
 
     def test_migrations_are_idempotent(self):
         self.store.migrate()
-        self.assertEqual(self.store.count("schema_migrations"), 5)
-        self.assertEqual(self.store.integrity_report()["migration_version"], 5)
+        self.assertEqual(self.store.count("schema_migrations"), 6)
+        self.assertEqual(self.store.integrity_report()["migration_version"], 6)
 
     def test_duplicate_source_event_is_committed_once(self):
         first = self.store.append_source_event(self.event)
@@ -371,7 +371,7 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(report["integrity_check"], "ok")
         self.assertEqual(report["foreign_keys"], 1)
         self.assertEqual(report["journal_mode"], "wal")
-        self.assertEqual(report["migration_version"], 5)
+        self.assertEqual(report["migration_version"], 6)
 
     def test_sqlite_writer_owns_runtime_write_connection(self):
         self.store.close()

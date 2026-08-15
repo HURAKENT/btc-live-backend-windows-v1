@@ -35,6 +35,18 @@ class C9DatabaseOperationsTests(unittest.TestCase):
         )
         self.store._connection.execute(
             """
+            INSERT INTO strategy_performance_catchup(
+                catchup_key, schema_version, market_date, classification,
+                reason_code, market_id, source_event_identity,
+                classified_at_ms, provenance_json, payload_json, payload_sha256
+            ) VALUES ('catchup:fixture', 'PERFORMANCE_CATCHUP_V1',
+                      '2026-08-01', 'EXPECTED_ABSENT', 'NO_CANONICAL_MARKET',
+                      NULL, NULL, 5, '{}', '{}', ?)
+            """,
+            ("0" * 64,),
+        )
+        self.store._connection.execute(
+            """
             INSERT INTO paper_accounts(
                 account_key, schema_version, starting_bankroll_usd_micros,
                 cash_usd_micros, open_cost_basis_usd_micros,
@@ -43,6 +55,16 @@ class C9DatabaseOperationsTests(unittest.TestCase):
             ) VALUES ('default', 'PAPER_ACCOUNT_V1', 1000000000,
                       1000000000, 0, 1000000000, 0, 0, 4)
             """
+        )
+        self.store._connection.execute(
+            """
+            INSERT INTO strategy_performance_cursors(
+                cursor_name, schema_version, cursor_json,
+                cursor_sha256, updated_at_ms
+            ) VALUES ('forward-evaluations', 'PERFORMANCE_CURSOR_V1',
+                      '{}', ?, 6)
+            """,
+            ("0" * 64,),
         )
 
     def tearDown(self):
@@ -62,7 +84,7 @@ class C9DatabaseOperationsTests(unittest.TestCase):
 
         self.assertEqual(report["status"], "PASS")
         self.assertEqual(report["quick_check"], "ok")
-        self.assertEqual(report["migration_version"], 5)
+        self.assertEqual(report["migration_version"], 6)
         self.assertNotIn(
             "integrity_check",
             "\n".join(statements).lower(),
@@ -94,6 +116,23 @@ class C9DatabaseOperationsTests(unittest.TestCase):
         self.assertEqual(report["status"], "FAIL")
         self.assertIn("paper_fills", report["missing_tables"])
 
+    def test_startup_validation_rejects_missing_performance_table(self):
+        self.store._connection.execute(
+            "DROP TABLE strategy_performance_timeseries"
+        )
+        self.store.close()
+        store = StartupValidatedSqliteStore.open(self.database_path)
+        try:
+            report = store.integrity_report()
+        finally:
+            store.close()
+
+        self.assertEqual(report["status"], "FAIL")
+        self.assertIn(
+            "strategy_performance_timeseries",
+            report["missing_tables"],
+        )
+
     def test_online_backup_captures_committed_live_wal_state(self):
         backup_path = self.root / "backup.sqlite3"
 
@@ -102,6 +141,12 @@ class C9DatabaseOperationsTests(unittest.TestCase):
         self.assertEqual(report["status"], "PASS")
         self.assertEqual(report["representative_rows"]["source_events"], 1)
         self.assertEqual(report["representative_rows"]["paper_accounts"], 1)
+        self.assertEqual(
+            report["representative_rows"]["strategy_performance_catchup"], 1
+        )
+        self.assertEqual(
+            report["representative_rows"]["strategy_performance_cursors"], 1
+        )
         self.assertEqual(
             validate_database_copy(backup_path)["representative_rows"],
             report["representative_rows"],
@@ -118,6 +163,12 @@ class C9DatabaseOperationsTests(unittest.TestCase):
         self.assertTrue(restored_path.is_file())
         self.assertEqual(report["representative_rows"]["source_events"], 1)
         self.assertEqual(report["representative_rows"]["paper_accounts"], 1)
+        self.assertEqual(
+            report["representative_rows"]["strategy_performance_catchup"], 1
+        )
+        self.assertEqual(
+            report["representative_rows"]["strategy_performance_cursors"], 1
+        )
         with closing(sqlite3.connect(self.database_path)) as working:
             self.assertEqual(
                 working.execute("SELECT COUNT(*) FROM source_events").fetchone()[0],

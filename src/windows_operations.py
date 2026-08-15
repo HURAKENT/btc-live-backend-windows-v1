@@ -32,6 +32,14 @@ _REQUIRED_TABLES = frozenset(
         "source_events",
         "strategy_checkpoint_schedules",
         "strategy_evaluations",
+        "strategy_performance_aggregates",
+        "strategy_performance_catchup",
+        "strategy_performance_cursors",
+        "strategy_performance_ingest_runs",
+        "strategy_performance_materialization_revisions",
+        "strategy_performance_observations",
+        "strategy_performance_resolutions",
+        "strategy_performance_timeseries",
     }
 )
 _REPRESENTATIVE_TABLES = (
@@ -44,6 +52,14 @@ _REPRESENTATIVE_TABLES = (
     "paper_fills",
     "paper_positions",
     "paper_accounts",
+    "strategy_performance_observations",
+    "strategy_performance_resolutions",
+    "strategy_performance_ingest_runs",
+    "strategy_performance_cursors",
+    "strategy_performance_catchup",
+    "strategy_performance_materialization_revisions",
+    "strategy_performance_aggregates",
+    "strategy_performance_timeseries",
 )
 
 
