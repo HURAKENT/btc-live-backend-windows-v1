@@ -2,14 +2,15 @@
 
 ## Status
 
-DONE_WITH_CONCERNS until the final commit hash is filled by amend.
+DONE.
 
 ## Scope
 
 - Worktree: `/mnt/c/Users/gegos/Documents/Codex/btc_live_backend_windows_v1/.worktrees/final-live-system-cycle`
 - Branch: `codex/final-live-system-cycle`
 - Base commit before fix: `d85b54b59d009378eea0e45f3b1307540249e96a`
-- Final commit: `PENDING_AMEND`
+- Implementation commit: `13038bd5d8c00b6ed7369d482f2363fd092b1af3`
+- Report finalization commit: recorded by the follow-up commit after this report update.
 
 ## Requirement Source
 
