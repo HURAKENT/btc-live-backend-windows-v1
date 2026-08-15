@@ -74,6 +74,7 @@ class BackendRuntime:
         *,
         orchestrator_factory=None,
         api_bind_override: tuple[str, int] | None = None,
+        performance_bootstrap: Callable[[SqliteStore], Any] | None = None,
     ) -> None:
         self._store: SqliteStore | None = None
         self._read_store: SqliteReadStore | None = None
@@ -85,6 +86,7 @@ class BackendRuntime:
         self._orchestrator_factory = orchestrator_factory
         self._orchestrator = None
         self._api_bind_override = api_bind_override
+        self._performance_bootstrap = performance_bootstrap
 
     def initialize(
         self,
@@ -99,6 +101,8 @@ class BackendRuntime:
             store.paper_ledger().initialize_account(
                 updated_at_ms=time.time_ns() // 1_000_000
             )
+        if self._performance_bootstrap is not None:
+            self._performance_bootstrap(store)
 
     async def start_runtime_tasks(self) -> None:
         if self._store is None or self._broker is None:

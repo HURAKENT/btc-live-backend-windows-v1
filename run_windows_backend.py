@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import logging
 import sys
+from datetime import datetime, timezone
 from functools import partial
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -13,6 +14,8 @@ from src.app import BackendRuntime, LiveBackend, run_backend
 from src.integration_endpoints import load_integration_endpoints
 from src.runtime_orchestrator import build_default_runtime_orchestrator
 from src.windows_operations import StartupValidatedSqliteStore
+from src.performance_engine import bootstrap_historical_performance
+from src.performance_repository import PerformanceRepository
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -84,6 +87,14 @@ def close_backend_logger() -> None:
         handler.close()
 
 
+def bootstrap_strategy_performance(store) -> None:
+    bootstrap_historical_performance(
+        project_root=PROJECT_ROOT,
+        repository=PerformanceRepository(store),
+        as_of_date=datetime.now(timezone.utc).date(),
+    )
+
+
 def main(
     argv: list[str] | None = None,
     *,
@@ -108,7 +119,7 @@ def main(
             arguments.integration_endpoints is not None
         ):
             raise DatabasePathError("INVALID_INTEGRATION_MODE_ARGUMENTS")
-        runtime = None
+        runtime = BackendRuntime(performance_bootstrap=bootstrap_strategy_performance)
         if arguments.integration_test_mode:
             endpoint_path = Path(arguments.integration_endpoints)
             if not endpoint_path.is_absolute():
@@ -125,6 +136,7 @@ def main(
                     endpoints.api_bind_host,
                     endpoints.api_bind_port,
                 ),
+                performance_bootstrap=None,
             )
 
         backend_kwargs = {
@@ -132,8 +144,7 @@ def main(
             "database_path": database_path,
             "store_factory": StartupValidatedSqliteStore.open,
         }
-        if runtime is not None:
-            backend_kwargs["runtime"] = runtime
+        backend_kwargs["runtime"] = runtime
         logger.info(
             "backend startup requested database=%s",
             database_path,

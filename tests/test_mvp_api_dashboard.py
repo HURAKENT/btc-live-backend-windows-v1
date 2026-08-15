@@ -77,6 +77,24 @@ class MvpApiDashboardTests(unittest.IsolatedAsyncioTestCase):
                 await runtime.close_read_connections()
                 store.close()
 
+    async def test_runtime_invokes_configured_performance_bootstrap_before_api(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteStore.open(Path(directory) / "runtime.sqlite3")
+            store.migrate()
+            calls = []
+            runtime = BackendRuntime(
+                performance_bootstrap=lambda selected: calls.append(selected)
+            )
+            runtime.initialize(
+                load_versioned_runtime_config(Path("config/mvp_runtime_v1.json")),
+                store,
+            )
+            try:
+                self.assertEqual(calls, [store])
+            finally:
+                await runtime.close_read_connections()
+                store.close()
+
     async def test_real_paper_state_is_exposed_to_attached_dashboard(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SqliteStore.open(Path(directory) / "runtime.sqlite3")
