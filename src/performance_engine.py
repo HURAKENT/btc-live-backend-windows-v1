@@ -57,9 +57,13 @@ class StrategyPerformanceEngine:
             project_root=self.project_root, bundle=bundle
         ).build()
         observation_results = self.repository.append_observation_batch(observations)
+        built_keys = {row.observation_key for row in observations}
         persisted = tuple(
-            self.repository.read_observations(source_layer="HISTORICAL")
+            row for row in self.repository.read_observations(source_layer="HISTORICAL")
+            if row.observation_key in built_keys
         )
+        if len(persisted) != len(observations):
+            raise ValueError("PERFORMANCE_HISTORICAL_PERSISTED_SCOPE_INCOMPLETE")
         resolutions = HistoricalSettlementReconciler(
             project_root=self.project_root, bundle=bundle
         ).reconcile(persisted)
@@ -155,7 +159,10 @@ class StrategyPerformanceEngine:
                for row in scoped_resolutions.values()]
         )
         ledger_sha = canonical_sha256(ledger_rows)
-        ledger_revision = int(ledger_sha[:15], 16)
+        materialization_input_sha = canonical_sha256(
+            {"as_of_date": str(as_of_date), "source_ledger_sha256": ledger_sha}
+        )
+        ledger_revision = int(materialization_input_sha[:15], 16)
         revision_key = canonical_identity(
             "performance-materialization",
             {"calculation_version": CALCULATION_VERSION,
@@ -250,7 +257,7 @@ def _timeseries_membership(
         endpoint = date.fromisoformat(str(point["as_of_date"]))
         start = endpoint - timedelta(days=days - 1)
         members = [
-            row for row in resolved
+            row for row in resolved[: point_index + 1]
             if start <= date.fromisoformat(row.market_date) <= endpoint
         ]
     else:

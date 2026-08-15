@@ -74,8 +74,14 @@ class StrategyPerformanceEngineTests(unittest.TestCase):
             historical_revision.revision_key,
             historical_after["revision"].revision_key,
         )
+        next_day = self.engine.refresh_all(as_of_date="2026-08-16")
+        self.assertEqual({"inserted": 141, "replayed": 0}, next_day)
+        self.assertEqual(
+            {"inserted": 0, "replayed": 141},
+            self.engine.refresh_all(as_of_date="2026-08-16"),
+        )
 
-        second = self.engine.bootstrap_historical()
+        second = self.engine.bootstrap_historical(as_of_date="2026-08-16")
         self.assertEqual((0, 4_994), (second.observation_inserted, second.observation_replayed))
         self.assertEqual((0, 1_850), (second.resolution_inserted, second.resolution_replayed))
         self.assertEqual("REPLAYED", second.ingest_receipt_outcome)
