@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field, fields
 from datetime import date
 from types import MappingProxyType
-from typing import Any, Mapping, Self
+from typing import Any, Mapping, Self, Sequence
 
 
 FIVE_SHARES_MICROS = 5_000_000
@@ -296,6 +296,8 @@ class PerformanceObservation:
             or self.signal_identity_key is None
         ):
             raise ValueError("INVALID_OBSERVATION_EMISSION")
+        if (self.signal_identity_key is not None) != self.emitted:
+            raise ValueError("INVALID_OBSERVATION_EMISSION")
 
     def constructor_values(self) -> dict[str, Any]:
         computed = {
@@ -353,6 +355,7 @@ class PerformanceResolution:
             not observation.accepted
             or observation.performance_price_micros is None
             or observation.performance_price_micros <= 0
+            or observation.scoring_status != "RESOLUTION_PENDING"
         ):
             raise ValueError("UNSCORABLE_PERFORMANCE_OBSERVATION")
         economics = five_share_economics(observation.performance_price_micros, won=won)
@@ -578,6 +581,9 @@ class AggregateRevision:
     source_ledger_sha256: str
     generated_at_ms: int
     provenance: Mapping[str, object]
+    aggregate_count: int
+    timeseries_count: int
+    children_sha256: str
     schema_version: str = "PERFORMANCE_MATERIALIZATION_REVISION_V1"
     payload_json: str = field(init=False, default="")
     payload_sha256: str = field(init=False, default="")
@@ -593,6 +599,18 @@ class AggregateRevision:
         _require_nonnegative_int(self.source_ledger_revision, "INVALID_SOURCE_LEDGER_REVISION")
         _require_sha256(self.source_ledger_sha256, "INVALID_SOURCE_LEDGER_SHA256")
         _require_nonnegative_int(self.generated_at_ms, "INVALID_MATERIALIZATION_TIMESTAMP")
+        _require_nonnegative_int(
+            self.aggregate_count,
+            "INVALID_MATERIALIZATION_AGGREGATE_COUNT",
+        )
+        _require_nonnegative_int(
+            self.timeseries_count,
+            "INVALID_MATERIALIZATION_TIMESERIES_COUNT",
+        )
+        _require_sha256(
+            self.children_sha256,
+            "INVALID_MATERIALIZATION_CHILDREN_SHA256",
+        )
         provenance = _deep_freeze(dict(self.provenance))
         object.__setattr__(self, "provenance", provenance)
         _set_payload(self, {
@@ -604,6 +622,9 @@ class AggregateRevision:
             "source_ledger_revision": self.source_ledger_revision,
             "source_ledger_sha256": self.source_ledger_sha256,
             "generated_at_ms": self.generated_at_ms,
+            "aggregate_count": self.aggregate_count,
+            "timeseries_count": self.timeseries_count,
+            "children_sha256": self.children_sha256,
             "provenance": provenance,
         })
 
@@ -671,6 +692,57 @@ class TimeseriesRow:
         payload = _deep_freeze(dict(self.payload))
         object.__setattr__(self, "payload", payload)
         _set_payload(self, payload)
+
+
+def materialization_children_sha256(
+    aggregates: Sequence[AggregateRow],
+    timeseries: Sequence[TimeseriesRow],
+) -> str:
+    if type(aggregates) not in (list, tuple) or any(
+        type(row) is not AggregateRow for row in aggregates
+    ):
+        raise ValueError("INVALID_MATERIALIZATION_AGGREGATES")
+    if type(timeseries) not in (list, tuple) or any(
+        type(row) is not TimeseriesRow for row in timeseries
+    ):
+        raise ValueError("INVALID_MATERIALIZATION_TIMESERIES")
+    return canonical_sha256(
+        {
+            "aggregates": sorted(
+                (
+                    {
+                        "aggregate_key": row.aggregate_key,
+                        "payload_sha256": row.payload_sha256,
+                        "window_key": row.window_key,
+                        "window_kind": row.window_kind,
+                    }
+                    for row in aggregates
+                ),
+                key=lambda value: (
+                    value["window_kind"],
+                    value["window_key"],
+                    value["aggregate_key"],
+                ),
+            ),
+            "timeseries": sorted(
+                (
+                    {
+                        "observation_sha256": row.observation_sha256,
+                        "payload_sha256": row.payload_sha256,
+                        "period_key": row.period_key,
+                        "series_kind": row.series_kind,
+                        "timeseries_key": row.timeseries_key,
+                    }
+                    for row in timeseries
+                ),
+                key=lambda value: (
+                    value["series_kind"],
+                    value["period_key"],
+                    value["timeseries_key"],
+                ),
+            ),
+        }
+    )
 
 
 def _set_payload(value: object, payload: object) -> None:

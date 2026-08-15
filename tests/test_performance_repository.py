@@ -16,8 +16,10 @@ from src.performance_models import (
     PerformanceResolution,
     TimeseriesRow,
     canonical_identity,
+    materialization_children_sha256,
 )
 from src.performance_repository import PerformanceRepository
+from src.models import SignalRecord
 from src.storage import SqliteStore
 
 
@@ -165,7 +167,7 @@ class PerformanceRepositoryTests(unittest.TestCase):
         forward = self.observation(
             observation_key="obs:f:1",
             source_layer="FORWARD",
-            emitted=True,
+            emitted=False,
         )
         self.repository.append_observation(historical)
         self.repository.append_observation(forward)
@@ -243,7 +245,7 @@ class PerformanceRepositoryTests(unittest.TestCase):
             observation_key="obs:f:10",
             logical_decision_key="decision:10",
             source_layer="FORWARD",
-            emitted=True,
+            emitted=False,
         )
         results = self.repository.append_observations_and_advance_cursor(
             [first], cursor1
@@ -260,13 +262,13 @@ class PerformanceRepositoryTests(unittest.TestCase):
             observation_key="obs:f:20",
             logical_decision_key="decision:20",
             source_layer="FORWARD",
-            emitted=True,
+            emitted=False,
         )
         conflicting = self.observation(
             observation_key="obs:f:10",
             logical_decision_key="decision:10",
             source_layer="FORWARD",
-            emitted=True,
+            emitted=False,
             reason_code="DRIFTED",
         )
         with self.assertRaisesRegex(ValueError, "PERFORMANCE_OBSERVATION_CONFLICT"):
@@ -275,6 +277,74 @@ class PerformanceRepositoryTests(unittest.TestCase):
             )
         self.assertEqual(self.repository.read_cursor("forward-evaluations"), cursor1)
         self.assertEqual(self.store.count("strategy_performance_observations"), 1)
+
+    def test_unscorable_observation_cannot_be_resolved_or_persisted_as_resolution(self) -> None:
+        unscorable = self.observation(
+            observation_key="obs:h:unscorable",
+            logical_decision_key="decision:unscorable",
+            performance_price_micros=695_000,
+            scoring_status="UNSCORABLE",
+            scoring_reason_code="UNSCORABLE_AMBIGUOUS_BUCKET",
+        )
+        with self.assertRaisesRegex(ValueError, "UNSCORABLE_PERFORMANCE_OBSERVATION"):
+            self.resolution(unscorable)
+
+        pending = self.observation(
+            observation_key="obs:h:pending-template",
+            logical_decision_key="decision:pending-template",
+            performance_price_micros=695_000,
+        )
+        forged = dataclasses.replace(
+            self.resolution(pending),
+            resolution_key="resolution:forged-unscorable",
+            observation_key=unscorable.observation_key,
+        )
+        self.repository.append_observation(unscorable)
+        with self.assertRaisesRegex(
+            ValueError,
+            "PERFORMANCE_RESOLUTION_OBSERVATION_UNSCORABLE",
+        ):
+            self.repository.append_resolution(forged)
+
+    def test_emitted_observation_requires_matching_persisted_signal(self) -> None:
+        emitted = self.observation(
+            observation_key="obs:f:emitted",
+            logical_decision_key="decision:emitted",
+            source_layer="FORWARD",
+            emitted=True,
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "PERFORMANCE_EMITTED_SIGNAL_MISSING",
+        ):
+            self.repository.append_observation(emitted)
+
+        self.store.commit_signal_and_outbox(
+            SignalRecord(
+                identity_key=emitted.signal_identity_key,
+                evaluation_key=emitted.evaluation_key,
+                strategy_id=emitted.strategy_id,
+                signal_type="STRICT_A_SIGNAL_V1",
+                payload_json="{}",
+                created_at_ms=99,
+            ),
+            topic="signal.created",
+        )
+        self.assertEqual(
+            self.repository.append_observation(emitted).outcome,
+            "INSERTED",
+        )
+        foreign_keys = self.store.rows(
+            "PRAGMA foreign_key_list(strategy_performance_observations)"
+        )
+        self.assertTrue(
+            any(
+                row[2] == "signals"
+                and row[3] == "signal_identity_key"
+                and row[4] == "identity_key"
+                for row in foreign_keys
+            )
+        )
 
     def test_ingest_and_catchup_records_replay_but_never_overwrite(self) -> None:
         ingest = PerformanceIngestRun.create(
@@ -363,6 +433,9 @@ class PerformanceRepositoryTests(unittest.TestCase):
             source_ledger_sha256="e" * 64,
             generated_at_ms=10,
             provenance={"input_count": 1},
+            aggregate_count=1,
+            timeseries_count=1,
+            children_sha256="0" * 64,
         )
         aggregate1 = AggregateRow.create(
             aggregate_key="aggregate:1",
@@ -386,6 +459,13 @@ class PerformanceRepositoryTests(unittest.TestCase):
             observation_sha256="f" * 64,
             payload={"cumulative_pnl_usd_micros": 10},
         )
+        revision1 = dataclasses.replace(
+            revision1,
+            children_sha256=materialization_children_sha256(
+                [aggregate1],
+                [series1],
+            ),
+        )
         self.repository.publish_materialization(revision1, [aggregate1], [series1])
 
         revision2 = dataclasses.replace(
@@ -403,7 +483,7 @@ class PerformanceRepositoryTests(unittest.TestCase):
             dataclasses.replace(series1, revision_key=revision2.revision_key),
             dataclasses.replace(series1, revision_key=revision2.revision_key),
         ]
-        with self.assertRaisesRegex(ValueError, "PERFORMANCE_MATERIALIZATION_CONFLICT"):
+        with self.assertRaisesRegex(ValueError, "PERFORMANCE_MATERIALIZATION_INCOMPLETE"):
             self.repository.publish_materialization(
                 revision2, [aggregate2], duplicate_series
             )
@@ -421,7 +501,7 @@ class PerformanceRepositoryTests(unittest.TestCase):
             aggregate1,
             payload={"pnl_usd_micros": 999},
         )
-        with self.assertRaisesRegex(ValueError, "PERFORMANCE_MATERIALIZATION_CONFLICT"):
+        with self.assertRaisesRegex(ValueError, "PERFORMANCE_MATERIALIZATION_INCOMPLETE"):
             self.repository.publish_materialization(
                 revision1, [changed_aggregate], [series1]
             )
@@ -445,6 +525,53 @@ class PerformanceRepositoryTests(unittest.TestCase):
                 )
         finally:
             read_store.close()
+
+    def test_materialization_refuses_empty_or_missing_all_aggregate(self) -> None:
+        empty = AggregateRevision.create(
+            revision_key="materialization:NO_A0:FORWARD:empty",
+            strategy_id="NO_A0",
+            source_view="FORWARD",
+            calculation_version="PERFORMANCE_V1",
+            source_ledger_revision=0,
+            source_ledger_sha256="0" * 64,
+            generated_at_ms=1,
+            provenance={"input_count": 0},
+            aggregate_count=0,
+            timeseries_count=0,
+            children_sha256=materialization_children_sha256([], []),
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "PERFORMANCE_MATERIALIZATION_INCOMPLETE",
+        ):
+            self.repository.publish_materialization(empty, [], [])
+
+        monthly = AggregateRow.create(
+            aggregate_key="aggregate:monthly-only",
+            revision_key="materialization:NO_A0:FORWARD:monthly-only",
+            strategy_id="NO_A0",
+            source_view="FORWARD",
+            window_kind="MONTHLY",
+            window_key="2026-08",
+            calculation_version="PERFORMANCE_V1",
+            payload={"resolved_signal_count": 0},
+        )
+        missing_all = dataclasses.replace(
+            empty,
+            revision_key=monthly.revision_key,
+            source_ledger_revision=1,
+            aggregate_count=1,
+            children_sha256=materialization_children_sha256([monthly], []),
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "PERFORMANCE_MATERIALIZATION_INCOMPLETE",
+        ):
+            self.repository.publish_materialization(
+                missing_all,
+                [monthly],
+                [],
+            )
 
     def test_database_constraints_reject_invalid_share_and_signed_pnl_equations(self) -> None:
         observation = self.observation()

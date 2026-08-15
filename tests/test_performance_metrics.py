@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import unittest
 from datetime import date
 
@@ -310,6 +311,40 @@ class PerformanceMetricsTests(unittest.TestCase):
                 [self.resolution(orphan, won=True)],
                 source_view="HISTORICAL",
                 as_of_date="2026-04-01",
+            )
+
+    def test_unscorable_positive_price_cannot_enter_resolved_metrics(self) -> None:
+        unscorable = self.observation(
+            "unscorable-priced",
+            "unscorable-decision",
+            "2026-04-02",
+            60,
+            accepted=True,
+            price=500_000,
+            scoring_status="UNSCORABLE",
+        )
+        pending = self.observation(
+            "pending-template",
+            "pending-decision",
+            "2026-04-02",
+            60,
+            accepted=True,
+            price=500_000,
+        )
+        forged_resolution = dataclasses.replace(
+            self.resolution(pending, won=True),
+            resolution_key="resolution:unscorable-priced",
+            observation_key=unscorable.observation_key,
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "INVALID_EFFECTIVE_PERFORMANCE_RESOLUTION",
+        ):
+            build_metrics(
+                [unscorable],
+                [forged_resolution],
+                source_view="HISTORICAL",
+                as_of_date="2026-04-02",
             )
 
 

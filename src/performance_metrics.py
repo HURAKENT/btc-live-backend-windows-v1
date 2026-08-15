@@ -235,6 +235,7 @@ def _validate_resolution(
         or not observation.accepted
         or observation.performance_price_micros is None
         or observation.performance_price_micros <= 0
+        or observation.scoring_status != "RESOLUTION_PENDING"
     ):
         raise ValueError("INVALID_EFFECTIVE_PERFORMANCE_RESOLUTION")
     expected_cost = observation.performance_price_micros * 5

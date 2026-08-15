@@ -16,6 +16,7 @@ from src.performance_models import (
     TimeseriesRow,
     canonical_json,
     five_share_economics,
+    materialization_children_sha256,
 )
 from src.storage import SqliteReadStore, SqliteStore
 
@@ -99,6 +100,22 @@ class PerformanceRepository:
             if tuple(stored) != (observation.payload_json, observation.payload_sha256):
                 raise ValueError("PERFORMANCE_OBSERVATION_CONFLICT")
             return RepositoryWriteResult(observation.observation_key, "REPLAYED")
+
+        if observation.emitted:
+            signal = self._connection.execute(
+                """
+                SELECT evaluation_key, strategy_id
+                FROM signals WHERE identity_key = ?
+                """,
+                (observation.signal_identity_key,),
+            ).fetchone()
+            if signal is None:
+                raise ValueError("PERFORMANCE_EMITTED_SIGNAL_MISSING")
+            if tuple(signal) != (
+                observation.evaluation_key,
+                observation.strategy_id,
+            ):
+                raise ValueError("PERFORMANCE_EMITTED_SIGNAL_CONFLICT")
 
         collision = self._connection.execute(
             """
@@ -243,14 +260,19 @@ class PerformanceRepository:
 
         observation_row = self._connection.execute(
             """
-            SELECT accepted, performance_price_micros
+            SELECT accepted, performance_price_micros, scoring_status
             FROM strategy_performance_observations WHERE observation_key = ?
             """,
             (resolution.observation_key,),
         ).fetchone()
         if observation_row is None:
             raise ValueError("PERFORMANCE_RESOLUTION_OBSERVATION_MISSING")
-        if observation_row[0] != 1 or observation_row[1] is None or observation_row[1] <= 0:
+        if (
+            observation_row[0] != 1
+            or observation_row[1] is None
+            or observation_row[1] <= 0
+            or observation_row[2] != "RESOLUTION_PENDING"
+        ):
             raise ValueError("PERFORMANCE_RESOLUTION_OBSERVATION_UNSCORABLE")
         expected_economics = five_share_economics(observation_row[1], won=resolution.won)
         if any(
@@ -586,6 +608,17 @@ class PerformanceRepository:
                 or row.calculation_version != revision.calculation_version
             ):
                 raise ValueError("PERFORMANCE_MATERIALIZATION_SCOPE_CONFLICT")
+        if (
+            len(aggregates) != revision.aggregate_count
+            or len(timeseries) != revision.timeseries_count
+            or sum(
+                row.window_kind == "ALL" and row.window_key == "ALL"
+                for row in aggregates
+            ) != 1
+            or materialization_children_sha256(aggregates, timeseries)
+            != revision.children_sha256
+        ):
+            raise ValueError("PERFORMANCE_MATERIALIZATION_INCOMPLETE")
         try:
             self._connection.execute("BEGIN IMMEDIATE")
             stored = self._connection.execute(
@@ -609,15 +642,18 @@ class PerformanceRepository:
                 INSERT INTO strategy_performance_materialization_revisions(
                     revision_key, schema_version, strategy_id, source_view,
                     calculation_version, source_ledger_revision,
-                    source_ledger_sha256, generated_at_ms, status, is_current,
+                    source_ledger_sha256, generated_at_ms, aggregate_count,
+                    timeseries_count, children_sha256, status, is_current,
                     payload_json, payload_sha256
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETE', 0, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETE', 0, ?, ?)
                 """,
                 (
                     revision.revision_key, revision.schema_version,
                     revision.strategy_id, revision.source_view,
                     revision.calculation_version, revision.source_ledger_revision,
                     revision.source_ledger_sha256, revision.generated_at_ms,
+                    revision.aggregate_count, revision.timeseries_count,
+                    revision.children_sha256,
                     revision.payload_json, revision.payload_sha256,
                 ),
             )

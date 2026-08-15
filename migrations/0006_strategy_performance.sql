@@ -59,11 +59,14 @@ CREATE TABLE strategy_performance_observations (
          AND performance_price_basis = 'NOT_APPLICABLE'
          AND scoring_status = 'REJECTED')
     ),
-    CHECK (emitted = 0 OR (accepted = 1 AND source_layer = 'FORWARD' AND signal_identity_key IS NOT NULL)),
+    CHECK ((emitted = 1 AND accepted = 1 AND source_layer = 'FORWARD'
+            AND signal_identity_key IS NOT NULL)
+        OR (emitted = 0 AND signal_identity_key IS NULL)),
     CHECK (scoring_status <> 'RESOLUTION_PENDING' OR (
         performance_price_micros > 0
         AND performance_price_basis NOT IN ('NOT_APPLICABLE', 'UNAVAILABLE')
-    ))
+    )),
+    FOREIGN KEY (signal_identity_key) REFERENCES signals(identity_key)
 );
 
 CREATE TABLE strategy_performance_resolutions (
@@ -170,6 +173,9 @@ CREATE TABLE strategy_performance_materialization_revisions (
     source_ledger_revision INTEGER NOT NULL CHECK (source_ledger_revision >= 0),
     source_ledger_sha256 TEXT NOT NULL CHECK (length(source_ledger_sha256) = 64),
     generated_at_ms INTEGER NOT NULL CHECK (generated_at_ms >= 0),
+    aggregate_count INTEGER NOT NULL CHECK (aggregate_count > 0),
+    timeseries_count INTEGER NOT NULL CHECK (timeseries_count >= 0),
+    children_sha256 TEXT NOT NULL CHECK (length(children_sha256) = 64),
     status TEXT NOT NULL CHECK (status = 'COMPLETE'),
     is_current INTEGER NOT NULL CHECK (is_current IN (0, 1)),
     payload_json TEXT NOT NULL,
