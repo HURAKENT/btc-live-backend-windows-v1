@@ -115,6 +115,15 @@ class MvpApiDashboardTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(payload["paper_account"]["account_key"], "default")
                 self.assertEqual(len(payload["paper_positions"]), 1)
                 self.assertEqual(len(payload["paper_fills"]), 1)
+                health = await client.get("/api/v1/health")
+                self.assertEqual(health.status, 200)
+                self.assertIn("performance", await health.json())
+                performance_status = await client.get("/api/v1/performance/status")
+                self.assertEqual(performance_status.status, 200)
+                self.assertEqual(
+                    (await performance_status.json())["schema_version"],
+                    "PERFORMANCE_QUERY_V1",
+                )
                 dashboard = await client.get("/dashboard")
                 self.assertEqual(dashboard.status, 200)
                 self.assertIn("LOCAL PAPER", await dashboard.text())

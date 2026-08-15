@@ -9,6 +9,7 @@ from aiohttp import WSMsgType, web
 
 from src.models import OutboxEvent
 from src.outbox import OutboxBroker
+from src.performance_query import PerformanceQueryService
 from src.storage import SqliteReadStore
 from src.dashboard import attach_dashboard_routes
 
@@ -101,6 +102,20 @@ def create_api_app(
     app.router.add_get("/api/v1/sources", _sources)
     app.router.add_get("/api/v1/signals", _signals)
     app.router.add_get("/api/v1/incidents", _incidents)
+    app.router.add_get("/api/v1/performance/status", _performance_status)
+    app.router.add_get("/api/v1/performance/strategies", _performance_strategies)
+    app.router.add_get(
+        "/api/v1/performance/strategies/{strategy_id}/timeseries",
+        _performance_timeseries,
+    )
+    app.router.add_get(
+        "/api/v1/performance/strategies/{strategy_id}/observations",
+        _performance_observations,
+    )
+    app.router.add_get(
+        "/api/v1/performance/strategies/{strategy_id}",
+        _performance_strategy_detail,
+    )
     app.router.add_get("/ws/v1/events", _websocket_events)
     attach_dashboard_routes(app)
     return app
@@ -137,6 +152,66 @@ async def _incidents(request: web.Request) -> web.Response:
     )
 
 
+async def _performance_status(request: web.Request) -> web.Response:
+    return _json_response(_performance_service(request).status())
+
+
+async def _performance_strategies(request: web.Request) -> web.Response:
+    return _json_response(_performance_service(request).strategies())
+
+
+async def _performance_strategy_detail(request: web.Request) -> web.Response:
+    service = _performance_service(request)
+    try:
+        return _json_response(
+            service.strategy_detail(request.match_info["strategy_id"])
+        )
+    except KeyError:
+        return _json_response(
+            {"error": "UNKNOWN_PERFORMANCE_STRATEGY_ID"},
+            status=404,
+        )
+    except ValueError as exc:
+        return _json_response({"error": str(exc)}, status=400)
+
+
+async def _performance_timeseries(request: web.Request) -> web.Response:
+    service = _performance_service(request)
+    try:
+        return _json_response(
+            service.timeseries(
+                request.match_info["strategy_id"],
+                source_view=request.query.get("view", "HISTORICAL"),
+            )
+        )
+    except KeyError:
+        return _json_response(
+            {"error": "UNKNOWN_PERFORMANCE_STRATEGY_ID"},
+            status=404,
+        )
+    except ValueError as exc:
+        return _json_response({"error": str(exc)}, status=400)
+
+
+async def _performance_observations(request: web.Request) -> web.Response:
+    service = _performance_service(request)
+    try:
+        return _json_response(
+            service.observations(
+                request.match_info["strategy_id"],
+                limit=_parse_performance_limit(request),
+                after_observation_key=request.query.get("after_observation_key"),
+            )
+        )
+    except KeyError:
+        return _json_response(
+            {"error": "UNKNOWN_PERFORMANCE_STRATEGY_ID"},
+            status=404,
+        )
+    except ValueError as exc:
+        return _json_response({"error": str(exc)}, status=400)
+
+
 async def _bootstrap(request: web.Request) -> web.Response:
     store = _store(request)
     health = build_health_payload(
@@ -161,6 +236,19 @@ async def _bootstrap(request: web.Request) -> web.Response:
     )
 
 
+def _performance_service(request: web.Request) -> PerformanceQueryService:
+    return PerformanceQueryService(_store(request))
+
+
+def _parse_performance_limit(request: web.Request) -> int:
+    value = request.query.get("limit")
+    if value is None:
+        return 100
+    if not value.isdigit():
+        raise ValueError("INVALID_PERFORMANCE_LIMIT")
+    return int(value)
+
+
 def _starting_runtime_status() -> dict[str, Any]:
     return {
         "state": "BOOTING",
@@ -182,6 +270,7 @@ def build_health_payload(
     runtime_status: Any,
 ) -> dict[str, Any]:
     database_health = read_store.health()
+    performance_status = PerformanceQueryService(read_store).status()
     if type(runtime_status) is dict:
         runtime = dict(runtime_status)
     else:
@@ -210,6 +299,18 @@ def build_health_payload(
         status = "STARTING"
     return {
         "database_health": database_health,
+        "performance": {
+            "blocking_reason": performance_status["blocking_reason"],
+            "catchup": performance_status["catchup"],
+            "current_revision_count": performance_status["performance"][
+                "current_revision_count"
+            ],
+            "latest_generated_at_ms": performance_status["performance"][
+                "latest_generated_at_ms"
+            ],
+            "schema_version": performance_status["schema_version"],
+            "source_freshness": performance_status["source_freshness"],
+        },
         "runtime_readiness": {
             "asset_count": runtime["asset_count"],
             "failure": runtime["failure"],
