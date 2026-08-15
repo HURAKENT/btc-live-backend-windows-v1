@@ -1,0 +1,46 @@
+{
+  "schema_version": "FINAL_LIVE_SYSTEM_CYCLE_CONTINUATION_V1",
+  "captured_date": "2026-08-15",
+  "branch": "codex/final-live-system-cycle",
+  "worktree_windows": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\.worktrees\\final-live-system-cycle",
+  "worktree_wsl": "/mnt/c/Users/gegos/Documents/Codex/btc_live_backend_windows_v1/.worktrees/final-live-system-cycle",
+  "content_parent_head": "8bca56f4a95252e1cbe5cb42deac220258749a9b",
+  "origin_before_checkpoint": "13370891bc785858550e31f8536525d88cb32c01",
+  "head_capture_semantics": "The handoff commit cannot embed its own SHA. Verify the pushed continuation tip with git rev-parse HEAD and git rev-parse origin/codex/final-live-system-cycle.",
+  "tasks": {
+    "task_1": {
+      "status": "COMPLETE",
+      "implementation_commit": "13038bd5d8c00b6ed7369d482f2363fd092b1af3",
+      "report_commit": "88a4d93aced91b1e458d6e6fd3005225022fde76"
+    },
+    "task_2": {
+      "status": "COMPLETE",
+      "commits": ["cf0dd014c42fcf3d30aa313719dc512aee7b2f58", "3198d4a33182184069e1afa2a3720fef5ac063f2", "23ddbe722b083c8326dfeef0bd64b685e3521a97", "d7baab99789adafe2dc2702e043b92ad63049e97"]
+    },
+    "task_3": {
+      "status": "COMPLETE",
+      "commits": ["c240882a945b64d25592549dc81e67401d41bb69", "62e8bf720721d2db6a31d39f5cebeddd8747f08f", "130437495197d5c63af249358f33d758f65fd7a0", "15c997b74429bf0538e22cda07aadbffcfcda1fa", "0e6a102adc9b473cf6f6442acabe8b6087343e43"],
+      "review": "APPROVED",
+      "focused_tests": {"count": 25, "failures": 0, "errors": 0, "elapsed_seconds": 57.877}
+    },
+    "task_4": {
+      "status": "PARTIAL_UNCOMMITTED_WIP",
+      "untracked_files": ["src/performance_forward.py", "src/market_calendar.py", "tests/test_performance_forward.py", "tests/test_market_calendar.py"]
+    }
+  },
+  "historical": {
+    "ahr_run_id": "20260814T205244105513Z",
+    "observation_count": 4994,
+    "accepted_count": 1850,
+    "rejected_count": 3144,
+    "resolution_count": 1850,
+    "strategy_count": 47,
+    "acceptance_sha256": "20fa45912f1a892eb13c40deb5c5e8c3508fc642bf72db7f90c6676cebec1d0c",
+    "results_sha256": "26fad48c7d705bc4954fe65dfaefa7b3b87e1af77a7e94dfffe79c383aa38d84",
+    "manifest_file_sha256": "aa7d24fdcfe91fdcc9418d3cd83608fc5c8722efd7c678677ae45087c0e8759f",
+    "manifest_semantic_sha256": "3591523173ccdf820623c2e11d05e3e9981b33bda9d790f1d1b969a47291e11a",
+    "settlements_sha256": "ea9ed11c1aa7a975c499bcd27332fdbfa0dd927cf2ef4323e89b372516c4e8e1"
+  },
+  "production_mutations": {"database": false, "scheduler": false, "ahr_rerun": false},
+  "security_invariants": {"real_orders": false, "wallet": false, "signing": false, "authenticated_clob_writes": false, "trading_approval": false}
+}
