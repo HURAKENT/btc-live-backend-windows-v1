@@ -11,6 +11,7 @@ DONE.
 - Base commit: `88a4d93aced91b1e458d6e6fd3005225022fde76`
 - Implementation commit: `cf0dd01`
 - Post-review correction/report commit: `3198d4a`
+- Review fix round 1 commit: `23ddbe7`
 - Report metadata finalization commit: recorded by the follow-up commit after
   this exact-hash update.
 - Requirement source: `.superpowers/sdd/2026-08-15-final-live-system-cycle/task-2-brief.md`
@@ -233,3 +234,94 @@ was reported.
 
 - None within Task 2 scope. Historical bootstrap and forward ingestion remain
   deliberately deferred to Tasks 3 and 4.
+
+## Review fix round 1: scoring, publication, and emitted-signal linkage
+
+Independent review found three Important invariants that needed stronger
+enforcement. Commit `23ddbe7` addresses all three without expanding Task 2 into
+bootstrap, API, dashboard, or forward acquisition work:
+
+1. Resolution construction, repository persistence, and metric validation now
+   require the referenced observation to have `scoring_status =
+   RESOLUTION_PENDING`. A positive-priced `UNSCORABLE` observation therefore
+   cannot enter resolved counts, PnL, WR, or ROI.
+2. Every materialization revision declares aggregate count, timeseries count,
+   and a canonical child-manifest SHA-256. Publication validates those values
+   and requires exactly one `ALL`/`ALL` aggregate before the transaction can
+   replace the current revision.
+3. An emitted forward observation must reference a persisted, unique
+   `signals.identity_key` whose evaluation and strategy match the observation.
+   The migration adds the foreign key; repository validation provides stable
+   missing/conflict errors. Historical and forward accepted-but-not-emitted
+   observations retain a null signal key.
+
+### Strict RED evidence
+
+Command run before production changes:
+
+```text
+python3 -m unittest \
+  tests.test_performance_repository.PerformanceRepositoryTests.test_unscorable_observation_cannot_be_resolved_or_persisted_as_resolution \
+  tests.test_performance_repository.PerformanceRepositoryTests.test_emitted_observation_requires_matching_persisted_signal \
+  tests.test_performance_repository.PerformanceRepositoryTests.test_materialization_refuses_empty_or_missing_all_aggregate \
+  tests.test_performance_metrics.PerformanceMetricsTests.test_unscorable_positive_price_cannot_enter_resolved_metrics -v
+```
+
+Observed output:
+
+```text
+FAIL: test_unscorable_observation_cannot_be_resolved_or_persisted_as_resolution
+FAIL: test_emitted_observation_requires_matching_persisted_signal
+FAIL: test_materialization_refuses_empty_or_missing_all_aggregate
+FAIL: test_unscorable_positive_price_cannot_enter_resolved_metrics
+
+Ran 4 tests in 0.230s
+FAILED (failures=4)
+```
+
+Each failure reported that the expected `ValueError` was not raised, directly
+demonstrating the three missing invariants.
+
+### Focused GREEN evidence
+
+The same four-test command after the minimal coherent implementation produced:
+
+```text
+Ran 4 tests in 0.290s
+
+OK
+```
+
+### Full Task 2 regression evidence
+
+Authoritative project-environment command after CRLF normalization:
+
+```text
+../../.venv/Scripts/python.exe -m unittest \
+  tests.test_performance_repository \
+  tests.test_performance_metrics \
+  tests.test_storage_outbox \
+  tests.test_c9_database_operations
+```
+
+Observed output:
+
+```text
+..............................................................
+----------------------------------------------------------------------
+Ran 62 tests in 2.101s
+
+OK
+```
+
+Static and whitespace verification:
+
+```text
+python3 -m compileall -q src tests/test_performance_repository.py tests/test_performance_metrics.py
+git diff --check
+```
+
+Both commands exited `0` with no output. The project-wide native Windows suite
+was not run because the operational contract reserves it for an explicitly
+authorized release boundary; this verification is the complete Task 2 suite
+requested for this fix round.
