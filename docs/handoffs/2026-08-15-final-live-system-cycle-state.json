@@ -1,0 +1,42 @@
+{
+  "repo": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1",
+  "branch": "codex/final-live-system-cycle",
+  "base_commit": "be9401a45babbcc38d3540cb540a366b46dcf842",
+  "origin_commit": "be9401a45babbcc38d3540cb540a366b46dcf842",
+  "handoff_commit": null,
+  "approved_spec_path": "docs/superpowers/specs/2026-08-15-strategy-performance-engine-design.md",
+  "approved_spec_commit": "be9401a45babbcc38d3540cb540a366b46dcf842",
+  "ahr_run_id": "20260814T205244105513Z",
+  "ahr_result_path": "reports/historical_revalidation/20260814T205244105513Z/STRATEGY_RESULTS.parquet",
+  "ahr_result_sha256": "26fad48c7d705bc4954fe65dfaefa7b3b87e1af77a7e94dfffe79c383aa38d84",
+  "settlement_path": "C:\\Users\\gegos\\Documents\\Codex\\btc_edge_search_lab_v1\\data\\normalized\\unified_research_visible_170_v1\\settlements.parquet",
+  "settlement_sha256": "ea9ed11c1aa7a975c499bcd27332fdbfa0dd927cf2ef4323e89b372516c4e8e1",
+  "database_path": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\data\\runtime\\btc_live_backend.sqlite3",
+  "runtime_entrypoints": ["scripts/C9_RUN_BACKEND.ps1", "run_windows_backend.py"],
+  "api_entrypoint": "src/api.py:create_api_app (http://127.0.0.1:8767/api/v1)",
+  "dashboard_entrypoint": "src/dashboard.py:attach_dashboard_routes (http://127.0.0.1:8767/dashboard)",
+  "strategy_count": 47,
+  "known_closed_gates": [
+    "AHR_1_BASELINE_170_EXACT_REPLAY_PASS",
+    "STRATEGY_47_BINDINGS_AND_PARITY_PASS",
+    "SQLITE_SINGLE_WRITER_AND_IDEMPOTENCY_ACCEPTED",
+    "RECOVERED_CHECKPOINT_IS_NOT_FRESH_SIGNAL",
+    "TASK_SCHEDULER_DEFINITION_VERIFIED",
+    "SECURITY_INVARIANTS_LOCKED"
+  ],
+  "known_missing_capabilities": [
+    "CURRENT_RUNTIME_RECOVERY_BLOCK_MUST_BE_RESOLVED",
+    "STRATEGY_PERFORMANCE_ENGINE_NOT_IMPLEMENTED",
+    "POST_BASELINE_FORWARD_CATCHUP_NOT_IMPLEMENTED",
+    "STRATEGY_PERFORMANCE_SETTLEMENT_RECONCILIATION_NOT_IMPLEMENTED",
+    "PERFORMANCE_API_NOT_IMPLEMENTED",
+    "PERFORMANCE_DASHBOARD_NOT_IMPLEMENTED"
+  ],
+  "security_invariants": {
+    "real_orders": false,
+    "wallet": false,
+    "signing": false,
+    "authenticated_CLOB_writes": false,
+    "trading_approval": false
+  }
+}
