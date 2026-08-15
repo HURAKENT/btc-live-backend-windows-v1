@@ -1927,26 +1927,27 @@ class C1RuntimeOrchestrator:
     async def _drain_live_buffer(self) -> tuple[int, int]:
         drained_event_count = 0
         replay_count = 0
-        while self._live_buffer:
-            buffered = sorted(
-                self._live_buffer,
-                key=lambda item: (
-                    item[1].source_timestamp_ms,
-                    item[0],
-                    item[1].natural_key,
-                ),
-            )
-            self._live_buffer.clear()
-            for source, event in buffered:
-                result = await self._submit_source(
-                    event,
-                )
-                drained_event_count += 1
-                if not result.inserted:
-                    replay_count += 1
-                self._mark_live_evidence(source, result)
-                self._ensure_running()
+        buffered = sorted(
+            self._live_buffer,
+            key=lambda item: (
+                item[1].source_timestamp_ms,
+                item[0],
+                item[1].natural_key,
+            ),
+        )
+        self._live_buffer.clear()
         self._buffering_live = False
+        for source, event in buffered:
+            result = await self._submit_source(
+                event,
+            )
+            drained_event_count += 1
+            if not result.inserted:
+                replay_count += 1
+            self._mark_live_evidence(source, result)
+            self._ensure_running()
+        if self._live_buffer:
+            raise RuntimeError("LIVE_BUFFER_DRAIN_RESIDUAL")
         return drained_event_count, replay_count
 
     def _mark_live_evidence(

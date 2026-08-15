@@ -22,7 +22,8 @@ from src.polymarket_provider import (
     parse_market_ws_message,
 )
 from src.runtime_adapters import PolymarketRuntimeAdapter
-from src.runtime_orchestrator import C1RuntimeOrchestrator
+from src.recovery import assess_c2_recovery
+from src.runtime_orchestrator import C1RuntimeOrchestrator, _SourceWriteResult
 from src.storage import SqliteStore
 from tests.test_runtime_core_adversarial import FakePolymarket, _book
 
@@ -421,6 +422,75 @@ class DynamicCutoverBoundaryTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(self.runtime.start(), timeout=2)
         self.assertEqual(self.runtime.status().state, "RECOVERY_BLOCKED")
         self.assertFalse(self.runtime.status().live_ready)
+
+    async def test_live_buffer_cutover_excludes_late_arrivals_from_drain_count(self):
+        self.runtime = C1RuntimeOrchestrator(
+            run_id="buffer-cutover",
+            store=self.store,
+            broker=OutboxBroker(),
+            binance_adapter=_RealParserBinance(live_minutes=()),
+            polymarket_adapter=FakePolymarket(live=()),
+            binance_start_ms=MINUTE_MS,
+            binance_end_ms=2 * MINUTE_MS,
+            history_start_ts=1,
+            history_end_ts=2,
+        )
+        initial = _book("asset-00", 5 * MINUTE_MS, sequence=1, origin="LIVE")
+        late = _book("asset-00", 6 * MINUTE_MS, sequence=2, origin="LIVE")
+        self.runtime._live_buffer.append(("polymarket", initial))
+        self.runtime._buffering_live = True
+        first_write_started = asyncio.Event()
+        release_first_write = asyncio.Event()
+        writes: list[tuple[str, bool]] = []
+
+        async def controlled_submit_source(
+            event: SourceEvent,
+            *,
+            authoritative_replay: bool = False,
+        ) -> _SourceWriteResult:
+            self.assertFalse(authoritative_replay)
+            writes.append((event.natural_key, self.runtime._buffering_live))
+            if event is initial:
+                first_write_started.set()
+                await asyncio.wait_for(release_first_write.wait(), timeout=1)
+            return _SourceWriteResult(
+                event_id=len(writes),
+                inserted=True,
+                snapshot=None,
+            )
+
+        self.runtime._submit_source = controlled_submit_source
+
+        buffered_event_count = len(self.runtime._live_buffer)
+        drain_task = asyncio.create_task(self.runtime._drain_live_buffer())
+        await asyncio.wait_for(first_write_started.wait(), timeout=1)
+
+        await self.runtime._ingest_live("polymarket", late)
+        release_first_write.set()
+        drained_event_count, _ = await asyncio.wait_for(drain_task, timeout=1)
+
+        self.assertEqual(self.runtime._live_buffer, [])
+        summary = assess_c2_recovery(
+            binance_expected_closed_minutes=1,
+            binance_recovered_closed_minutes=1,
+            binance_missing_closed_minutes=0,
+            binance_duplicate_count_after_dedup=0,
+            market_count=11,
+            asset_count=22,
+            current_book_count=22,
+            history_completed_asset_count=22,
+            history_event_count=22,
+            buffered_event_count=buffered_event_count,
+            drained_event_count=drained_event_count,
+            source_duplicate_count_after_dedup=0,
+            writer_consumer_count=1,
+            recovered_evaluation_committed=True,
+            current_evaluation_committed=True,
+            recovered_execution_eligible=False,
+            current_execution_eligible=False,
+        )
+        self.assertEqual(summary.blockers, (), summary.as_dict())
+        self.assertEqual(writes[-1], (late.natural_key, False))
 
     async def test_live_evidence_wait_has_fail_closed_timeout(self):
         self.runtime = C1RuntimeOrchestrator(
