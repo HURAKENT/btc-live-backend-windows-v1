@@ -88,6 +88,14 @@ class StrategyPerformanceEngineTests(unittest.TestCase):
         self.assertEqual((0, 141), (second.materialization_inserted, second.materialization_replayed))
         self.assertEqual({"inserted": 0, "replayed": 141},
                          self.engine.refresh_all(as_of_date="2026-08-15"))
+        current_after_replay = self.repository.read_current_materialization(
+            strategy_id="NO_A0", source_view="HISTORICAL",
+            calculation_version=CALCULATION_VERSION,
+        )
+        self.assertEqual(
+            "2026-08-15",
+            current_after_replay["aggregates"][0].payload["as_of_date"],
+        )
         self.assertEqual(4_995, self.store.count("strategy_performance_observations"))
         self.assertEqual(1_850, self.store.count("strategy_performance_resolutions"))
 

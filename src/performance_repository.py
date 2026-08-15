@@ -772,6 +772,7 @@ class PerformanceRepository:
                 )
             ):
                 raise ValueError("PERFORMANCE_MATERIALIZATION_CONFLICT")
+            self._set_materialization_current_uncommitted(revision)
             return RepositoryWriteResult(revision.revision_key, "REPLAYED")
         self._connection.execute(
                 """
@@ -827,6 +828,12 @@ class PerformanceRepository:
                         row.payload_json, row.payload_sha256,
                     ),
                 )
+        self._set_materialization_current_uncommitted(revision)
+        return RepositoryWriteResult(revision.revision_key, "INSERTED")
+
+    def _set_materialization_current_uncommitted(
+        self, revision: AggregateRevision
+    ) -> None:
         self._connection.execute(
                 """
                 UPDATE strategy_performance_materialization_revisions
@@ -840,7 +847,6 @@ class PerformanceRepository:
             "UPDATE strategy_performance_materialization_revisions SET is_current = 1 WHERE revision_key = ?",
             (revision.revision_key,),
         )
-        return RepositoryWriteResult(revision.revision_key, "INSERTED")
 
     def _stored_materialization_matches(
         self,
