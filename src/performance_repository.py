@@ -85,6 +85,25 @@ class PerformanceRepository:
                 self._connection.rollback()
             raise
 
+    def append_observation_batch(
+        self, observations: Sequence[PerformanceObservation]
+    ) -> list[RepositoryWriteResult]:
+        """Persist a complete immutable source batch in one writer transaction."""
+        self._require_writer()
+        if type(observations) not in (list, tuple) or any(
+            type(row) is not PerformanceObservation for row in observations
+        ):
+            raise ValueError("INVALID_PERFORMANCE_OBSERVATIONS")
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            results = [self._append_observation_uncommitted(row) for row in observations]
+            self._connection.commit()
+            return results
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
     def _append_observation_uncommitted(
         self, observation: PerformanceObservation
     ) -> RepositoryWriteResult:
@@ -413,6 +432,74 @@ class PerformanceRepository:
                 self._connection.rollback()
             raise
 
+    def append_resolutions_and_ingest_run(
+        self,
+        resolutions: Sequence[PerformanceResolution],
+        ingest: PerformanceIngestRun,
+    ) -> tuple[list[RepositoryWriteResult], RepositoryWriteResult]:
+        """Complete reconciliation and its ingest receipt atomically."""
+        self._require_writer()
+        if type(resolutions) not in (list, tuple) or any(
+            type(row) is not PerformanceResolution for row in resolutions
+        ):
+            raise ValueError("INVALID_PERFORMANCE_RESOLUTIONS")
+        if type(ingest) is not PerformanceIngestRun:
+            raise ValueError("INVALID_PERFORMANCE_INGEST_RUN_TYPE")
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            resolution_results = [
+                self._append_resolution_uncommitted(row) for row in resolutions
+            ]
+            stored = self._connection.execute(
+                "SELECT payload_json, payload_sha256 FROM strategy_performance_ingest_runs WHERE ingest_run_key = ?",
+                (ingest.ingest_run_key,),
+            ).fetchone()
+            if stored is not None:
+                if tuple(stored) != (ingest.payload_json, ingest.payload_sha256):
+                    raise ValueError("PERFORMANCE_INGEST_RUN_CONFLICT")
+                ingest_result = RepositoryWriteResult(ingest.ingest_run_key, "REPLAYED")
+            else:
+                self._insert_ingest_run_uncommitted(ingest)
+                ingest_result = RepositoryWriteResult(ingest.ingest_run_key, "INSERTED")
+            self._connection.commit()
+            return resolution_results, ingest_result
+        except sqlite3.IntegrityError:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise ValueError("PERFORMANCE_INGEST_RUN_CONFLICT") from None
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def _insert_ingest_run_uncommitted(self, ingest: PerformanceIngestRun) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO strategy_performance_ingest_runs(
+                ingest_run_key, schema_version, mode, source_artifact_class,
+                source_sha256, acceptance_sha256, source_schema_version,
+                input_count, inserted_count, replayed_count, rejected_count,
+                accepted_count, unscorable_count, conflict_count,
+                first_source_identity, last_source_identity, first_cursor_json,
+                last_cursor_json, status, started_at_ms, completed_at_ms,
+                payload_json, payload_sha256
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ingest.ingest_run_key, ingest.schema_version, ingest.mode,
+                ingest.source_artifact_class, ingest.source_sha256,
+                ingest.acceptance_sha256, ingest.source_schema_version,
+                ingest.input_count, ingest.inserted_count, ingest.replayed_count,
+                ingest.rejected_count, ingest.accepted_count,
+                ingest.unscorable_count, ingest.conflict_count,
+                ingest.first_source_identity, ingest.last_source_identity,
+                _optional_json(ingest.first_cursor_json),
+                _optional_json(ingest.last_cursor_json), ingest.status,
+                ingest.started_at_ms, ingest.completed_at_ms,
+                ingest.payload_json, ingest.payload_sha256,
+            ),
+        )
+
     def append_catchup_classification(
         self, classification: CatchupClassification
     ) -> RepositoryWriteResult:
@@ -593,7 +680,54 @@ class PerformanceRepository:
         aggregates: Sequence[AggregateRow],
         timeseries: Sequence[TimeseriesRow],
     ) -> RepositoryWriteResult:
+        return self.publish_materialization_batch(
+            [(revision, aggregates, timeseries)]
+        )[0]
+
+    def publish_materialization_batch(
+        self,
+        materializations: Sequence[
+            tuple[AggregateRevision, Sequence[AggregateRow], Sequence[TimeseriesRow]]
+        ],
+    ) -> list[RepositoryWriteResult]:
+        """Publish a complete multi-view rebuild with one all-or-nothing cutover."""
         self._require_writer()
+        if type(materializations) not in (list, tuple) or not materializations:
+            raise ValueError("INVALID_PERFORMANCE_MATERIALIZATION_BATCH")
+        seen_scopes: set[tuple[str, str, str]] = set()
+        for revision, aggregates, timeseries in materializations:
+            self._validate_materialization(revision, aggregates, timeseries)
+            scope = (
+                revision.strategy_id,
+                revision.source_view,
+                revision.calculation_version,
+            )
+            if scope in seen_scopes:
+                raise ValueError("PERFORMANCE_MATERIALIZATION_BATCH_DUPLICATE_SCOPE")
+            seen_scopes.add(scope)
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            results = [
+                self._publish_materialization_uncommitted(revision, aggregates, timeseries)
+                for revision, aggregates, timeseries in materializations
+            ]
+            self._connection.commit()
+            return results
+        except sqlite3.IntegrityError:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise ValueError("PERFORMANCE_MATERIALIZATION_CONFLICT") from None
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    @staticmethod
+    def _validate_materialization(
+        revision: AggregateRevision,
+        aggregates: Sequence[AggregateRow],
+        timeseries: Sequence[TimeseriesRow],
+    ) -> None:
         if type(revision) is not AggregateRevision:
             raise ValueError("INVALID_MATERIALIZATION_REVISION_TYPE")
         if type(aggregates) not in (list, tuple) or any(type(row) is not AggregateRow for row in aggregates):
@@ -619,25 +753,27 @@ class PerformanceRepository:
             != revision.children_sha256
         ):
             raise ValueError("PERFORMANCE_MATERIALIZATION_INCOMPLETE")
-        try:
-            self._connection.execute("BEGIN IMMEDIATE")
-            stored = self._connection.execute(
-                "SELECT payload_json, payload_sha256 FROM strategy_performance_materialization_revisions WHERE revision_key = ?",
-                (revision.revision_key,),
-            ).fetchone()
-            if stored is not None:
-                if (
-                    tuple(stored) != (revision.payload_json, revision.payload_sha256)
-                    or not self._stored_materialization_matches(
-                        revision.revision_key,
-                        aggregates,
-                        timeseries,
-                    )
-                ):
-                    raise ValueError("PERFORMANCE_MATERIALIZATION_CONFLICT")
-                self._connection.commit()
-                return RepositoryWriteResult(revision.revision_key, "REPLAYED")
-            self._connection.execute(
+
+    def _publish_materialization_uncommitted(
+        self,
+        revision: AggregateRevision,
+        aggregates: Sequence[AggregateRow],
+        timeseries: Sequence[TimeseriesRow],
+    ) -> RepositoryWriteResult:
+        stored = self._connection.execute(
+            "SELECT payload_json, payload_sha256 FROM strategy_performance_materialization_revisions WHERE revision_key = ?",
+            (revision.revision_key,),
+        ).fetchone()
+        if stored is not None:
+            if (
+                tuple(stored) != (revision.payload_json, revision.payload_sha256)
+                or not self._stored_materialization_matches(
+                    revision.revision_key, aggregates, timeseries
+                )
+            ):
+                raise ValueError("PERFORMANCE_MATERIALIZATION_CONFLICT")
+            return RepositoryWriteResult(revision.revision_key, "REPLAYED")
+        self._connection.execute(
                 """
                 INSERT INTO strategy_performance_materialization_revisions(
                     revision_key, schema_version, strategy_id, source_view,
@@ -657,8 +793,8 @@ class PerformanceRepository:
                     revision.payload_json, revision.payload_sha256,
                 ),
             )
-            for row in aggregates:
-                self._connection.execute(
+        for row in aggregates:
+            self._connection.execute(
                     """
                     INSERT INTO strategy_performance_aggregates(
                         aggregate_key, schema_version, revision_key, strategy_id,
@@ -673,8 +809,8 @@ class PerformanceRepository:
                         row.payload_sha256,
                     ),
                 )
-            for row in timeseries:
-                self._connection.execute(
+        for row in timeseries:
+            self._connection.execute(
                     """
                     INSERT INTO strategy_performance_timeseries(
                         timeseries_key, schema_version, revision_key, strategy_id,
@@ -691,7 +827,7 @@ class PerformanceRepository:
                         row.payload_json, row.payload_sha256,
                     ),
                 )
-            self._connection.execute(
+        self._connection.execute(
                 """
                 UPDATE strategy_performance_materialization_revisions
                 SET is_current = 0
@@ -700,20 +836,11 @@ class PerformanceRepository:
                 """,
                 (revision.strategy_id, revision.source_view, revision.calculation_version),
             )
-            self._connection.execute(
-                "UPDATE strategy_performance_materialization_revisions SET is_current = 1 WHERE revision_key = ?",
-                (revision.revision_key,),
-            )
-            self._connection.commit()
-            return RepositoryWriteResult(revision.revision_key, "INSERTED")
-        except sqlite3.IntegrityError:
-            if self._connection.in_transaction:
-                self._connection.rollback()
-            raise ValueError("PERFORMANCE_MATERIALIZATION_CONFLICT") from None
-        except BaseException:
-            if self._connection.in_transaction:
-                self._connection.rollback()
-            raise
+        self._connection.execute(
+            "UPDATE strategy_performance_materialization_revisions SET is_current = 1 WHERE revision_key = ?",
+            (revision.revision_key,),
+        )
+        return RepositoryWriteResult(revision.revision_key, "INSERTED")
 
     def _stored_materialization_matches(
         self,

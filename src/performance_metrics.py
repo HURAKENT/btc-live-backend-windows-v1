@@ -163,6 +163,20 @@ def build_metrics(
     }
 
 
+def effective_observations_for_view(
+    observations: Sequence[PerformanceObservation], *, source_view: str
+) -> list[PerformanceObservation]:
+    """Return the exact observation membership used by a metrics view."""
+    if source_view not in _SOURCE_VIEWS:
+        raise ValueError("INVALID_PERFORMANCE_SOURCE_VIEW")
+    raw = _deduplicate_observations(observations)
+    if source_view == "COMBINED":
+        selected, _ = _combined_observations(raw)
+    else:
+        selected = [row for row in raw if row.source_layer == source_view]
+    return sorted(selected, key=_financial_order)
+
+
 def _deduplicate_observations(
     observations: Sequence[PerformanceObservation],
 ) -> list[PerformanceObservation]:

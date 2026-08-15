@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
@@ -10,7 +10,7 @@ from src.performance_historical import (
     HistoricalSettlementReconciler,
     PinnedAhrArtifactLoader,
 )
-from src.performance_metrics import build_metrics
+from src.performance_metrics import build_metrics, effective_observations_for_view
 from src.performance_models import (
     AggregateRevision,
     AggregateRow,
@@ -37,6 +37,11 @@ class HistoricalBootstrapResult:
     resolution_inserted: int
     resolution_replayed: int
     ingest_receipt_outcome: str
+    materialization_inserted: int
+    materialization_replayed: int
+
+
+PerformanceIngestReceipt = HistoricalBootstrapResult
 
 
 class StrategyPerformanceEngine:
@@ -44,23 +49,20 @@ class StrategyPerformanceEngine:
         self.project_root = Path(project_root).resolve()
         self.repository = repository
 
-    def bootstrap_historical(self) -> HistoricalBootstrapResult:
+    def bootstrap_historical(
+        self, *, as_of_date: date | str = "2026-08-15"
+    ) -> HistoricalBootstrapResult:
         bundle = PinnedAhrArtifactLoader(project_root=self.project_root).load()
         observations = HistoricalPerformanceObservationBuilder(
             project_root=self.project_root, bundle=bundle
         ).build()
+        observation_results = self.repository.append_observation_batch(observations)
+        persisted = tuple(
+            self.repository.read_observations(source_layer="HISTORICAL")
+        )
         resolutions = HistoricalSettlementReconciler(
             project_root=self.project_root, bundle=bundle
-        ).reconcile(observations)
-
-        observation_results = [
-            self.repository.append_observation(observation)
-            for observation in observations
-        ]
-        resolution_results = [
-            self.repository.append_resolution(resolution)
-            for resolution in resolutions
-        ]
+        ).reconcile(persisted)
         first_key = observations[0].observation_key
         last_key = observations[-1].observation_key
         completed_at = _date_epoch_ms(max(row.market_date for row in observations))
@@ -87,7 +89,10 @@ class StrategyPerformanceEngine:
             status="COMPLETE", started_at_ms=completed_at,
             completed_at_ms=completed_at,
         )
-        receipt = self.repository.append_ingest_run(ingest)
+        resolution_results, receipt = self.repository.append_resolutions_and_ingest_run(
+            resolutions, ingest
+        )
+        materializations = self.refresh_all(as_of_date=as_of_date)
         return HistoricalBootstrapResult(
             input_count=len(observations),
             observation_inserted=sum(row.inserted for row in observation_results),
@@ -95,47 +100,62 @@ class StrategyPerformanceEngine:
             resolution_inserted=sum(row.inserted for row in resolution_results),
             resolution_replayed=sum(not row.inserted for row in resolution_results),
             ingest_receipt_outcome=receipt.outcome,
+            materialization_inserted=materializations["inserted"],
+            materialization_replayed=materializations["replayed"],
         )
 
     def refresh_all(self, *, as_of_date: date | str) -> dict[str, int]:
         observations = self.repository.read_observations()
         resolutions = self.repository.read_effective_resolutions()
         strategy_ids = tuple(sorted({row.strategy_id for row in observations}))
-        outcomes = {"inserted": 0, "replayed": 0}
+        materializations = []
         for strategy_id in strategy_ids:
             strategy_observations = [
                 row for row in observations if row.strategy_id == strategy_id
             ]
             for source_view in SOURCE_VIEWS:
-                result = self._refresh_one(
+                materializations.append(self._build_one_materialization(
                     strategy_id=strategy_id,
                     source_view=source_view,
                     observations=strategy_observations,
                     resolutions=resolutions,
                     as_of_date=as_of_date,
-                )
-                outcomes[result.outcome.lower()] += 1
+                ))
+        results = self.repository.publish_materialization_batch(materializations)
+        outcomes = {"inserted": 0, "replayed": 0}
+        for result in results:
+            outcomes[result.outcome.lower()] += 1
         return outcomes
 
-    def _refresh_one(
+    def _build_one_materialization(
         self, *, strategy_id: str, source_view: str,
         observations: Sequence[PerformanceObservation],
         resolutions: Mapping[str, PerformanceResolution], as_of_date: date | str,
     ):
-        observation_keys = {item.observation_key for item in observations}
+        if source_view == "COMBINED":
+            ledger_observations = list(observations)
+        else:
+            ledger_observations = [
+                row for row in observations if row.source_layer == source_view
+            ]
+        effective_observations = effective_observations_for_view(
+            ledger_observations, source_view=source_view
+        )
+        observation_keys = {item.observation_key for item in ledger_observations}
         scoped_resolutions = {
             key: value for key, value in resolutions.items() if key in observation_keys
         }
         metrics = build_metrics(
-            observations, scoped_resolutions,
+            ledger_observations, scoped_resolutions,
             source_view=source_view, as_of_date=as_of_date
         )
         ledger_rows = sorted(
-            [(row.observation_key, row.payload_sha256) for row in observations]
+            [(row.observation_key, row.payload_sha256) for row in ledger_observations]
             + [(row.resolution_key, row.payload_sha256)
                for row in scoped_resolutions.values()]
         )
         ledger_sha = canonical_sha256(ledger_rows)
+        ledger_revision = int(ledger_sha[:15], 16)
         revision_key = canonical_identity(
             "performance-materialization",
             {"calculation_version": CALCULATION_VERSION,
@@ -154,22 +174,26 @@ class StrategyPerformanceEngine:
         timeseries = self._timeseries(
             revision_key=revision_key, strategy_id=strategy_id,
             source_view=source_view, metrics=metrics,
+            effective_observations=effective_observations,
+            resolutions=scoped_resolutions,
         )
         revision = AggregateRevision.create(
             revision_key=revision_key, strategy_id=strategy_id,
             source_view=source_view, calculation_version=CALCULATION_VERSION,
-            source_ledger_revision=len(ledger_rows), source_ledger_sha256=ledger_sha,
+            source_ledger_revision=ledger_revision, source_ledger_sha256=ledger_sha,
             generated_at_ms=_date_epoch_ms(str(as_of_date)),
             provenance={"as_of_date": str(as_of_date),
                         "calculation_contract": CALCULATION_VERSION},
             aggregate_count=len(aggregates), timeseries_count=len(timeseries),
             children_sha256=materialization_children_sha256(aggregates, timeseries),
         )
-        return self.repository.publish_materialization(revision, aggregates, timeseries)
+        return (revision, aggregates, timeseries)
 
     @staticmethod
     def _timeseries(*, revision_key: str, strategy_id: str,
-                    source_view: str, metrics: Mapping[str, object]) -> list[TimeseriesRow]:
+                    source_view: str, metrics: Mapping[str, object],
+                    effective_observations: Sequence[PerformanceObservation],
+                    resolutions: Mapping[str, PerformanceResolution]) -> list[TimeseriesRow]:
         groups: list[tuple[str, Iterable[Mapping[str, object]], str]] = [
             ("CUMULATIVE", metrics["cumulative_series"], "observation_key"),
             ("MONTHLY", metrics["monthly_series"], "month"),
@@ -179,9 +203,15 @@ class StrategyPerformanceEngine:
         for label in ("30D", "90D", "365D"):
             groups.append((f"ROLLING_{label}", rolling[label], "observation_key"))
         rows: list[TimeseriesRow] = []
+        resolved = [
+            row for row in effective_observations if row.observation_key in resolutions
+        ]
         for series_kind, points, period_field in groups:
-            for point in points:
+            for point_index, point in enumerate(points):
                 period_key = str(point[period_field])
+                membership = _timeseries_membership(
+                    series_kind, point, point_index, resolved
+                )
                 rows.append(TimeseriesRow.create(
                     timeseries_key=canonical_identity(
                         "performance-timeseries", [revision_key, series_kind, period_key]
@@ -189,10 +219,43 @@ class StrategyPerformanceEngine:
                     revision_key=revision_key, strategy_id=strategy_id,
                     source_view=source_view, series_kind=series_kind,
                     period_key=period_key, calculation_version=CALCULATION_VERSION,
-                    observation_count=int(point.get("resolved_signal_count", 1)),
-                    observation_sha256=canonical_sha256(point), payload=point,
+                    observation_count=len(membership),
+                    observation_sha256=canonical_sha256(membership), payload=point,
                 ))
         return rows
+
+
+def bootstrap_historical_performance(
+    *, project_root: Path, repository: PerformanceRepository,
+    as_of_date: date | str,
+) -> PerformanceIngestReceipt:
+    return StrategyPerformanceEngine(
+        project_root=project_root, repository=repository
+    ).bootstrap_historical(as_of_date=as_of_date)
+
+
+def _timeseries_membership(
+    series_kind: str,
+    point: Mapping[str, object],
+    point_index: int,
+    resolved: Sequence[PerformanceObservation],
+) -> list[str]:
+    if series_kind == "CUMULATIVE":
+        members = resolved[: point_index + 1]
+    elif series_kind == "MONTHLY":
+        month = str(point["month"])
+        members = [row for row in resolved if row.market_date[:7] == month]
+    elif series_kind.startswith("ROLLING_"):
+        days = int(series_kind.removeprefix("ROLLING_").removesuffix("D"))
+        endpoint = date.fromisoformat(str(point["as_of_date"]))
+        start = endpoint - timedelta(days=days - 1)
+        members = [
+            row for row in resolved
+            if start <= date.fromisoformat(row.market_date) <= endpoint
+        ]
+    else:
+        raise ValueError("INVALID_TIMESERIES_KIND")
+    return sorted(row.observation_key for row in members)
 
 
 def _date_epoch_ms(value: str) -> int:
