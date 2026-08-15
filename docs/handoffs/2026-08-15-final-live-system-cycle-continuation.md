@@ -169,19 +169,29 @@ dashboard consuming backend values. The current normal startup can populate
 historical facts/materializations on an initialized DB, but production was not
 mutated in this checkpoint.
 
-Task 4 is **PARTIAL / UNCOMMITTED WIP**. Preserve these untracked files without
-`git clean`, reset or stash:
+Task 4 is **PARTIAL / CHECKPOINT READY**. The current isolated milestone covers:
 
 - `src/performance_forward.py`
 - `src/market_calendar.py`
 - `tests/test_performance_forward.py`
 - `tests/test_market_calendar.py`
 
-They contain useful forward observation/settlement/calendar scaffolding and
-tests, but they are not accepted. Known unresolved boundaries include actual
-bounded public catch-up acquisition, runtime one-writer lifecycle integration,
-atomic resolution+refresh, and final proof that infrastructure canaries are
-skipped while legitimate missing checkpoint evidence fails closed.
+The implemented boundary projects committed legitimate `LIVE` evaluations into
+immutable FORWARD observations, advances its cursor and COMPLETE ingest receipt
+atomically, reconciles canonical daily settlement evidence with explicit
+revision lineage, refreshes backend materializations, and persists append-only
+`RESOLVED`/`PENDING`/`EXPECTED_ABSENT`/`DATA_GAP` classifications through the
+single runtime writer. Raw provider `POLYMARKET_MARKET_RESOLVED` passthrough
+without canonical market/date/winner fields is scoped out rather than invented
+into a daily winner. Focused verification on 2026-08-15: 63/63 PASS across
+`tests.test_market_calendar`, `tests.test_performance_forward`,
+`tests.test_runtime_orchestrator`, `tests.test_performance_repository`, and
+`tests.test_performance_metrics` (20.348 seconds).
+
+Remaining Task 4 boundary: bounded public post-baseline acquisition and
+fail-closed projection of canonical daily settlement/absence evidence. Until
+that producer exists, missing dates remain explicit `DATA_GAP`; the system must
+not infer `EXPECTED_ABSENT` or settlements from incomplete raw events.
 
 ## 7. Remaining outcomes to FINAL SYSTEM ACCEPTED
 

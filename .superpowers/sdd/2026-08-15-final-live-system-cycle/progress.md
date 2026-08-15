@@ -15,7 +15,13 @@ Task 3 focused checkpoint verification on 2026-08-15: 25/25 PASS
 Task 3 independent review: APPROVED after source-scoped/as-of revisions,
 coherent atomic publication, exact persisted reconciliation scope, rolling
 membership provenance, and replay-current-cutover fixes.
-Task 4: PARTIAL / UNCOMMITTED WIP only. Four untracked files are preserved:
-`src/performance_forward.py`, `src/market_calendar.py`,
-`tests/test_performance_forward.py`, `tests/test_market_calendar.py`. They are
-not accepted and must not be mistaken for a completed forward/catch-up path.
+Task 4: PARTIAL / CHECKPOINT READY. Local persisted evaluation -> immutable
+FORWARD observation -> canonical settlement/revision -> materialization is
+integrated through the single writer; four-state calendar evidence is
+append-only and corrections are lineage-aware. Focused verification: 63/63
+PASS (`test_market_calendar`, `test_performance_forward`,
+`test_runtime_orchestrator`, `test_performance_repository`,
+`test_performance_metrics`). Remaining Task 4 outcome: bounded public
+post-baseline acquisition/projection of canonical daily settlement/absence
+evidence; raw provider market-resolution passthrough is deliberately not
+treated as a daily winner.

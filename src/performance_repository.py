@@ -85,6 +85,61 @@ class PerformanceRepository:
                 self._connection.rollback()
             raise
 
+    def append_observations_cursor_and_ingest_run(
+        self,
+        observations: Sequence[PerformanceObservation],
+        cursor: PerformanceCursor,
+        ingest: PerformanceIngestRun,
+    ) -> tuple[list[RepositoryWriteResult], RepositoryWriteResult]:
+        self._require_writer()
+        if type(observations) not in (list, tuple) or any(
+            type(observation) is not PerformanceObservation
+            for observation in observations
+        ):
+            raise ValueError("INVALID_PERFORMANCE_OBSERVATIONS")
+        if type(cursor) is not PerformanceCursor:
+            raise ValueError("INVALID_PERFORMANCE_CURSOR_TYPE")
+        if type(ingest) is not PerformanceIngestRun:
+            raise ValueError("INVALID_PERFORMANCE_INGEST_RUN_TYPE")
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            observation_results = [
+                self._append_observation_uncommitted(observation)
+                for observation in observations
+            ]
+            self._advance_cursor_uncommitted(cursor)
+            stored = self._connection.execute(
+                """
+                SELECT payload_json, payload_sha256
+                FROM strategy_performance_ingest_runs
+                WHERE ingest_run_key = ?
+                """,
+                (ingest.ingest_run_key,),
+            ).fetchone()
+            if stored is not None:
+                if tuple(stored) != (ingest.payload_json, ingest.payload_sha256):
+                    raise ValueError("PERFORMANCE_INGEST_RUN_CONFLICT")
+                ingest_result = RepositoryWriteResult(
+                    ingest.ingest_run_key,
+                    "REPLAYED",
+                )
+            else:
+                self._insert_ingest_run_uncommitted(ingest)
+                ingest_result = RepositoryWriteResult(
+                    ingest.ingest_run_key,
+                    "INSERTED",
+                )
+            self._connection.commit()
+            return observation_results, ingest_result
+        except sqlite3.IntegrityError:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise ValueError("PERFORMANCE_INGEST_RUN_CONFLICT") from None
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
     def append_observation_batch(
         self, observations: Sequence[PerformanceObservation]
     ) -> list[RepositoryWriteResult]:

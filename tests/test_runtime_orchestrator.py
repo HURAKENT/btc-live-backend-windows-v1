@@ -31,7 +31,7 @@ class LoopbackCheckpointInputSource:
                 market_q_no=None,
                 vwap5=0.35 if index == 0 else 0.15,
                 confirmed_fee=0.0,
-                no_token_id=None,
+                no_token_id=f"no-token-{index}",
             )
             for index in range(11)
         )
@@ -190,6 +190,8 @@ class FakePolymarketRuntimeAdapter:
             {
                 "asset_ids": list(self.assets),
                 "event_id": "event-1",
+                "market_date": "2033-05-18",
+                "outcomes": [f"bucket-{index}" for index in range(11)],
                 "resolution_utc": "2033-05-18T03:33:20+00:00",
             },
             sort_keys=True,
@@ -316,6 +318,16 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
             self.store.scalar(
                 "SELECT COUNT(*) FROM strategy_evaluations "
                 "WHERE checkpoint_group_key IS NOT NULL"
+            ),
+            0,
+        )
+        self.assertGreater(self.store.count("strategy_performance_observations"), 0)
+        self.assertGreater(
+            self.store.scalar(
+                """
+                SELECT COUNT(*) FROM strategy_performance_materialization_revisions
+                WHERE source_view = 'FORWARD' AND is_current = 1
+                """
             ),
             0,
         )

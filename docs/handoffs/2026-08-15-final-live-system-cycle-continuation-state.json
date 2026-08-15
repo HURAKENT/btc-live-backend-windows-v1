@@ -24,8 +24,11 @@
       "focused_tests": {"count": 25, "failures": 0, "errors": 0, "elapsed_seconds": 57.877}
     },
     "task_4": {
-      "status": "PARTIAL_UNCOMMITTED_WIP",
-      "untracked_files": ["src/performance_forward.py", "src/market_calendar.py", "tests/test_performance_forward.py", "tests/test_market_calendar.py"]
+      "status": "PARTIAL_CHECKPOINT_READY",
+      "files": ["src/performance_forward.py", "src/market_calendar.py", "src/performance_repository.py", "src/runtime_orchestrator.py", "tests/test_performance_forward.py", "tests/test_market_calendar.py", "tests/test_runtime_orchestrator.py"],
+      "focused_tests": {"count": 63, "failures": 0, "errors": 0, "elapsed_seconds": 20.348},
+      "completed_boundary": "Persisted LIVE evaluation to immutable FORWARD observation, canonical daily settlement revisions, materialization refresh, append-only four-state classification, and single-writer runtime lifecycle.",
+      "remaining_boundary": "Bounded public post-baseline acquisition and fail-closed projection of canonical daily resolution/absence evidence."
     }
   },
   "historical": {

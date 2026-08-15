@@ -859,6 +859,7 @@ class C1RuntimeOrchestrator:
             self._ensure_streams_alive()
             await self._transition("LIVE_READY")
             self._started = True
+            await self._submit_write("PERFORMANCE_FORWARD_REFRESH", None)
             self._ready.set()
             self._tasks["checkpoint_scheduler"] = asyncio.create_task(
                 self._run_checkpoint_scheduler(),
@@ -1092,6 +1093,8 @@ class C1RuntimeOrchestrator:
                     )
             completed += 1
         completed += await self._poll_current_reevaluations_once()
+        if completed > 0:
+            await self._submit_write("PERFORMANCE_FORWARD_REFRESH", None)
         return completed
 
     async def _poll_current_reevaluations_once(self) -> int:
@@ -2129,6 +2132,8 @@ class C1RuntimeOrchestrator:
                 evidence=payload.evidence,
                 evaluated_at_ms=payload.evaluated_at_ms,
             )
+        if operation == "PERFORMANCE_FORWARD_REFRESH":
+            return self._run_forward_performance_cycle()
         if operation == "SET_MARKET":
             self._projector.set_market_identity(payload)
             return None
@@ -2136,12 +2141,37 @@ class C1RuntimeOrchestrator:
             self._projector.set_live_ready()
             return None
         if operation == "SOURCE_EVENT":
-            return self._write_source_event(payload)
+            result = self._write_source_event(payload)
+            if (
+                result.inserted
+                and payload.event.event_type
+                == "POLYMARKET_DAILY_RANGE_MARKET_RESOLVED"
+            ):
+                self._run_forward_performance_cycle()
+            return result
         if operation == "BUILD_SNAPSHOT":
             snapshot = self._projector.build_snapshot(**payload)
             self._persist_snapshot_and_canary(snapshot)
             return snapshot
         raise ValueError("UNKNOWN_RUNTIME_WRITE_COMMAND")
+
+    def _run_forward_performance_cycle(self) -> Any:
+        from src.performance_forward import ForwardPerformanceCycle
+        from src.performance_repository import PerformanceRepository
+
+        observed_at_ms = self._clock_ms()
+        catchup_end_date = datetime.fromtimestamp(
+            observed_at_ms / 1000,
+            tz=timezone.utc,
+        ).date().isoformat()
+        if catchup_end_date < "2026-07-08":
+            catchup_end_date = None
+        return ForwardPerformanceCycle(
+            store=self._store,
+            repository=PerformanceRepository(self._store),
+            observed_at_ms=observed_at_ms,
+            catchup_end_date=catchup_end_date,
+        ).run_once()
 
     def _write_source_event(
         self,
