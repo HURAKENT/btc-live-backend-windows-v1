@@ -229,6 +229,63 @@ authenticated_CLOB_writes=false
 trading_approval=false
 ```
 
+## 9. 2026-08-23 isolated final-cycle acceptance update
+
+The prior Task 4 partial marker is superseded by this section and the companion
+state JSON. Verified code commit
+`ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e` completes bounded public Gamma
+catch-up, single-writer application, startup/rollover refresh, truthful API
+degradation on `DATA_GAP`, and the Windows startup signal-handler race fix.
+
+Current task ledger:
+
+- Task 1: **COMPLETE** (`13038bd5d8c00b6ed7369d482f2363fd092b1af3`).
+- Task 2: **COMPLETE** (final invariant report `d7baab99789adafe2dc2702e043b92ad63049e97`).
+- Task 3: **COMPLETE** (final startup integration `0e6a102adc9b473cf6f6442acabe8b6087343e43`).
+- Task 4: **COMPLETE** (`d54ded9a51a31600b463badc832a2efe7727e3a6`,
+  `ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e`).
+- Task 5: **COMPLETE** (`15dd55e39702758278ffc72a2ab4d04ca21eeacc`).
+- Task 6: **COMPLETE** (`8bca56f4a95252e1cbe5cb42deac220258749a9b`).
+- Task 7: **COMPLETE IN ISOLATION**. The only omitted full-suite module was
+  `tests.test_c9_task_scheduler`, because it registers/unregisters Windows tasks
+  and the user explicitly prohibited Scheduler mutation.
+- Task 8: **NOT EXECUTED BY EXPLICIT ISOLATION BOUNDARY**. Canonical integration,
+  production DB migration, and production Scheduler changes remain for the
+  separate integration review.
+
+Fresh public-provider evidence is stored outside the repository at
+`C:\Users\gegos\Documents\Codex\backups\final_live_runtime_acceptance_20260823_04`.
+Three controlled operational-launcher cycles all reached `LIVE_READY`/`PASS`
+with Binance and Polymarket `LIVE`, served 47 strategies and the active
+dashboard, then stopped cleanly with exit code `0`. The same DB remained at
+4,994 HISTORICAL observations, zero legitimate FORWARD observations, 1,850
+resolutions, and 141 materialization revisions; duplicate observation,
+revision, and signal-identity counts were all zero. FORWARD is legitimately
+zero because the bounded live runs contained no non-infrastructure accepted
+strategy decision; recovered checkpoints and canaries are excluded by
+contract.
+
+Post-baseline calendar coverage from persisted public evidence is 2026-07-08
+through 2026-08-23: 42 `RESOLVED` through 2026-08-22, one `PENDING` for
+2026-08-23, four `EXPECTED_ABSENT`, and zero `DATA_GAP`. Malformed or
+date-contradictory Gamma evidence now fails closed before absence can be
+created; independent review found no remaining P0/P1.
+
+Verification on the tested code commit:
+
+- focused release suites: 121/121 PASS;
+- full native Windows suite without Scheduler mutation: 1,123 tests, zero
+  failures/errors, two skips, 242.948 seconds;
+- `compileall`: PASS;
+- SQLite quick/integrity checks: `ok`;
+- isolated online backup and restore-to-copy: PASS, including all performance
+  tables and 15,348 timeseries rows.
+
+Machine-readable acceptance evidence is
+`reports/FINAL_LIVE_SYSTEM_ACCEPTANCE.json`. The canonical root, production DB,
+canonical AHR artifacts, and production Scheduler were not mutated. All five
+security invariants remain false.
+
 No orders, wallet, keys, signing, authenticated CLOB writes, trading approval,
 production DB mutation, Scheduler mutation, AHR replay, or soak were performed
 in this checkpoint.

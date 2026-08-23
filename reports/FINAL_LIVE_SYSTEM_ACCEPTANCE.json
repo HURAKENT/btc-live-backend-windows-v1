@@ -1,0 +1,122 @@
+{
+  "schema_version": "FINAL_LIVE_SYSTEM_ACCEPTANCE_V1",
+  "status": "ISOLATED_FINAL_SYSTEM_ACCEPTANCE_PASS",
+  "captured_at": "2026-08-23T14:30:16+03:00",
+  "tested_code_commit": "ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e",
+  "branch": "codex/final-live-system-cycle",
+  "worktree": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\.worktrees\\final-live-system-cycle",
+  "isolation": {
+    "database": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_04\\acceptance.sqlite3",
+    "production_database_mutated": false,
+    "production_scheduler_mutated": false,
+    "canonical_root_implementation_mutated": false,
+    "ahr_rerun": false
+  },
+  "runtime": {
+    "launcher": "run_windows_backend.py",
+    "bounded_public_cycles": 3,
+    "clean_exit_codes": [0, 0, 0],
+    "final_health_status": "PASS",
+    "runtime_state": "LIVE_READY",
+    "binance": "LIVE",
+    "polymarket": "LIVE",
+    "market_id": "859785",
+    "market_count": 11,
+    "asset_count": 22,
+    "post_pass_event_growth": 46,
+    "dashboard_http_status": 200,
+    "dashboard_bytes": 7416,
+    "performance_api_http_status": 200,
+    "performance_api_strategy_count": 47
+  },
+  "catchup": {
+    "start_date": "2026-07-08",
+    "latest_resolved_date": "2026-08-22",
+    "current_pending_date": "2026-08-23",
+    "counts": {
+      "RESOLVED": 42,
+      "PENDING": 1,
+      "EXPECTED_ABSENT": 4,
+      "DATA_GAP": 0
+    }
+  },
+  "performance_storage": {
+    "historical_observations": 4994,
+    "forward_observations": 0,
+    "resolutions": 1850,
+    "catchup_rows": 47,
+    "materialization_revisions": 141,
+    "current_views": {
+      "HISTORICAL": 47,
+      "FORWARD": 47,
+      "COMBINED": 47
+    },
+    "duplicate_observation_keys": 0,
+    "duplicate_revision_keys": 0,
+    "duplicate_signal_identities": 0,
+    "forward_zero_reason": "No legitimate non-infrastructure LIVE strategy decision existed in the bounded public run; recovered checkpoints and infrastructure canaries are deliberately excluded."
+  },
+  "backend_computed_examples": [
+    {
+      "strategy_id": "YES_PF1_OPERATIONAL",
+      "source_view": "COMBINED",
+      "accepted": 131,
+      "resolved": 131,
+      "wins": 89,
+      "losses": 42,
+      "win_rate_ratio": "0.679389312977",
+      "turnover_usd_micros": 403810000,
+      "pnl_usd_micros": 41190000,
+      "roi_ratio": "0.102003417449",
+      "max_drawdown_usd_micros": 11097500
+    },
+    {
+      "strategy_id": "YES_STRICT_A_OPERATIONAL",
+      "source_view": "COMBINED",
+      "accepted": 50,
+      "resolved": 50,
+      "wins": 46,
+      "losses": 4,
+      "win_rate_ratio": "0.920000000000",
+      "turnover_usd_micros": 208295000,
+      "pnl_usd_micros": 21705000,
+      "roi_ratio": "0.104203173384",
+      "max_drawdown_usd_micros": 7075000
+    }
+  ],
+  "storage": {
+    "migration_version": 6,
+    "journal_mode": "wal",
+    "quick_check": "ok",
+    "integrity_check": "ok",
+    "backup_status": "PASS",
+    "restore_status": "PASS",
+    "backup_representative_rows_match": true
+  },
+  "verification": {
+    "focused_tests": {
+      "count": 121,
+      "failures": 0,
+      "errors": 0
+    },
+    "full_native_tests_without_scheduler_mutation": {
+      "count": 1123,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "elapsed_seconds": 242.948
+    },
+    "excluded_module": "tests.test_c9_task_scheduler",
+    "excluded_reason": "The module registers and unregisters Windows Scheduled Tasks; the user explicitly prohibited Scheduler mutation in isolated acceptance.",
+    "compileall": "PASS",
+    "independent_review": "APPROVED_NO_P0_P1"
+  },
+  "security": {
+    "real_orders": false,
+    "wallet": false,
+    "signing": false,
+    "authenticated_clob_writes": false,
+    "trading_approval": false
+  },
+  "deployment_boundary": "The accepted branch is not integrated into the canonical checkout and the existing production Scheduled Task is unchanged."
+}

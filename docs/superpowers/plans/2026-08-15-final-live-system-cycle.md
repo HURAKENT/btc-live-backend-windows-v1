@@ -21,6 +21,22 @@
 - No implicit 47-strategy portfolio, bankroll CAGR, strategy optimization, real/test orders, wallet, signing, authenticated writes, new Windows Service, or extra Scheduler task.
 - Do not rerun the frozen AHR replay; bootstrap from the pinned PASS evidence and verify hashes before writes.
 
+## Current completion ledger (2026-08-23)
+
+This ledger supersedes the original unchecked execution-template boxes below:
+
+- Tasks 1-6: **COMPLETE**.
+- Task 7: **COMPLETE IN ISOLATION** at tested code commit
+  `ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e`; 1,123 native Windows tests
+  passed with two skips after excluding only the Scheduler-mutating module.
+- Task 8: **NOT EXECUTED BY EXPLICIT ISOLATION BOUNDARY**. The user prohibited
+  canonical integration, production DB mutation, and production Scheduler
+  mutation. These are deployment actions, not unfinished isolated product code.
+- Acceptance receipt: `reports/FINAL_LIVE_SYSTEM_ACCEPTANCE.json`.
+
+The step boxes below are preserved as the original implementation specification,
+not as the current progress authority.
+
 ---
 
 ### Task 1: Repair startup live-buffer cutover race
