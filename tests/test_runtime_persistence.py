@@ -191,6 +191,62 @@ class RuntimePersistenceTests(unittest.TestCase):
         finally:
             reader.close()
 
+    def test_market_identity_lookup_by_active_id_ignores_import_time(self):
+        current_payload = canonical_json(
+            {"event_id": "current", "market_date": "2026-08-23"}
+        )
+        historical_payload = canonical_json(
+            {"event_id": "historical", "market_date": "2026-07-08"}
+        )
+        self.store.persist_market_identity(
+            market_id="current",
+            payload_json=current_payload,
+            payload_sha256=self._sha(current_payload),
+            updated_at_ms=100,
+        )
+        self.store.persist_market_identity(
+            market_id="historical",
+            payload_json=historical_payload,
+            payload_sha256=self._sha(historical_payload),
+            updated_at_ms=200,
+        )
+
+        reader = self.store.open_read_store()
+        try:
+            self.assertEqual(
+                reader.current_market_identity(market_id="current")["market_id"],
+                "current",
+            )
+        finally:
+            reader.close()
+
+    def test_current_market_identity_legacy_fallback_uses_import_time(self):
+        current_payload = canonical_json({"event_id": "legacy-current"})
+        historical_payload = canonical_json(
+            {"event_id": "historical", "market_date": "2026-07-08"}
+        )
+        self.store.persist_market_identity(
+            market_id="legacy-current",
+            payload_json=current_payload,
+            payload_sha256=self._sha(current_payload),
+            updated_at_ms=300,
+        )
+        self.store.persist_market_identity(
+            market_id="historical",
+            payload_json=historical_payload,
+            payload_sha256=self._sha(historical_payload),
+            updated_at_ms=200,
+        )
+
+        reader = self.store.open_read_store()
+        try:
+            self.assertEqual(
+                reader.current_market_identity()["market_id"],
+                "legacy-current",
+            )
+        finally:
+            reader.close()
+
     def test_market_identity_exact_replay_is_idempotent(self):
         payload = canonical_json({"event_id": "733270"})
         first = self.store.persist_market_identity(

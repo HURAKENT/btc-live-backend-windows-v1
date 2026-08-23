@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 import unittest
@@ -18,6 +19,147 @@ from tests.test_paper import PaperLedgerTests
 
 
 class MvpApiDashboardTests(unittest.IsolatedAsyncioTestCase):
+    async def test_live_ready_without_active_market_does_not_fall_back_to_inventory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteStore.open(Path(directory) / "runtime.sqlite3")
+            store.migrate()
+            payload_json = json.dumps(
+                {"event_id": "stale", "market_date": "2026-07-08"},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            store.persist_market_identity(
+                market_id="stale",
+                payload_json=payload_json,
+                payload_sha256=hashlib.sha256(payload_json.encode()).hexdigest(),
+                updated_at_ms=200,
+            )
+            read_store = store.open_read_store()
+            runtime_status = lambda: {
+                "state": "LIVE_READY",
+                "live_ready": True,
+                "source_health": (("binance", "LIVE"), ("polymarket", "LIVE")),
+                "market_id": None,
+                "market_count": 11,
+                "asset_count": 22,
+                "last_event_id": 0,
+                "failure": None,
+            }
+            client = TestClient(
+                TestServer(
+                    create_api_app(
+                        read_store,
+                        OutboxBroker(),
+                        runtime_status=runtime_status,
+                    )
+                )
+            )
+            await client.start_server()
+            try:
+                bootstrap = await (await client.get("/api/v1/bootstrap")).json()
+                self.assertIsNone(bootstrap["current_market_identity"])
+                self.assertEqual(bootstrap["health"]["status"], "DEGRADED")
+                self.assertEqual(
+                    bootstrap["health"]["runtime_readiness"]["blocking_reason"],
+                    "ACTIVE_MARKET_IDENTITY_MISSING",
+                )
+            finally:
+                await client.close()
+                read_store.close()
+                store.close()
+
+    async def test_missing_runtime_active_market_is_explicitly_degraded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteStore.open(Path(directory) / "runtime.sqlite3")
+            store.migrate()
+            read_store = store.open_read_store()
+            runtime_status = lambda: {
+                "state": "LIVE_READY",
+                "live_ready": True,
+                "source_health": (("binance", "LIVE"), ("polymarket", "LIVE")),
+                "market_id": "missing-active",
+                "market_count": 11,
+                "asset_count": 22,
+                "last_event_id": 0,
+                "failure": None,
+            }
+            client = TestClient(
+                TestServer(
+                    create_api_app(
+                        read_store,
+                        OutboxBroker(),
+                        runtime_status=runtime_status,
+                    )
+                )
+            )
+            await client.start_server()
+            try:
+                health = await (await client.get("/api/v1/health")).json()
+                bootstrap = await (await client.get("/api/v1/bootstrap")).json()
+                self.assertEqual(health["status"], "DEGRADED")
+                self.assertEqual(
+                    health["runtime_readiness"]["blocking_reason"],
+                    "ACTIVE_MARKET_IDENTITY_MISSING",
+                )
+                self.assertIsNone(bootstrap["current_market_identity"])
+                self.assertEqual(bootstrap["health"]["status"], "DEGRADED")
+            finally:
+                await client.close()
+                read_store.close()
+                store.close()
+
+    async def test_bootstrap_uses_runtime_active_market_not_newer_inventory_import(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteStore.open(Path(directory) / "runtime.sqlite3")
+            store.migrate()
+            for market_id, market_date, updated_at_ms in (
+                ("active", "2026-08-23", 100),
+                ("historical", "2026-07-08", 200),
+            ):
+                payload_json = json.dumps(
+                    {"event_id": market_id, "market_date": market_date},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                store.persist_market_identity(
+                    market_id=market_id,
+                    payload_json=payload_json,
+                    payload_sha256=hashlib.sha256(payload_json.encode()).hexdigest(),
+                    updated_at_ms=updated_at_ms,
+                )
+            read_store = store.open_read_store()
+            runtime_status = lambda: {
+                "state": "LIVE_READY",
+                "live_ready": True,
+                "source_health": (("binance", "LIVE"), ("polymarket", "LIVE")),
+                "market_id": "active",
+                "market_count": 11,
+                "asset_count": 22,
+                "last_event_id": 0,
+                "failure": None,
+            }
+            client = TestClient(
+                TestServer(
+                    create_api_app(
+                        read_store,
+                        OutboxBroker(),
+                        runtime_status=runtime_status,
+                    )
+                )
+            )
+            await client.start_server()
+            try:
+                response = await client.get("/api/v1/bootstrap")
+                self.assertEqual(response.status, 200)
+                self.assertEqual(
+                    (await response.json())["current_market_identity"]["market_id"],
+                    "active",
+                )
+            finally:
+                await client.close()
+                read_store.close()
+                store.close()
+
     async def test_latest_strict_a_signal_ignores_newer_generic_evaluation(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SqliteStore.open(Path(directory) / "runtime.sqlite3")

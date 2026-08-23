@@ -1339,15 +1339,30 @@ class SqliteReadStore:
             for row in rows
         ]
 
-    def current_market_identity(self) -> dict[str, Any] | None:
-        row = self._connection.execute(
-            """
-            SELECT market_id, payload_json, updated_at_ms
-            FROM market_catalog
-            ORDER BY updated_at_ms DESC, market_id ASC
-            LIMIT 1
-            """
-        ).fetchone()
+    def current_market_identity(
+        self,
+        *,
+        market_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if market_id is None:
+            row = self._connection.execute(
+                """
+                SELECT market_id, payload_json, updated_at_ms
+                FROM market_catalog
+                ORDER BY updated_at_ms DESC, market_id ASC
+                LIMIT 1
+                """
+            ).fetchone()
+        else:
+            _require_nonempty_string(market_id, "INVALID_MARKET_IDENTITY_ID")
+            row = self._connection.execute(
+                """
+                SELECT market_id, payload_json, updated_at_ms
+                FROM market_catalog
+                WHERE market_id = ?
+                """,
+                (market_id,),
+            ).fetchone()
         if row is None:
             return None
         return {

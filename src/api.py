@@ -218,10 +218,19 @@ async def _bootstrap(request: web.Request) -> web.Response:
         store,
         request.app["runtime_status"](),
     )
+    active_market_id = health["runtime_readiness"]["market_id"]
+    if type(active_market_id) is str and active_market_id:
+        current_market_identity = store.current_market_identity(
+            market_id=active_market_id
+        )
+    elif health["runtime_readiness"]["live_ready"]:
+        current_market_identity = None
+    else:
+        current_market_identity = store.current_market_identity()
     return _json_response(
         {
             "interface_version": "BTC_DAILY_RANGE_MVP_V1",
-            "current_market_identity": store.current_market_identity(),
+            "current_market_identity": current_market_identity,
             "execution_readiness": store.paper_readiness(),
             "health": health,
             "incidents": store.incidents(limit=REST_RESULT_LIMIT),
@@ -290,18 +299,29 @@ def build_health_payload(
         and source_health.get("polymarket") == "LIVE"
     )
     live_ready = runtime["live_ready"] is True
+    active_market_id = runtime.get("market_id")
+    active_market_missing = live_ready and (
+        type(active_market_id) is not str
+        or not active_market_id
+        or read_store.current_market_identity(market_id=active_market_id) is None
+    )
+    runtime_blocking_reason = (
+        "ACTIVE_MARKET_IDENTITY_MISSING" if active_market_missing else None
+    )
     database_pass = database_health.get("status") == "PASS"
     performance_blocking_reason = performance_status["blocking_reason"]
     if (
         database_pass
         and live_ready
         and required_sources_ready
+        and runtime_blocking_reason is None
         and performance_blocking_reason is None
     ):
         status = "PASS"
     elif (
         runtime.get("failure") is not None
         or not database_pass
+        or runtime_blocking_reason is not None
         or (live_ready and required_sources_ready and performance_blocking_reason)
     ):
         status = "DEGRADED"
@@ -323,6 +343,7 @@ def build_health_payload(
         },
         "runtime_readiness": {
             "asset_count": runtime["asset_count"],
+            "blocking_reason": runtime_blocking_reason,
             "failure": runtime["failure"],
             "last_event_id": runtime["last_event_id"],
             "live_ready": live_ready,
