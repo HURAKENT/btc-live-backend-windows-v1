@@ -343,7 +343,7 @@ class ForwardPerformanceTests(unittest.TestCase):
             self.repository.read_current_materialization(
                 strategy_id="NO_A0",
                 source_view="FORWARD",
-                calculation_version="PERFORMANCE_METRICS_V1",
+                calculation_version="PERFORMANCE_METRICS_V2",
             )
         )
         self.assertEqual(

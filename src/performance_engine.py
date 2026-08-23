@@ -25,7 +25,7 @@ from src.performance_models import (
 from src.performance_repository import PerformanceRepository
 
 
-CALCULATION_VERSION = "PERFORMANCE_METRICS_V1"
+CALCULATION_VERSION = "PERFORMANCE_METRICS_V2"
 SOURCE_VIEWS = ("HISTORICAL", "FORWARD", "COMBINED")
 
 

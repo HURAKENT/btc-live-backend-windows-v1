@@ -25,7 +25,7 @@ from src.storage import SqliteStore
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CALCULATION_VERSION = "PERFORMANCE_METRICS_V1"
+CALCULATION_VERSION = "PERFORMANCE_METRICS_V2"
 
 
 class PerformanceApiTests(unittest.IsolatedAsyncioTestCase):
