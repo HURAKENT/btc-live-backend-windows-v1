@@ -677,6 +677,7 @@ async def iter_price_history(
         prior_seen = set(canonical_by_timestamp)
         page_seen: set[int] = set()
         page_has_in_range_point = False
+        page_has_post_end_point = False
         page_made_progress = False
         for index, point in enumerate(history):
             _require_type(point, dict, f"history[{index}]")
@@ -690,6 +691,7 @@ async def iter_price_history(
                 f"history[{index}].p",
             )
             if timestamp > end_ts:
+                page_has_post_end_point = True
                 continue
             page_has_in_range_point = True
             normalized = {
@@ -771,6 +773,8 @@ async def iter_price_history(
             )
 
         if not page_has_in_range_point:
+            break
+        if not page_made_progress and page_has_post_end_point:
             break
         if not page_made_progress or last_accepted_timestamp is None:
             raise ValueError("POLYMARKET_HISTORY_NO_PROGRESS")

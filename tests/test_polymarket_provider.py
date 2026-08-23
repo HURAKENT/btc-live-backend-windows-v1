@@ -1201,6 +1201,36 @@ class PolymarketHistoryDuplicateNormalizationTests(
         ):
             await anext(generator)
 
+    async def test_overlap_only_tail_with_post_end_point_completes_range(self):
+        generator = iter_price_history(
+            FakeSession(
+                [
+                    {
+                        "history": [
+                            {"t": 100, "p": "0.45"},
+                            {"t": 160, "p": "0.46"},
+                        ]
+                    },
+                    {
+                        "history": [
+                            {"t": 160, "p": "0.46"},
+                            {"t": 280, "p": "0.47"},
+                        ]
+                    },
+                ]
+            ),
+            asset_id="synthetic-history-asset",
+            start_ts=100,
+            end_ts=220,
+        )
+
+        events = [event async for event in generator]
+
+        self.assertEqual(
+            [event.source_timestamp_ms for event in events],
+            [100_000, 160_000],
+        )
+
     async def test_history_requests_have_hard_per_asset_bound(self):
         responses = [
             {"history": [{"t": 100 + index * 60, "p": "0.45"}]}
