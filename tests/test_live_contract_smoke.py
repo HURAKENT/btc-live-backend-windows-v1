@@ -24,6 +24,11 @@ from src.app import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+AUTHORITY_ROOT = (
+    PROJECT_ROOT.parent.parent
+    if PROJECT_ROOT.parent.name == ".worktrees"
+    else PROJECT_ROOT
+)
 EXPECTED_TASK_13_OFFLINE_COMMIT = "812628afa5afb5a020dceed4a44d0a3fc8170543"
 EXPECTED_TASK_13_PROVIDER_BASE = "46e8f3ded26c31f77a79b5bbdb02a290e97ca45c"
 EXPECTED_TASK_14_COMMIT = "a6348f6e0c4e0eee4bd529d35d360a99e8d455fb"
@@ -31,7 +36,7 @@ OFFLINE_REPORT = PROJECT_ROOT / "reports" / "C1_OFFLINE_VERIFICATION.json"
 PROVIDER_REPORT = PROJECT_ROOT / "reports" / "C1_PROVIDER_CAPABILITY_SMOKE.json"
 DOWNTIME_REPORT = PROJECT_ROOT / "reports" / "C1_DOWNTIME_ACCEPTANCE.json"
 FINAL_ACCEPTANCE_REPORT = PROJECT_ROOT / "reports" / "C1_FINAL_ACCEPTANCE.json"
-ACCEPTANCE_PACK = PROJECT_ROOT / "artifacts" / "C1_ACCEPTANCE_PACK.zip"
+ACCEPTANCE_PACK = AUTHORITY_ROOT / "artifacts" / "C1_ACCEPTANCE_PACK.zip"
 LAUNCHERS = (
     PROJECT_ROOT / "scripts" / "RUN_BACKEND_SAFE.ps1",
     PROJECT_ROOT / "scripts" / "RUN_TESTS_SAFE.ps1",
@@ -146,15 +151,21 @@ class LiveContractSmokeTests(unittest.TestCase):
         )
         self.assertEqual(payload["project"]["requires-python"], "==3.12.4")
 
-    def test_direct_runtime_dependency_is_only_aiohttp(self):
+    def test_direct_runtime_dependencies_are_exact(self):
         payload = tomllib.loads(
             (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         )
-        self.assertEqual(payload["project"]["dependencies"], ["aiohttp==3.14.3"])
+        self.assertEqual(
+            payload["project"]["dependencies"],
+            ["aiohttp==3.14.3", "pyarrow==25.0.1"],
+        )
         requirements = (
             PROJECT_ROOT / "requirements.in"
         ).read_text(encoding="utf-8").splitlines()
-        self.assertEqual(requirements, ["aiohttp==3.14.3"])
+        self.assertEqual(
+            requirements,
+            ["aiohttp==3.14.3", "pyarrow==25.0.1"],
+        )
 
     def test_frozen_runtime_config_is_fail_closed(self):
         config = json.loads(

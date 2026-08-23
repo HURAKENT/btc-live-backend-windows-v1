@@ -132,6 +132,19 @@ class _PolymarketLoopback:
             {
                 "asset_ids": list(self.assets),
                 "event_id": "market-a",
+                "outcomes": [
+                    "<52,000",
+                    "52,000-54,000",
+                    "54,000-56,000",
+                    "56,000-58,000",
+                    "58,000-60,000",
+                    "60,000-62,000",
+                    "62,000-64,000",
+                    "64,000-66,000",
+                    "66,000-68,000",
+                    "68,000-70,000",
+                    ">70,000",
+                ],
                 "resolution_utc": datetime.fromtimestamp(
                     resolution_ms / 1_000, tz=UTC
                 ).isoformat(),

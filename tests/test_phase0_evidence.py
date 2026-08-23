@@ -14,9 +14,32 @@ from pathlib import Path
 from unittest import mock
 
 
+def _git_prefix(project_root: Path) -> tuple[str, ...]:
+    pointer_file = project_root / ".git"
+    if os.name != "nt" or not pointer_file.is_file():
+        return ("git", "-C", str(project_root))
+    pointer = pointer_file.read_text(encoding="utf-8").strip()
+    if not pointer.startswith("gitdir: "):
+        return ("git", "-C", str(project_root))
+    git_dir = pointer.removeprefix("gitdir: ")
+    if (
+        git_dir.startswith("/mnt/")
+        and len(git_dir) > 7
+        and git_dir[5].isalpha()
+        and git_dir[6] == "/"
+    ):
+        git_dir = git_dir[5].upper() + ":\\" + git_dir[7:].replace("/", "\\")
+    return (
+        "git",
+        f"--git-dir={git_dir}",
+        f"--work-tree={project_root}",
+    )
+
+
 class Phase0EvidenceTests(unittest.TestCase):
     def test_canonical_phase0_c1_c2_c3_evidence_has_crlf_checkout_contract(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
+        git_prefix = _git_prefix(project_root)
         canonical_reports = (
             "reports/PHASE0_ACCEPTED_BASELINE.json",
             "reports/PHASE0_COMMAND_RECEIPT.json",
@@ -29,10 +52,7 @@ class Phase0EvidenceTests(unittest.TestCase):
 
         for relative_path in canonical_reports:
             result = subprocess.run(
-                (
-                    "git",
-                    "-C",
-                    str(project_root),
+                (*git_prefix,
                     "check-attr",
                     "text",
                     "eol",
@@ -61,10 +81,7 @@ class Phase0EvidenceTests(unittest.TestCase):
             "reports/STRATEGY_47_STATUS_MATRIX.json",
         ):
             result = subprocess.run(
-                (
-                    "git",
-                    "-C",
-                    str(project_root),
+                (*git_prefix,
                     "check-attr",
                     "text",
                     "eol",

@@ -354,10 +354,15 @@ async def run_backend(
     *,
     wait_for_stop: bool = True,
 ) -> int:
+    signal_wait: asyncio.Task | None = None
     try:
-        await backend.start()
         if wait_for_stop:
             signal_wait = asyncio.create_task(_wait_for_shutdown_signal())
+            # Let the task install the Windows console handlers before startup
+            # can expose an API that an operator or test may immediately stop.
+            await asyncio.sleep(0)
+        await backend.start()
+        if wait_for_stop:
             wait_runtime = getattr(backend, "wait_runtime_termination", None)
             runtime_wait = (
                 asyncio.create_task(wait_runtime())
@@ -394,6 +399,10 @@ async def run_backend(
     except BaseException:
         await _stop_after_failure(backend)
         return UNEXPECTED_FAILURE_EXIT
+    finally:
+        if signal_wait is not None and not signal_wait.done():
+            signal_wait.cancel()
+            await asyncio.gather(signal_wait, return_exceptions=True)
 
 
 async def _stop_after_failure(backend) -> None:

@@ -33,6 +33,14 @@ REQUIRED_TABLES = {
     "paper_fills",
     "paper_positions",
     "paper_accounts",
+    "strategy_performance_aggregates",
+    "strategy_performance_catchup",
+    "strategy_performance_cursors",
+    "strategy_performance_ingest_runs",
+    "strategy_performance_materialization_revisions",
+    "strategy_performance_observations",
+    "strategy_performance_resolutions",
+    "strategy_performance_timeseries",
 }
 
 
@@ -492,11 +500,11 @@ class RuntimePersistenceTests(unittest.TestCase):
             reader.close()
         self.assertEqual(latest["state"], "BOOTING")
 
-    def test_migration_version_is_exactly_five(self):
-        self.assertEqual(self.store.count("schema_migrations"), 5)
-        self.assertEqual(self.store.integrity_report()["migration_version"], 5)
+    def test_migration_version_is_exactly_six(self):
+        self.assertEqual(self.store.count("schema_migrations"), 6)
+        self.assertEqual(self.store.integrity_report()["migration_version"], 6)
 
-    def test_required_table_set_matches_migration_five(self):
+    def test_required_table_set_matches_migration_six(self):
         rows = self.store.rows(
             "SELECT name FROM sqlite_master WHERE type = 'table'"
         )

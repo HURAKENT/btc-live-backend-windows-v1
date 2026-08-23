@@ -70,6 +70,8 @@ class LoopbackCheckpointInputSource:
 
 try:
     from src.runtime_orchestrator import C1RuntimeOrchestrator
+    from src.performance_catchup_source import GammaDailyRangeInventory
+    from tests.test_performance_catchup_source import _event as catchup_event
 except ModuleNotFoundError:
     C1RuntimeOrchestrator = None
 
@@ -231,6 +233,14 @@ class FakePolymarketRuntimeAdapter:
         self.closed += 1
 
 
+class CatchupPolymarketRuntimeAdapter(FakePolymarketRuntimeAdapter):
+    async def load_performance_catchup_inventory(self, *, start_date, end_date):
+        return GammaDailyRangeInventory(
+            events=(catchup_event("2026-07-08", closed=True, winner=5),),
+            complete=True,
+        )
+
+
 class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -298,6 +308,57 @@ class RuntimeOrchestratorTests(unittest.IsolatedAsyncioTestCase):
             )
         finally:
             reader.close()
+
+    async def test_startup_applies_complete_public_catchup_through_writer(self):
+        self.polymarket = CatchupPolymarketRuntimeAdapter()
+        self.runtime = self._runtime(clock_ms=lambda: 1_783_641_600_000)
+
+        await self.runtime.start()
+
+        resolved = self.store.scalar(
+            "SELECT COUNT(*) FROM source_events WHERE event_type = ?",
+            ("POLYMARKET_DAILY_RANGE_MARKET_RESOLVED",),
+        )
+        absence = self.store.scalar(
+            "SELECT COUNT(*) FROM source_events WHERE event_type = ?",
+            ("POLYMARKET_DAILY_RANGE_MARKET_ABSENT",),
+        )
+        classifications = {
+            row[0]: row[1]
+            for row in self.store.rows(
+                "SELECT market_date, classification FROM strategy_performance_catchup"
+            )
+        }
+        self.assertEqual(resolved, 1)
+        self.assertEqual(absence, 1)
+        self.assertEqual(classifications["2026-07-08"], "RESOLVED")
+        self.assertEqual(classifications["2026-07-09"], "EXPECTED_ABSENT")
+        self.assertEqual(self.runtime.writer_consumer_count, 1)
+
+        before = {
+            name: self.store.count(name)
+            for name in (
+                "source_events",
+                "market_catalog",
+                "strategy_performance_catchup",
+                "strategy_performance_resolutions",
+            )
+        }
+        await self.runtime.stop()
+        self.polymarket = CatchupPolymarketRuntimeAdapter()
+        self.runtime = self._runtime(
+            run_id="run-2",
+            clock_ms=lambda: 1_783_641_601_000,
+        )
+        await self.runtime.start()
+
+        self.assertEqual(
+            {
+                name: self.store.count(name)
+                for name in before
+            },
+            before,
+        )
 
     async def test_provider_events_use_single_writer_consumer(self):
         await self.runtime.start()

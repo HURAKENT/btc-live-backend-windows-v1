@@ -21,6 +21,7 @@ from src.polymarket_provider import (
     fetch_current_books,
     iter_price_history,
 )
+from src.performance_catchup_source import GammaDailyRangeInventory
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +171,7 @@ class PolymarketRuntimeAdapter:
         "_discover",
         "_discover_pair",
         "_event_loader",
+        "_catchup_event_loader",
         "_fetch_books",
         "_history",
         "_last_recovery_summary",
@@ -190,6 +192,9 @@ class PolymarketRuntimeAdapter:
         stream: PolymarketStream,
         event_loader: Callable[[], Awaitable[list[dict[str, Any]]]],
         now_utc: Callable[[], datetime],
+        catchup_event_loader: (
+            Callable[[str, str], Awaitable[GammaDailyRangeInventory]] | None
+        ) = None,
         discover: Callable[..., MarketIdentity] = (
             discover_active_btc_daily_range
         ),
@@ -208,6 +213,7 @@ class PolymarketRuntimeAdapter:
         self._stream = stream
         self._stream_factory = stream_factory
         self._event_loader = event_loader
+        self._catchup_event_loader = catchup_event_loader
         self._now_utc = now_utc
         self._discover = discover
         self._discover_pair = discover_pair
@@ -222,6 +228,19 @@ class PolymarketRuntimeAdapter:
         self._clob_base_url = clob_base_url
         self._reconnect_recovery = None
         self._state_sink = None
+
+    async def load_performance_catchup_inventory(
+        self,
+        *,
+        start_date: str,
+        end_date: str,
+    ) -> GammaDailyRangeInventory:
+        if self._catchup_event_loader is None:
+            raise RuntimeError("POLYMARKET_CATCHUP_SOURCE_UNAVAILABLE")
+        result = await self._catchup_event_loader(start_date, end_date)
+        if type(result) is not GammaDailyRangeInventory:
+            raise ValueError("INVALID_POLYMARKET_CATCHUP_INVENTORY")
+        return result
 
     def configure_runtime_callbacks(
         self,

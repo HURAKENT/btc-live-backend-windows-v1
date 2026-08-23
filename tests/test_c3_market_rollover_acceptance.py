@@ -8,10 +8,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+AUTHORITY_ROOT = (
+    ROOT.parent.parent if ROOT.parent.name == ".worktrees" else ROOT
+)
 C3_REPORT = ROOT / "reports" / "C3_MARKET_ROLLOVER_ACCEPTANCE.json"
 C3_MATRIX = ROOT / "reports" / "C3_MARKET_ROLLOVER_TEST_MATRIX.md"
 FINAL_REPORT = ROOT / "reports" / "C2_C3_FINAL_ACCEPTANCE.json"
-PACK = ROOT / "artifacts" / "C2_C3_ACCEPTANCE_PACK.zip"
+PACK = AUTHORITY_ROOT / "artifacts" / "C2_C3_ACCEPTANCE_PACK.zip"
 IMPLEMENTATION_COMMIT = "cec9e29255a207859006dfdffbc27aa140f273ad"
 
 

@@ -26,6 +26,11 @@ from src.models import CanonicalSnapshot, SignalRecord, SourceEvent, StrategyEva
 from src.market_rollover import C3RolloverSummary, MarketRolloverLifecycle
 from src.outbox import OutboxBroker
 from src.polymarket_provider import PolymarketStream
+from src.performance_catchup_source import (
+    GammaCatchupProjection,
+    fetch_gamma_daily_range_inventory,
+    project_gamma_daily_range_inventory,
+)
 from src.recovery import (
     C2RecoverySummary,
     assess_c2_recovery,
@@ -859,7 +864,8 @@ class C1RuntimeOrchestrator:
             self._ensure_streams_alive()
             await self._transition("LIVE_READY")
             self._started = True
-            await self._submit_write("PERFORMANCE_FORWARD_REFRESH", None)
+            if not await self._refresh_performance_catchup():
+                await self._submit_write("PERFORMANCE_FORWARD_REFRESH", None)
             self._ready.set()
             self._tasks["checkpoint_scheduler"] = asyncio.create_task(
                 self._run_checkpoint_scheduler(),
@@ -1584,6 +1590,7 @@ class C1RuntimeOrchestrator:
             try:
                 cycle = await self._run_market_rollover_cycle()
                 await self._refresh_market_pair(cycle["market"])
+                await self._refresh_performance_catchup()
                 self._rollover_summary = C3RolloverSummary(
                     status="C3_MARKET_ROLLOVER_PASS",
                     old_market_identity_sha256=cycle["old_market_hash"],
@@ -2134,6 +2141,29 @@ class C1RuntimeOrchestrator:
             )
         if operation == "PERFORMANCE_FORWARD_REFRESH":
             return self._run_forward_performance_cycle()
+        if operation == "PERFORMANCE_CATCHUP_APPLY":
+            if type(payload) is not GammaCatchupProjection:
+                raise ValueError("INVALID_PERFORMANCE_CATCHUP_PROJECTION")
+            for market in payload.markets:
+                stored = self._store.rows(
+                    "SELECT payload_json, payload_sha256 FROM market_catalog WHERE market_id = ?",
+                    (market.market_id,),
+                )
+                if stored:
+                    if stored != [(market.payload_json, market.payload_sha256)]:
+                        raise ValueError("MARKET_IDENTITY_CONFLICT")
+                else:
+                    self._store.persist_market_identity(
+                        market_id=market.market_id,
+                        payload_json=market.payload_json,
+                        payload_sha256=market.payload_sha256,
+                        updated_at_ms=market.observed_at_ms,
+                    )
+            for event in payload.events:
+                self._write_source_event(
+                    _SourceWrite(event=event, authoritative_replay=True)
+                )
+            return self._run_forward_performance_cycle()
         if operation == "SET_MARKET":
             self._projector.set_market_identity(payload)
             return None
@@ -2172,6 +2202,54 @@ class C1RuntimeOrchestrator:
             observed_at_ms=observed_at_ms,
             catchup_end_date=catchup_end_date,
         ).run_once()
+
+    async def _refresh_performance_catchup(self) -> bool:
+        loader = getattr(
+            self._polymarket,
+            "load_performance_catchup_inventory",
+            None,
+        )
+        if not callable(loader):
+            return False
+        observed_at_ms = self._clock_ms()
+        end_date = (
+            datetime.fromtimestamp(observed_at_ms / 1000, tz=timezone.utc).date()
+            - timedelta(days=1)
+        ).isoformat()
+        if end_date < "2026-07-08":
+            return False
+        try:
+            inventory = await loader(
+                start_date="2026-07-08",
+                end_date=end_date,
+            )
+            projection = project_gamma_daily_range_inventory(
+                events=inventory.events,
+                start_date="2026-07-08",
+                end_date=end_date,
+                observed_at_ms=observed_at_ms,
+                inventory_complete=inventory.complete,
+            )
+            await self._submit_write("PERFORMANCE_CATCHUP_APPLY", projection)
+            return True
+        except asyncio.CancelledError:
+            raise
+        except BaseException as error:
+            await self._submit_write(
+                "INCIDENT",
+                {
+                    "incident_key": f"performance-catchup:{self._run_id}:{observed_at_ms}",
+                    "severity": "WARNING",
+                    "status": "PERFORMANCE_CATCHUP_DEGRADED",
+                    "payload_json": json.dumps(
+                        {"detail": str(error)[:400]},
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    "created_at_ms": observed_at_ms,
+                },
+            )
+            return False
 
     def _write_source_event(
         self,
@@ -2550,6 +2628,20 @@ async def build_default_runtime_orchestrator(
             raise ValueError("INVALID_GAMMA_DISCOVERY_RESPONSE")
         return events
 
+    gamma_url = (
+        "https://gamma-api.polymarket.com/events/keyset"
+        if integration_endpoints is None
+        else integration_endpoints.gamma_events_url
+    )
+
+    async def load_catchup_events(start_date: str, end_date: str):
+        return await fetch_gamma_daily_range_inventory(
+            session=session,
+            gamma_events_url=gamma_url,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     binance_stream = BinanceStream(
         connect=lambda _url: session.ws_connect(
             (
@@ -2583,6 +2675,7 @@ async def build_default_runtime_orchestrator(
             session, websocket_url=polymarket_websocket_url
         ),
         event_loader=load_events,
+        catchup_event_loader=load_catchup_events,
         now_utc=lambda: datetime.now(timezone.utc),
         close_session=session.close,
         clob_base_url=(

@@ -29,6 +29,32 @@ class _FatalBackend(_Backend):
 
 
 class WindowsSignalLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_shutdown_waiter_is_armed_before_startup_completes(self):
+        events = []
+
+        class SlowStartingBackend(_Backend):
+            async def start(self):
+                events.append("start-entered")
+                await asyncio.sleep(0)
+                events.append("start-completed")
+
+        async def signal_during_startup():
+            events.append("signal-waiter-armed")
+
+        with patch.object(
+            app,
+            "_wait_for_shutdown_signal",
+            new=signal_during_startup,
+        ):
+            exit_code = await app.run_backend(SlowStartingBackend())
+
+        self.assertEqual(exit_code, app.CLEAN_STOP_EXIT)
+        self.assertLess(
+            events.index("signal-waiter-armed"),
+            events.index("start-completed"),
+            events,
+        )
+
     async def test_fatal_runtime_terminates_backend_without_os_signal(self):
         backend = _FatalBackend()
 

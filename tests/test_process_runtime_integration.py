@@ -343,7 +343,11 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
             ["STARTING", "PASS"],
             self.status_timeline,
         )
-        self.assertEqual(self._blocking_incidents(), ())
+        self.assertEqual(
+            self._blocking_incidents(),
+            (),
+            self._incident_dump(),
+        )
         await self._ctrl_break(restarted)
         self.assertEqual(restarted.returncode, 0)
         self.assertTrue(self._port_is_free(self.api_port))
@@ -557,6 +561,20 @@ class ProcessRuntimeIntegrationTests(unittest.IsolatedAsyncioTestCase):
             )
             if code in text
         )
+
+    def _incident_dump(self):
+        connection = sqlite3.connect(
+            f"file:{self.database_path.as_posix()}?mode=ro",
+            uri=True,
+        )
+        try:
+            return connection.execute(
+                "SELECT incident_key, status, payload_json FROM incidents "
+                "WHERE status IN ('RECOVERY_BLOCKED', 'WRITER_FAILED') "
+                "ORDER BY incident_id"
+            ).fetchall()
+        finally:
+            connection.close()
 
     @staticmethod
     def _free_port():

@@ -583,7 +583,10 @@ class C2RuntimeEvidenceTests(unittest.IsolatedAsyncioTestCase):
             await self.runtime.start()
 
         evaluation_queries = [
-            sql for sql in observed_sql if "strategy_evaluations" in sql
+            sql
+            for sql in observed_sql
+            if "FROM strategy_evaluations" in sql
+            and "SELECT execution_eligible" in sql
         ]
         self.assertEqual(len(evaluation_queries), 2)
         self.assertFalse(

@@ -82,6 +82,8 @@ class FakeProviderServer:
         event = copy.deepcopy(fixture)
         event["id"] = f"btc-daily-range-{suffix}"
         event["endDate"] = resolution.isoformat().replace("+00:00", "Z")
+        event["ticker"] = f"bitcoin-price-on-{resolution.date().isoformat()}"
+        event["slug"] = event["ticker"]
         for index, market in enumerate(event["markets"]):
             market["id"] = f"{suffix}-bucket-{index:02d}"
             market["clobTokenIds"] = json.dumps(

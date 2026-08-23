@@ -6,7 +6,7 @@ from pathlib import Path
 
 from aiohttp.test_utils import TestClient, TestServer
 
-from src.api import create_api_app
+from src.api import build_health_payload, create_api_app
 from src.models import SignalRecord
 from src.outbox import OutboxBroker
 from src.performance_models import (
@@ -159,6 +159,21 @@ class PerformanceApiTests(unittest.IsolatedAsyncioTestCase):
         status_payload = await status.json()
         self.assertEqual(status_payload["catchup"]["counts"], {"DATA_GAP": 1})
         self.assertEqual(status_payload["database_health"]["status"], "PASS")
+        health = build_health_payload(
+            self.read_store,
+            {
+                "state": "LIVE_READY",
+                "live_ready": True,
+                "source_health": (("binance", "LIVE"), ("polymarket", "LIVE")),
+                "market_id": "market-current",
+                "market_count": 11,
+                "asset_count": 22,
+                "last_event_id": 1,
+                "failure": None,
+            },
+        )
+        self.assertEqual(health["status"], "DEGRADED")
+        self.assertEqual(health["performance"]["blocking_reason"], "DATA_GAP")
         self.assertEqual(invalid.status, 400)
         self.assertEqual(portfolio.status, 400)
         self.assertEqual(before_counts, _read_only_counts(self.store))

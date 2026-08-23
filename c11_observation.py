@@ -572,18 +572,50 @@ def _absolute_path(value: str) -> Path:
 
 
 def _git_head() -> str:
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=PROJECT_ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    commit = result.stdout.strip()
-    if result.returncode != 0 or len(commit) != 40:
-        raise ObservationError("INTEGRATION_COMMIT_UNAVAILABLE")
-    return commit
+    commands = [["git", "rev-parse", "HEAD"]]
+    git_pointer = PROJECT_ROOT / ".git"
+    if git_pointer.is_file():
+        try:
+            pointer = git_pointer.read_text(encoding="utf-8").strip()
+        except OSError:
+            pointer = ""
+        if pointer.startswith("gitdir: "):
+            git_dir = pointer.removeprefix("gitdir: ")
+            if (
+                os.name == "nt"
+                and git_dir.startswith("/mnt/")
+                and len(git_dir) > 7
+                and git_dir[5].isalpha()
+                and git_dir[6] == "/"
+            ):
+                git_dir = (
+                    git_dir[5].upper()
+                    + ":\\"
+                    + git_dir[7:].replace("/", "\\")
+                )
+            commands.insert(
+                0,
+                [
+                    "git",
+                    f"--git-dir={git_dir}",
+                    f"--work-tree={PROJECT_ROOT}",
+                    "rev-parse",
+                    "HEAD",
+                ],
+            )
+    for command in commands:
+        result = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        commit = result.stdout.strip()
+        if result.returncode == 0 and len(commit) == 40:
+            return commit
+    raise ObservationError("INTEGRATION_COMMIT_UNAVAILABLE")
 
 
 def _pid_alive(pid: Any) -> bool:

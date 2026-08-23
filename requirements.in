@@ -1,1 +1,2 @@
 aiohttp==3.14.3
+pyarrow==25.0.1

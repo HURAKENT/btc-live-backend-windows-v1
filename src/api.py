@@ -291,9 +291,19 @@ def build_health_payload(
     )
     live_ready = runtime["live_ready"] is True
     database_pass = database_health.get("status") == "PASS"
-    if database_pass and live_ready and required_sources_ready:
+    performance_blocking_reason = performance_status["blocking_reason"]
+    if (
+        database_pass
+        and live_ready
+        and required_sources_ready
+        and performance_blocking_reason is None
+    ):
         status = "PASS"
-    elif runtime.get("failure") is not None or not database_pass:
+    elif (
+        runtime.get("failure") is not None
+        or not database_pass
+        or (live_ready and required_sources_ready and performance_blocking_reason)
+    ):
         status = "DEGRADED"
     else:
         status = "STARTING"
