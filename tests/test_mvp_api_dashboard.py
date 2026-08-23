@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import tempfile
@@ -19,6 +20,26 @@ from tests.test_paper import PaperLedgerTests
 
 
 class MvpApiDashboardTests(unittest.IsolatedAsyncioTestCase):
+    async def test_api_shutdown_closes_connected_websocket(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteStore.open(Path(directory) / "runtime.sqlite3")
+            store.migrate()
+            read_store = store.open_read_store()
+            client = TestClient(
+                TestServer(create_api_app(read_store, OutboxBroker()))
+            )
+            await client.start_server()
+            websocket = await client.ws_connect("/ws/v1/events?after_event_id=0")
+            try:
+                await asyncio.wait_for(client.server.close(), timeout=0.5)
+                await asyncio.wait_for(websocket.receive(), timeout=0.5)
+                self.assertTrue(websocket.closed)
+            finally:
+                await websocket.close()
+                await client.close()
+                read_store.close()
+                store.close()
+
     async def test_live_ready_without_active_market_does_not_fall_back_to_inventory(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SqliteStore.open(Path(directory) / "runtime.sqlite3")

@@ -5,7 +5,7 @@ import contextlib
 import json
 from typing import Any, Callable
 
-from aiohttp import WSMsgType, web
+from aiohttp import WSCloseCode, WSMsgType, web
 
 from src.models import OutboxEvent
 from src.outbox import OutboxBroker
@@ -17,6 +17,10 @@ from src.dashboard import attach_dashboard_routes
 API_BIND_HOST = "127.0.0.1"
 API_BIND_PORT = 8767
 REST_RESULT_LIMIT = 100
+_WEBSOCKETS_KEY = web.AppKey(
+    "api_websockets",
+    set[web.WebSocketResponse],
+)
 OUTBOX_READ_LIMIT = 100
 SUBSCRIBER_QUEUE_LIMIT = 100
 
@@ -97,6 +101,8 @@ def create_api_app(
     app["read_store"] = read_store
     app["outbox_broker"] = outbox_broker
     app["runtime_status"] = runtime_status or _starting_runtime_status
+    app[_WEBSOCKETS_KEY] = set()
+    app.on_shutdown.append(_close_websockets)
     app.router.add_get("/api/v1/bootstrap", _bootstrap)
     app.router.add_get("/api/v1/health", _health)
     app.router.add_get("/api/v1/sources", _sources)
@@ -385,6 +391,7 @@ async def _websocket_events(request: web.Request) -> web.StreamResponse:
     broker: OutboxBroker = request.app["outbox_broker"]
     websocket = web.WebSocketResponse()
     await websocket.prepare(request)
+    request.app[_WEBSOCKETS_KEY].add(websocket)
 
     subscription = None
     try:
@@ -430,7 +437,23 @@ async def _websocket_events(request: web.Request) -> web.StreamResponse:
     except (ConnectionError, RuntimeError):
         pass
     finally:
+        request.app[_WEBSOCKETS_KEY].discard(websocket)
         if subscription is not None:
             subscription.close()
         await websocket.close()
     return websocket
+
+
+async def _close_websockets(app: web.Application) -> None:
+    websockets = tuple(app[_WEBSOCKETS_KEY])
+    if not websockets:
+        return
+    await asyncio.gather(
+        *(
+            websocket.close(
+                code=WSCloseCode.GOING_AWAY,
+                message=b"Server shutdown",
+            )
+            for websocket in websockets
+        )
+    )

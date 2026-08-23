@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import signal
 import time
 from collections.abc import Callable
@@ -23,6 +24,7 @@ CONFIG_FAILURE_EXIT = 30
 DATABASE_INTEGRITY_EXIT = 40
 UNEXPECTED_FAILURE_EXIT = 1
 DEFAULT_MUTEX_NAME = "BTC_LIVE_BACKEND_WINDOWS_V1"
+_RUNTIME_LOGGER = logging.getLogger("btc_live_backend.windows")
 
 SHUTDOWN_ORDER = (
     "stop accepting API connections",
@@ -343,9 +345,12 @@ class LiveBackend:
         errors: list[BaseException],
     ) -> None:
         self._shutdown_trace.append(label)
+        _RUNTIME_LOGGER.info("shutdown step started step=%s", label)
         try:
             await operation()
+            _RUNTIME_LOGGER.info("shutdown step completed step=%s", label)
         except BaseException as error:
+            _RUNTIME_LOGGER.exception("shutdown step failed step=%s", label)
             errors.append(error)
 
 
@@ -423,8 +428,12 @@ async def _wait_for_shutdown_signal() -> None:
         for shutdown_signal in signals
     }
 
+    def mark_stop_requested(signum: int) -> None:
+        _RUNTIME_LOGGER.info("shutdown signal received signum=%s", signum)
+        requested.set()
+
     def request_stop(signum, frame) -> None:
-        loop.call_soon_threadsafe(requested.set)
+        loop.call_soon_threadsafe(mark_stop_requested, signum)
 
     for shutdown_signal in signals:
         signal.signal(shutdown_signal, request_stop)

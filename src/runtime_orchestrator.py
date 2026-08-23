@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import inspect
 import json
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -60,6 +61,7 @@ from src.strategy_dispatch import (
 )
 
 
+_RUNTIME_LOGGER = logging.getLogger("btc_live_backend.windows")
 _STOP = object()
 DEFAULT_WRITE_QUEUE_MAXSIZE = 4096
 DEFAULT_LIVE_BUFFER_MAX_EVENTS = 8192
@@ -1348,21 +1350,31 @@ class C1RuntimeOrchestrator:
         for task in provider_tasks:
             if task is not None and not task.done():
                 task.cancel()
+        _RUNTIME_LOGGER.info("orchestrator stop awaiting provider tasks")
         await asyncio.gather(
             *(task for task in provider_tasks if task is not None),
             return_exceptions=True,
         )
+        _RUNTIME_LOGGER.info("orchestrator stop provider tasks completed")
         self._providers_stopped = True
         self._live_buffer.clear()
         self._next_live_buffer.clear()
+        _RUNTIME_LOGGER.info(
+            "orchestrator stop awaiting write queue size=%s",
+            self._write_queue.qsize(),
+        )
         await self._write_queue.join()
+        _RUNTIME_LOGGER.info("orchestrator stop write queue drained")
         writer = self._tasks.get("writer")
         if writer is not None and not writer.done():
             await self._write_queue.put(_STOP)
             await self._write_queue.join()
             await writer
+        _RUNTIME_LOGGER.info("orchestrator stop writer completed")
         await self._binance.close()
+        _RUNTIME_LOGGER.info("orchestrator stop binance closed")
         await self._polymarket.close()
+        _RUNTIME_LOGGER.info("orchestrator stop polymarket closed")
         self._stopped = True
 
     async def _provider_stream(self, source: str, operation: Any) -> None:
