@@ -1,12 +1,12 @@
 {
   "schema_version": "FINAL_LIVE_SYSTEM_ACCEPTANCE_V1",
   "status": "ISOLATED_FINAL_SYSTEM_ACCEPTANCE_PASS",
-  "captured_at": "2026-08-23T15:52:15+03:00",
-  "tested_code_commit": "97d56c8d64fdae54331af5620202be85e3050010",
+  "captured_at": "2026-08-23T16:50:07+03:00",
+  "tested_code_commit": "9b18a2d429e2d5f5f32864b601165d523aaca673",
   "branch": "codex/final-live-system-cycle",
   "worktree": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\.worktrees\\final-live-system-cycle",
   "isolation": {
-    "database": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_04\\acceptance.sqlite3",
+    "database": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_10\\acceptance-current.sqlite3",
     "production_database_mutated": false,
     "production_scheduler_mutated": false,
     "canonical_root_implementation_mutated": false,
@@ -14,8 +14,8 @@
   },
   "runtime": {
     "launcher": "run_windows_backend.py",
-    "bounded_public_cycles": 3,
-    "clean_exit_codes": [0, 0, 0],
+    "bounded_public_cycles": 2,
+    "clean_exit_codes": [0],
     "final_health_status": "PASS",
     "runtime_state": "LIVE_READY",
     "binance": "LIVE",
@@ -27,7 +27,14 @@
     "dashboard_http_status": 200,
     "dashboard_bytes": 7416,
     "performance_api_http_status": 200,
-    "performance_api_strategy_count": 47
+    "performance_api_strategy_count": 47,
+    "bootstrap_market_id": "859785",
+    "bootstrap_market_date": "2026-08-23",
+    "active_market_identity_matches_runtime": true,
+    "restart_economics_stable": true,
+    "duplicate_counts_zero": true,
+    "non_infrastructure_signals": 0,
+    "trading_eligible_signals": 0
   },
   "final_live_root_cause": {
     "reproduced_exit_code": 1,
@@ -55,8 +62,11 @@
     "rendered_dom_has_strategy": "YES_STRICT_A_OPERATIONAL",
     "rendered_dom_has_strategy_detail": true,
     "strategy_count_from_api": 47,
-    "screenshot": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_04\\dashboard-final-fixed.png",
-    "screenshot_bytes": 269769
+    "rendered_dom_has_active_market_id": true,
+    "rendered_dom_has_active_market_date": true,
+    "screenshot": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_10\\dashboard.png",
+    "rendered_dom": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_10\\dashboard-rendered.html",
+    "screenshot_bytes": 263930
   },
   "catchup": {
     "start_date": "2026-07-08",
@@ -122,12 +132,32 @@
     "restore_status": "PASS",
     "backup_representative_rows_match": true
   },
+  "shutdown_recovery": {
+    "root_cause": "Aiohttp AppRunner cleanup waited indefinitely for an active dashboard WebSocket handler before provider and writer shutdown could begin.",
+    "deterministic_red": "tests.test_mvp_api_dashboard.MvpApiDashboardTests.test_api_shutdown_closes_connected_websocket timed out before the fix.",
+    "fix": "Track active API WebSockets and close them with GOING_AWAY during aiohttp on_shutdown; emit component shutdown boundary logs.",
+    "real_public_cycle_exit_code": 0,
+    "forced": false,
+    "active_dashboard_websocket_present": true,
+    "independent_review": "APPROVED_NO_P0_P1"
+  },
   "verification": {
     "focused_tests": {
       "count": 121,
       "failures": 0,
       "errors": 0
     },
+    "current_delta_relevant_suite": {
+      "count": 102,
+      "failures": 0,
+      "errors": 0
+    },
+    "current_delta_final_shutdown_suite": {
+      "count": 8,
+      "failures": 0,
+      "errors": 0
+    },
+    "full_native_baseline_commit": "97d56c8d64fdae54331af5620202be85e3050010",
     "full_native_tests_without_scheduler_mutation": {
       "count": 1123,
       "failures": 0,

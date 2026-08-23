@@ -319,3 +319,41 @@ API returned 47 strategies. Browser evidence is in
 `C:\Users\gegos\Documents\Codex\backups\final_live_runtime_acceptance_20260823_04\dashboard-final-fixed.png`
 and `dashboard-final-fixed-rendered.html`. The isolated fixed backend was left
 running; production DB and Scheduler remain untouched.
+
+## 11. 2026-08-23 active-market and clean-shutdown closure
+
+Two final correctness defects were found and closed after the first browser
+receipt. Commit `53a7d7e83646ecbf384ef65a63242748123830dc` binds the
+dashboard market identity to the runtime's exact active market ID. It never
+selects a later inventory import or stale historical row while `LIVE_READY`;
+missing active catalog evidence degrades health with
+`ACTIVE_MARKET_IDENTITY_MISSING` and returns no fabricated fallback.
+
+An independently reviewed live restart then proved that aiohttp cleanup could
+wait indefinitely for an active dashboard WebSocket. A deterministic RED timed
+out while closing a test server with the socket open. Commit
+`9b18a2d429e2d5f5f32864b601165d523aaca673` tracks active API sockets,
+closes them with `GOING_AWAY` during `on_shutdown`, and records shutdown
+component boundaries in the existing Windows backend log.
+
+Fresh current-code evidence is in
+`C:\Users\gegos\Documents\Codex\backups\final_live_runtime_acceptance_20260823_10`.
+The first real public-provider cycle reached `PASS` / `LIVE_READY` with Binance
+and Polymarket `LIVE`, then stopped cleanly with exit code `0` and no force
+while an Edge dashboard WebSocket was active. The restarted cycle again reached
+`PASS` / `LIVE_READY`. Backend and bootstrap both reported active market
+`859785` for `2026-08-23`; Edge rendered that exact market/date, Registry47,
+COMBINED, and strategy detail from real API data.
+
+Restart preserved 4,994 historical observations, zero legitimate forward
+observations, 1,850 resolutions and 141 materialization revisions. Duplicate
+observation/logical-decision/revision/signal identities were all zero;
+non-infrastructure and trading-eligible signal counts were zero. SQLite
+`quick_check` was `ok`. Current-delta verification was 102/102 relevant tests
+and 8/8 final shutdown/process tests, plus compileall/py_compile and independent
+review with no P0/P1 or security finding. The previously recorded 1,123-test
+native Windows suite remains the release baseline at commit `97d56c8`; the
+current delta is covered by the focused suites above.
+
+Production DB, production Scheduler, canonical root, and pinned AHR artifacts
+were not mutated. All five security invariants remain false.
