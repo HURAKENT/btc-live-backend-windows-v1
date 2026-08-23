@@ -289,3 +289,33 @@ security invariants remain false.
 No orders, wallet, keys, signing, authenticated CLOB writes, trading approval,
 production DB mutation, Scheduler mutation, AHR replay, or soak were performed
 in this checkpoint.
+
+## 10. 2026-08-23 final live root-cause closure
+
+A fresh Windows-side isolated copy reproduced the previously unresolved real
+`BACKEND_EXIT=1`. Durable incidents identify the exact blocker as
+`POLYMARKET_HISTORY_NO_PROGRESS` during `POLYMARKET_BACKFILL`; this was not the
+earlier host-shutdown diagnostic and not a WebSocket-parser hypothesis.
+
+The public `/prices-history` tail response contained the last exact overlap at
+`1787487852` and a next provider point at `1787489111`, strictly beyond the
+requested `endTs=1787487912`. The old pagination boundary discarded the
+post-end point and then treated the remaining overlap-only page as fatal lack
+of progress. Commit `97d56c8d64fdae54331af5620202be85e3050010`
+accepts this one provably exhausted-tail shape while retaining fail-closed
+behavior for pure replay, conflicting overlap, malformed points, and
+non-increasing new points.
+
+Verification for the narrow correction: deterministic RED, 72/72 runtime and
+process regressions PASS, 115/115 complete Polymarket/C2 regressions PASS,
+`compileall` PASS, `git diff --check` clean, and independent review
+`APPROVED_NO_P0_P1`.
+
+After the fix, a new isolated Windows backend reached `PASS` / `LIVE_READY`
+with Binance and Polymarket both `LIVE`. Microsoft Edge headless loaded the
+real dashboard from that backend: HTTP 200, the rendered DOM contained the
+COMBINED workspace, `YES_STRICT_A_OPERATIONAL`, and its strategy detail; the
+API returned 47 strategies. Browser evidence is in
+`C:\Users\gegos\Documents\Codex\backups\final_live_runtime_acceptance_20260823_04\dashboard-final-fixed.png`
+and `dashboard-final-fixed-rendered.html`. The isolated fixed backend was left
+running; production DB and Scheduler remain untouched.

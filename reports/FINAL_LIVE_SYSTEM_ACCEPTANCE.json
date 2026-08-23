@@ -1,8 +1,8 @@
 {
   "schema_version": "FINAL_LIVE_SYSTEM_ACCEPTANCE_V1",
   "status": "ISOLATED_FINAL_SYSTEM_ACCEPTANCE_PASS",
-  "captured_at": "2026-08-23T14:30:16+03:00",
-  "tested_code_commit": "ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e",
+  "captured_at": "2026-08-23T15:52:15+03:00",
+  "tested_code_commit": "97d56c8d64fdae54331af5620202be85e3050010",
   "branch": "codex/final-live-system-cycle",
   "worktree": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\.worktrees\\final-live-system-cycle",
   "isolation": {
@@ -28,6 +28,35 @@
     "dashboard_bytes": 7416,
     "performance_api_http_status": 200,
     "performance_api_strategy_count": 47
+  },
+  "final_live_root_cause": {
+    "reproduced_exit_code": 1,
+    "durable_blocker": "POLYMARKET_HISTORY_NO_PROGRESS",
+    "provider_evidence": "The bounded tail request returned only an exact prior overlap inside the range and a strictly post-end point; the old parser treated the exhausted range as replay without progress.",
+    "fix": "A no-progress page terminates successfully only when it also contains a strictly post-end point. Pure replay, conflicts, malformed points, and non-increasing new points remain fail-closed.",
+    "focused_regression_tests": {
+      "count": 115,
+      "failures": 0,
+      "errors": 0
+    },
+    "runtime_after_fix": {
+      "health_status": "PASS",
+      "runtime_state": "LIVE_READY",
+      "binance": "LIVE",
+      "polymarket": "LIVE",
+      "database": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_04\\final-running-fixed.sqlite3"
+    },
+    "independent_review": "APPROVED_NO_P0_P1"
+  },
+  "browser_acceptance": {
+    "engine": "Microsoft Edge headless",
+    "dashboard_http_status": 200,
+    "rendered_dom_has_combined_view": true,
+    "rendered_dom_has_strategy": "YES_STRICT_A_OPERATIONAL",
+    "rendered_dom_has_strategy_detail": true,
+    "strategy_count_from_api": 47,
+    "screenshot": "C:\\Users\\gegos\\Documents\\Codex\\backups\\final_live_runtime_acceptance_20260823_04\\dashboard-final-fixed.png",
+    "screenshot_bytes": 269769
   },
   "catchup": {
     "start_date": "2026-07-08",

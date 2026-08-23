@@ -4,7 +4,7 @@
   "branch": "codex/final-live-system-cycle",
   "worktree_windows": "C:\\Users\\gegos\\Documents\\Codex\\btc_live_backend_windows_v1\\.worktrees\\final-live-system-cycle",
   "worktree_wsl": "/mnt/c/Users/gegos/Documents/Codex/btc_live_backend_windows_v1/.worktrees/final-live-system-cycle",
-  "content_parent_head": "ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e",
+  "content_parent_head": "97d56c8d64fdae54331af5620202be85e3050010",
   "origin_before_checkpoint": "13370891bc785858550e31f8536525d88cb32c01",
   "head_capture_semantics": "The handoff commit cannot embed its own SHA. Verify the pushed continuation tip with git rev-parse HEAD and git rev-parse origin/codex/final-live-system-cycle.",
   "tasks": {
@@ -25,10 +25,10 @@
     },
     "task_4": {
       "status": "COMPLETE",
-      "commits": ["d54ded9a51a31600b463badc832a2efe7727e3a6", "ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e"],
+      "commits": ["d54ded9a51a31600b463badc832a2efe7727e3a6", "ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e", "97d56c8d64fdae54331af5620202be85e3050010"],
       "focused_tests": {"count": 121, "failures": 0, "errors": 0},
       "review": "APPROVED_NO_P0_P1",
-      "public_acceptance": "PASS_THREE_CLEAN_ISOLATED_CYCLES",
+      "public_acceptance": "PASS_THREE_CLEAN_ISOLATED_CYCLES_PLUS_FINAL_FIXED_LIVE_BROWSER_RUN",
       "catchup": {"start_date": "2026-07-08", "latest_resolved_date": "2026-08-22", "current_pending_date": "2026-08-23", "resolved": 42, "pending": 1, "expected_absent": 4, "data_gap": 0}
     },
     "task_5": {
@@ -44,10 +44,14 @@
     },
     "task_7": {
       "status": "COMPLETE_ISOLATED",
-      "tested_code_commit": "ebdc7aadd05c978f9ef49d3a35b33f543f1dfd9e",
+      "tested_code_commit": "97d56c8d64fdae54331af5620202be85e3050010",
       "full_native_without_scheduler_mutation": {"count": 1123, "failures": 0, "errors": 0, "skipped": 2, "elapsed_seconds": 242.948},
       "backup_restore": "PASS",
-      "sqlite_integrity": "PASS"
+      "sqlite_integrity": "PASS",
+      "final_live_root_cause": "POLYMARKET_HISTORY_NO_PROGRESS_ON_EXHAUSTED_OVERLAP_TAIL",
+      "final_fix_regressions": {"runtime_and_process": 72, "polymarket_and_c2": 115, "failures": 0, "errors": 0},
+      "browser_acceptance": "MICROSOFT_EDGE_RENDERED_REAL_BACKEND_DASHBOARD",
+      "current_isolated_runtime": "PASS_LIVE_READY"
     },
     "task_8": {
       "status": "NOT_EXECUTED_BY_EXPLICIT_ISOLATION_BOUNDARY",
