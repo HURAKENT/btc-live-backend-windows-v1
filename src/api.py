@@ -187,7 +187,7 @@ async def _performance_timeseries(request: web.Request) -> web.Response:
         return _json_response(
             service.timeseries(
                 request.match_info["strategy_id"],
-                source_view=request.query.get("view", "HISTORICAL"),
+                source_view=request.query.get("view", "COMBINED"),
             )
         )
     except KeyError:

@@ -32,6 +32,12 @@ from src.performance_catchup_source import (
     fetch_gamma_daily_range_inventory,
     project_gamma_daily_range_inventory,
 )
+from src.performance_reconstruction import (
+    RecoveredMarketStrategyInput,
+    RecoveredStrategyReconstructor,
+    TerminalDistributionRecoveryContract,
+    build_recovered_market_strategy_input,
+)
 from src.recovery import (
     C2RecoverySummary,
     assess_c2_recovery,
@@ -2175,7 +2181,26 @@ class C1RuntimeOrchestrator:
                 self._write_source_event(
                     _SourceWrite(event=event, authoritative_replay=True)
                 )
-            return self._run_forward_performance_cycle()
+            pending: list[str] = []
+            for market in payload.markets:
+                identity = json.loads(market.payload_json)
+                market_date = str(identity["market_date"])
+                status_count = self._store.scalar(
+                    "SELECT COUNT(*) FROM strategy_reconstruction_status WHERE market_date = ?",
+                    (market_date,),
+                )
+                if status_count != 47:
+                    pending.append(market.payload_json)
+            return tuple(pending)
+        if operation == "PERFORMANCE_RECONSTRUCTION_APPLY":
+            if type(payload) is not RecoveredMarketStrategyInput:
+                raise ValueError("INVALID_PERFORMANCE_RECONSTRUCTION_INPUT")
+            from src.performance_repository import PerformanceRepository
+
+            return RecoveredStrategyReconstructor(
+                project_root=Path(__file__).resolve().parent.parent,
+                repository=PerformanceRepository(self._store),
+            ).reconstruct(payload)
         if operation == "SET_MARKET":
             self._projector.set_market_identity(payload)
             return None
@@ -2242,8 +2267,44 @@ class C1RuntimeOrchestrator:
                 observed_at_ms=observed_at_ms,
                 inventory_complete=inventory.complete,
             )
-            await self._submit_write("PERFORMANCE_CATCHUP_APPLY", projection)
-            return True
+            pending = await self._submit_write("PERFORMANCE_CATCHUP_APPLY", projection)
+            acquisition_failures = 0
+            for market_payload_json in pending:
+                try:
+                    recovered_input = await self._acquire_strategy_reconstruction_input(
+                        market_payload_json
+                    )
+                    await self._submit_write(
+                        "PERFORMANCE_RECONSTRUCTION_APPLY", recovered_input
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except BaseException as error:
+                    acquisition_failures += 1
+                    market = json.loads(market_payload_json)
+                    await self._submit_write(
+                        "INCIDENT",
+                        {
+                            "incident_key": (
+                                f"strategy-reconstruction:{market['market_date']}:"
+                                f"{self._run_id}:{observed_at_ms}"
+                            ),
+                            "severity": "WARNING",
+                            "status": "STRATEGY_RECONSTRUCTION_INPUT_DEGRADED",
+                            "payload_json": json.dumps(
+                                {
+                                    "detail": str(error)[:400],
+                                    "market_date": market["market_date"],
+                                    "missing_input": "POINT_IN_TIME_PUBLIC_HISTORY",
+                                },
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            ),
+                            "created_at_ms": observed_at_ms,
+                        },
+                    )
+            await self._submit_write("PERFORMANCE_FORWARD_REFRESH", None)
+            return acquisition_failures == 0
         except asyncio.CancelledError:
             raise
         except BaseException as error:
@@ -2262,6 +2323,60 @@ class C1RuntimeOrchestrator:
                 },
             )
             return False
+
+    async def _acquire_strategy_reconstruction_input(
+        self, market_payload_json: str
+    ) -> RecoveredMarketStrategyInput:
+        market = json.loads(market_payload_json)
+        resolution = datetime.fromisoformat(
+            str(market["resolution_utc"]).replace("Z", "+00:00")
+        )
+        resolution_ms = int(resolution.timestamp() * 1000)
+        binance_start_ms = resolution_ms - (1080 + 181) * MINUTE_MS
+        binance_end_ms = resolution_ms - 31 * MINUTE_MS
+        binance_events = await self._binance.recover(
+            start_ms=binance_start_ms,
+            end_ms=binance_end_ms,
+        )
+        candles = tuple(
+            {
+                "close_time_ms": int(payload["close_time_ms"]),
+                "close": float(payload["close"]),
+            }
+            for payload in (json.loads(event.payload_json) for event in binance_events)
+        )
+        reconciliation = MarketReconciliation(
+            market_identity_json=market_payload_json,
+            market_id=str(market["event_id"]),
+            market_ids=tuple(str(value) for value in market["market_ids"]),
+            asset_ids=tuple(str(value) for value in market["asset_ids"]),
+            current_events=(),
+            historical_depth="PUBLIC_PRICE_HISTORY_RECOVERY",
+        )
+        history_events = await self._polymarket.recover(
+            reconciliation,
+            start_ts=resolution_ms // 1000 - 24 * 60 * 60,
+            end_ts=resolution_ms // 1000 - 30 * 60,
+        )
+        history_by_asset: dict[str, list[dict[str, Any]]] = {
+            asset_id: [] for asset_id in reconciliation.asset_ids
+        }
+        for event in history_events:
+            payload = json.loads(event.payload_json)
+            history_by_asset[str(payload["asset_id"])].append(
+                {
+                    "timestamp_ms": int(payload["timestamp_seconds"]) * 1000,
+                    "price": int(payload["price_micros"]) / 1_000_000,
+                }
+            )
+        return build_recovered_market_strategy_input(
+            market_payload=market,
+            history_by_asset=history_by_asset,
+            binance_candles=candles,
+            contract=TerminalDistributionRecoveryContract.load(
+                Path(__file__).resolve().parent.parent
+            ),
+        )
 
     def _write_source_event(
         self,

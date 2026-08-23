@@ -31,6 +31,7 @@ _INGEST_STATUSES = frozenset({"STARTED", "COMPLETE", "FAILED"})
 _CATCHUP_CLASSIFICATIONS = frozenset(
     {"RESOLVED", "PENDING", "EXPECTED_ABSENT", "DATA_GAP"}
 )
+_RECONSTRUCTION_STATUSES = frozenset({"RECOVERED", "EXPECTED_ABSENT", "DATA_GAP"})
 _SERIES_KINDS = frozenset({"CUMULATIVE", "MONTHLY", "ROLLING_30D", "ROLLING_90D", "ROLLING_365D"})
 
 
@@ -513,6 +514,95 @@ class PerformanceIngestRun:
             )
         }
         _set_payload(self, payload)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StrategyReconstructionStatus:
+    reconstruction_key: str
+    market_date: str
+    strategy_id: str
+    status: str
+    reason_code: str
+    missing_input: str | None
+    checkpoint_minutes: tuple[int, ...]
+    observation_count: int
+    evidence_sha256: str
+    input_sha256: str
+    reconstructed_at_ms: int
+    provenance: Mapping[str, object]
+    schema_version: str = "STRATEGY_RECONSTRUCTION_STATUS_V1"
+    checkpoint_minutes_json: str = field(init=False, default="")
+    provenance_json: str = field(init=False, default="")
+    payload_json: str = field(init=False, default="")
+    payload_sha256: str = field(init=False, default="")
+
+    @classmethod
+    def create(cls, **values: Any) -> Self:
+        if type(values.get("checkpoint_minutes")) is list:
+            values["checkpoint_minutes"] = tuple(values["checkpoint_minutes"])
+        return cls(**values)
+
+    def __post_init__(self) -> None:
+        _require_nonempty(self.reconstruction_key, "INVALID_RECONSTRUCTION_KEY")
+        _require_date(self.market_date, "INVALID_RECONSTRUCTION_MARKET_DATE")
+        _require_nonempty(self.strategy_id, "INVALID_RECONSTRUCTION_STRATEGY_ID")
+        if (
+            self.schema_version != "STRATEGY_RECONSTRUCTION_STATUS_V1"
+            or self.status not in _RECONSTRUCTION_STATUSES
+        ):
+            raise ValueError("INVALID_RECONSTRUCTION_STATUS")
+        _require_nonempty(self.reason_code, "INVALID_RECONSTRUCTION_REASON_CODE")
+        _require_optional_nonempty(self.missing_input, "INVALID_RECONSTRUCTION_MISSING_INPUT")
+        if (
+            type(self.checkpoint_minutes) is not tuple
+            or any(type(value) is not int or value <= 0 for value in self.checkpoint_minutes)
+            or len(set(self.checkpoint_minutes)) != len(self.checkpoint_minutes)
+        ):
+            raise ValueError("INVALID_RECONSTRUCTION_CHECKPOINTS")
+        _require_nonnegative_int(
+            self.observation_count, "INVALID_RECONSTRUCTION_OBSERVATION_COUNT"
+        )
+        if self.status == "RECOVERED":
+            valid_partition = self.observation_count > 0 and self.missing_input is None
+        elif self.status == "EXPECTED_ABSENT":
+            valid_partition = self.observation_count == 0 and self.missing_input is None
+        else:
+            valid_partition = self.observation_count == 0 and self.missing_input is not None
+        if not valid_partition:
+            raise ValueError("INVALID_RECONSTRUCTION_STATUS_PARTITION")
+        _require_sha256(self.evidence_sha256, "INVALID_RECONSTRUCTION_EVIDENCE_SHA256")
+        _require_sha256(self.input_sha256, "INVALID_RECONSTRUCTION_INPUT_SHA256")
+        _require_nonnegative_int(
+            self.reconstructed_at_ms, "INVALID_RECONSTRUCTION_TIMESTAMP"
+        )
+        provenance = _deep_freeze(dict(self.provenance))
+        object.__setattr__(self, "provenance", provenance)
+        object.__setattr__(self, "checkpoint_minutes_json", canonical_json(list(self.checkpoint_minutes)))
+        object.__setattr__(self, "provenance_json", canonical_json(provenance))
+        _set_payload(self, {
+            "schema_version": self.schema_version,
+            "reconstruction_key": self.reconstruction_key,
+            "market_date": self.market_date,
+            "strategy_id": self.strategy_id,
+            "status": self.status,
+            "reason_code": self.reason_code,
+            "missing_input": self.missing_input,
+            "checkpoint_minutes": list(self.checkpoint_minutes),
+            "observation_count": self.observation_count,
+            "evidence_sha256": self.evidence_sha256,
+            "input_sha256": self.input_sha256,
+            "reconstructed_at_ms": self.reconstructed_at_ms,
+            "provenance": provenance,
+        })
+
+    def constructor_values(self) -> dict[str, Any]:
+        return {
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in {
+                "checkpoint_minutes_json", "provenance_json", "payload_json", "payload_sha256"
+            }
+        }
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -40,6 +40,7 @@ _REQUIRED_TABLES = frozenset(
         "strategy_performance_observations",
         "strategy_performance_resolutions",
         "strategy_performance_timeseries",
+        "strategy_reconstruction_status",
     }
 )
 _REPRESENTATIVE_TABLES = (
@@ -60,6 +61,7 @@ _REPRESENTATIVE_TABLES = (
     "strategy_performance_materialization_revisions",
     "strategy_performance_aggregates",
     "strategy_performance_timeseries",
+    "strategy_reconstruction_status",
 )
 
 

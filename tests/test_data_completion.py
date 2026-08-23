@@ -83,8 +83,8 @@ class DataCompletionLedgerTests(unittest.TestCase):
         )
         return run, source_range
 
-    def test_migration_v6_preserves_import_and_range_ledgers(self) -> None:
-        self.assertEqual(self.store.integrity_report()["migration_version"], 6)
+    def test_current_migration_preserves_import_and_range_ledgers(self) -> None:
+        self.assertEqual(self.store.integrity_report()["migration_version"], 7)
         tables = {
             row[0]
             for row in self.store.rows(

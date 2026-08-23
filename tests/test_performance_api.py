@@ -14,6 +14,7 @@ from src.performance_models import (
     AggregateRow,
     CatchupClassification,
     PerformanceObservation,
+    PerformanceResolution,
     TimeseriesRow,
     canonical_identity,
     canonical_sha256,
@@ -104,6 +105,11 @@ class PerformanceApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(historical["provenance"]["calculation_contract"], CALCULATION_VERSION)
         self.assertEqual(historical["timeseries"]["CUMULATIVE"][0], expected_cumulative)
         self.assertEqual(payload["views"]["FORWARD"]["status"], "NOT_READY")
+        self.assertEqual(payload["provenance_views"]["ORIGINAL"]["status"], "READY")
+        self.assertEqual(
+            payload["provenance_views"]["ORIGINAL"]["metrics"]["opportunity_count"],
+            0,
+        )
 
     async def test_timeseries_observations_status_and_invalid_queries_are_read_only(self) -> None:
         self._publish_materialization(
@@ -178,6 +184,67 @@ class PerformanceApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(portfolio.status, 400)
         self.assertEqual(before_counts, _read_only_counts(self.store))
 
+    async def test_combined_is_default_and_resolved_observation_is_effective_not_pending(self) -> None:
+        self._publish_materialization(
+            strategy_id="NO_A0",
+            source_view="COMBINED",
+            metrics={
+                "as_of_date": "2026-08-15",
+                "opportunity_count": 1,
+                "source_view": "COMBINED",
+            },
+            timeseries_payload={
+                "market_date": "2026-08-15",
+                "observation_key": "obs:NO_A0:resolved",
+            },
+        )
+        observation = _observation("obs:NO_A0:resolved", source_layer="HISTORICAL")
+        recovered = _observation(
+            "obs:NO_A0:recovered",
+            source_layer="HISTORICAL",
+            provenance_run_id="RECOVERED_RETROSPECTIVE:fixture",
+        )
+        self.repository.append_observation(observation)
+        self.repository.append_observation(recovered)
+        self.repository.append_resolution(
+            PerformanceResolution.create_for_observation(
+                observation,
+                resolution_key="resolution:resolved",
+                revision=1,
+                supersedes_resolution_key=None,
+                settlement_identity="settlement:resolved",
+                settlement_source_event_id=None,
+                winning_bucket_identity="bucket-3",
+                won=True,
+                resolution_date="2026-08-15",
+                resolved_at_ms=2,
+                provenance_json={"source": "unit-test"},
+            )
+        )
+
+        timeseries = await self.client.get(
+            "/api/v1/performance/strategies/NO_A0/timeseries"
+        )
+        observations = await self.client.get(
+            "/api/v1/performance/strategies/NO_A0/observations?limit=2"
+        )
+
+        self.assertEqual((await timeseries.json())["source_view"], "COMBINED")
+        row = next(
+            item
+            for item in (await observations.json())["observations"]
+            if item["observation_key"] == observation.observation_key
+        )
+        self.assertEqual(row["raw_scoring_status"], "RESOLUTION_PENDING")
+        self.assertEqual(row["scoring_status"], "RESOLVED")
+        self.assertEqual(row["scoring_reason_code"], "SETTLED")
+        self.assertEqual(row["resolution"]["won"], True)
+        detail = await self.client.get("/api/v1/performance/strategies/NO_A0")
+        provenance_views = (await detail.json())["provenance_views"]
+        self.assertEqual(provenance_views["ORIGINAL"]["metrics"]["opportunity_count"], 1)
+        self.assertEqual(provenance_views["RECOVERED"]["metrics"]["opportunity_count"], 1)
+        self.assertEqual(provenance_views["FORWARD"]["metrics"]["opportunity_count"], 0)
+
     def _publish_materialization(
         self,
         *,
@@ -228,7 +295,12 @@ class PerformanceApiTests(unittest.IsolatedAsyncioTestCase):
         self.repository.publish_materialization(revision, [aggregate], [timeseries])
 
 
-def _observation(observation_key: str, *, source_layer: str) -> PerformanceObservation:
+def _observation(
+    observation_key: str,
+    *,
+    source_layer: str,
+    provenance_run_id: str = "unit-test",
+) -> PerformanceObservation:
     return PerformanceObservation.create(
         observation_key=observation_key,
         logical_decision_key=f"decision:{observation_key}",
@@ -259,7 +331,7 @@ def _observation(observation_key: str, *, source_layer: str) -> PerformanceObser
         scoring_reason_code="SETTLEMENT_PENDING",
         observed_at_ms=1,
         source_created_at_ms=None,
-        provenance_run_id="unit-test",
+        provenance_run_id=provenance_run_id,
         source_result_sha256="a" * 64,
         input_sha256="b" * 64,
     )

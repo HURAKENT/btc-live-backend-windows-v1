@@ -5,6 +5,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Mapping
 
+from src.performance_metrics import build_metrics
 from src.performance_repository import PerformanceRepository
 from src.storage import SqliteReadStore
 
@@ -59,6 +60,7 @@ class PerformanceQueryService:
                 source_view: self._view_payload(strategy_id, source_view)
                 for source_view in SOURCE_VIEWS
             },
+            "provenance_views": self._provenance_views(strategy_id),
         }
 
     def timeseries(self, strategy_id: str, *, source_view: str) -> dict[str, Any]:
@@ -96,17 +98,25 @@ class PerformanceQueryService:
             raise ValueError("INVALID_PERFORMANCE_OBSERVATION_CURSOR")
         rows = self.read_store.rows(
             """
-            SELECT payload_json
-            FROM strategy_performance_observations
-            WHERE strategy_id = ?
-              AND (? IS NULL OR observation_key > ?)
-            ORDER BY market_date DESC, checkpoint_minutes DESC,
-                     observation_key ASC
+            SELECT observation.payload_json, resolution.payload_json
+            FROM strategy_performance_observations AS observation
+            LEFT JOIN strategy_performance_resolutions AS resolution
+              ON resolution.observation_key = observation.observation_key
+             AND NOT EXISTS (
+                    SELECT 1
+                    FROM strategy_performance_resolutions AS successor
+                    WHERE successor.supersedes_resolution_key = resolution.resolution_key
+                )
+            WHERE observation.strategy_id = ?
+              AND (? IS NULL OR observation.observation_key > ?)
+            ORDER BY observation.market_date DESC,
+                     observation.checkpoint_minutes DESC,
+                     observation.observation_key ASC
             LIMIT ?
             """,
             (strategy_id, after_observation_key, after_observation_key, limit + 1),
         )
-        page = [json.loads(row[0]) for row in rows[:limit]]
+        page = [_effective_observation_payload(row[0], row[1]) for row in rows[:limit]]
         return {
             "has_more": len(rows) > limit,
             "limit": limit,
@@ -247,6 +257,42 @@ class PerformanceQueryService:
             "timeseries": _timeseries_by_kind(materialized["timeseries"]),
         }
 
+    def _provenance_views(self, strategy_id: str) -> dict[str, Any]:
+        observations = self.repository.read_observations(strategy_id=strategy_id)
+        resolutions = self.repository.read_effective_resolutions()
+        result: dict[str, Any] = {}
+        for source_view in ("ORIGINAL", "RECOVERED", "FORWARD"):
+            selected = [
+                row
+                for row in observations
+                if (
+                    source_view == "ORIGINAL"
+                    and row.source_layer == "HISTORICAL"
+                    and not row.provenance_run_id.startswith("RECOVERED_RETROSPECTIVE:")
+                )
+                or (
+                    source_view == "RECOVERED"
+                    and row.source_layer == "HISTORICAL"
+                    and row.provenance_run_id.startswith("RECOVERED_RETROSPECTIVE:")
+                )
+                or (source_view == "FORWARD" and row.source_layer == "FORWARD")
+            ]
+            selected_keys = {row.observation_key for row in selected}
+            selected_resolutions = {
+                key: value for key, value in resolutions.items() if key in selected_keys
+            }
+            as_of_date = max((row.market_date for row in selected), default="1970-01-01")
+            result[source_view] = {
+                "status": "READY",
+                "metrics": build_metrics(
+                    selected,
+                    selected_resolutions,
+                    source_view=source_view,
+                    as_of_date=as_of_date,
+                ),
+            }
+        return result
+
     def _require_strategy(self, strategy_id: str) -> Mapping[str, Any]:
         if strategy_id == "ALL":
             raise ValueError("PERFORMANCE_PORTFOLIO_TOTAL_FORBIDDEN")
@@ -265,6 +311,29 @@ def _load_strategy_status(project_root: Path) -> tuple[dict[str, Any], ...]:
     if type(rows) is not list or len(rows) != 47:
         raise ValueError("PERFORMANCE_QUERY_STRATEGY_STATUS_INVALID")
     return tuple(dict(row) for row in rows)
+
+
+def _effective_observation_payload(
+    observation_payload_json: str,
+    resolution_payload_json: str | None,
+) -> dict[str, Any]:
+    payload = json.loads(observation_payload_json)
+    payload["provenance_kind"] = (
+        "RECOVERED_RETROSPECTIVE"
+        if payload["source_layer"] == "HISTORICAL"
+        and payload["provenance_run_id"].startswith("RECOVERED_RETROSPECTIVE:")
+        else "ORIGINAL_BASELINE"
+        if payload["source_layer"] == "HISTORICAL"
+        else "GENUINE_FORWARD"
+    )
+    if resolution_payload_json is None:
+        return payload
+    payload["raw_scoring_status"] = payload["scoring_status"]
+    payload["raw_scoring_reason_code"] = payload["scoring_reason_code"]
+    payload["scoring_status"] = "RESOLVED"
+    payload["scoring_reason_code"] = "SETTLED"
+    payload["resolution"] = json.loads(resolution_payload_json)
+    return payload
 
 
 def _family(strategy: Mapping[str, Any]) -> str:

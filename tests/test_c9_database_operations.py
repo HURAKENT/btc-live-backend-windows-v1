@@ -84,7 +84,7 @@ class C9DatabaseOperationsTests(unittest.TestCase):
 
         self.assertEqual(report["status"], "PASS")
         self.assertEqual(report["quick_check"], "ok")
-        self.assertEqual(report["migration_version"], 6)
+        self.assertEqual(report["migration_version"], 7)
         self.assertNotIn(
             "integrity_check",
             "\n".join(statements).lower(),

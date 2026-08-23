@@ -176,6 +176,19 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("window.setInterval", script)
         self.assertIn("30_000", script)
 
+    async def test_performance_ui_defaults_combined_and_has_explicit_series_ordering(self):
+        html = await (await self.client.get("/dashboard")).text()
+        script = await (await self.client.get("/dashboard/app.js")).text()
+        self.assertIn('data-source-view="COMBINED" aria-pressed="true"', html)
+        self.assertIn('performanceView: "COMBINED"', script)
+        self.assertIn("chronologicalSeriesRows", script)
+        self.assertIn("recentFirstSeriesRows", script)
+        self.assertIn("window_kind", script)
+        self.assertIn("as_of_date", script)
+        self.assertIn("original_raw_observation_count", script)
+        self.assertIn("recovered_raw_observation_count", script)
+        self.assertIn("forward_raw_observation_count", script)
+
 
 if __name__ == "__main__":
     unittest.main()

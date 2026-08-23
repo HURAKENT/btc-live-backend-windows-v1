@@ -14,6 +14,7 @@ from src.performance_models import (
     PerformanceIngestRun,
     PerformanceObservation,
     PerformanceResolution,
+    StrategyReconstructionStatus,
     TimeseriesRow,
     canonical_identity,
     materialization_children_sha256,
@@ -48,6 +49,7 @@ class PerformanceRepositoryTests(unittest.TestCase):
         scoring_reason_code: str = "SETTLEMENT_PENDING",
         market_date: str = "2026-01-03",
         checkpoint_minutes: int = 60,
+        provenance_run_id: str = "20260814T205244105513Z",
     ) -> PerformanceObservation:
         return PerformanceObservation.create(
             observation_key=observation_key,
@@ -89,7 +91,7 @@ class PerformanceRepositoryTests(unittest.TestCase):
             ),
             observed_at_ms=100,
             source_created_at_ms=None,
-            provenance_run_id="20260814T205244105513Z",
+            provenance_run_id=provenance_run_id,
             source_result_sha256="a" * 64,
             input_sha256="b" * 64,
         )
@@ -133,10 +135,42 @@ class PerformanceRepositoryTests(unittest.TestCase):
             "strategy_performance_materialization_revisions",
             "strategy_performance_aggregates",
             "strategy_performance_timeseries",
+            "strategy_reconstruction_status",
         }
         self.assertTrue(expected <= names)
         for table in expected:
             self.assertEqual(self.store.count(table), 0)
+
+    def test_reconstruction_status_is_idempotent_and_conflicts_on_drift(self) -> None:
+        status = StrategyReconstructionStatus.create(
+            reconstruction_key="reconstruction:2026-07-08:NO_A0",
+            market_date="2026-07-08",
+            strategy_id="NO_A0",
+            status="RECOVERED",
+            reason_code="RECOVERED_RETROSPECTIVE",
+            missing_input=None,
+            checkpoint_minutes=(60, 30),
+            observation_count=2,
+            evidence_sha256="a" * 64,
+            input_sha256="b" * 64,
+            reconstructed_at_ms=1,
+            provenance={"origin": "RECOVERED_RETROSPECTIVE"},
+        )
+        self.assertEqual(
+            self.repository.append_reconstruction_status(status).outcome,
+            "INSERTED",
+        )
+        self.assertEqual(
+            self.repository.append_reconstruction_status(status).outcome,
+            "REPLAYED",
+        )
+        self.assertEqual(self.repository.read_reconstruction_statuses(), [status])
+
+        drift = StrategyReconstructionStatus.create(
+            **{**status.constructor_values(), "reason_code": "DRIFTED"}
+        )
+        with self.assertRaisesRegex(ValueError, "STRATEGY_RECONSTRUCTION_CONFLICT"):
+            self.repository.append_reconstruction_status(drift)
 
     def test_immutable_observation_replays_exact_payload_and_conflicts_on_drift(self) -> None:
         observation = self.observation()

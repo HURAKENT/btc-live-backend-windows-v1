@@ -430,9 +430,13 @@ class ForwardSettlementProjector:
         resolved = self.repository.read_effective_resolutions()
         observations = [
             row
-            for row in self.repository.read_observations(source_layer="FORWARD")
+            for row in self.repository.read_observations()
             if row.accepted
             and row.scoring_status == "RESOLUTION_PENDING"
+            and (
+                row.source_layer == "FORWARD"
+                or row.provenance_run_id.startswith("RECOVERED_RETROSPECTIVE:")
+            )
         ]
         resolutions: list[PerformanceResolution] = []
         for observation in observations:

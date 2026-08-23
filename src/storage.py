@@ -49,6 +49,7 @@ _COUNTABLE_TABLES = frozenset(
         "strategy_performance_materialization_revisions",
         "strategy_performance_aggregates",
         "strategy_performance_timeseries",
+        "strategy_reconstruction_status",
     }
 )
 

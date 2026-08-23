@@ -28,6 +28,7 @@ class PerformanceMetricsTests(unittest.TestCase):
         emitted: bool = False,
         semantic_variant: str = "SAME",
         scoring_status: str | None = None,
+        provenance_run_id: str = "20260814T205244105513Z",
     ) -> PerformanceObservation:
         if scoring_status is None:
             scoring_status = (
@@ -77,7 +78,7 @@ class PerformanceMetricsTests(unittest.TestCase):
             ),
             observed_at_ms=1,
             source_created_at_ms=None,
-            provenance_run_id="run",
+            provenance_run_id=provenance_run_id,
             source_result_sha256="a" * 64,
             input_sha256="b" * 64,
         )
@@ -111,6 +112,33 @@ class PerformanceMetricsTests(unittest.TestCase):
                 selected_leg_count=2,
             ),
             (610_000, "CONTRACT_STRESSED_REFERENCE_EXPLICIT"),
+        )
+
+    def test_original_recovered_historical_forward_and_combined_membership(self) -> None:
+        original = self.observation(
+            "original", "original", "2026-07-07", 60,
+            accepted=False, price=None,
+        )
+        recovered = self.observation(
+            "recovered", "recovered", "2026-07-08", 60,
+            accepted=False, price=None,
+            provenance_run_id="RECOVERED_RETROSPECTIVE:run-1",
+        )
+        forward = self.observation(
+            "forward", "forward", "2026-07-09", 60,
+            accepted=False, price=None, source_layer="FORWARD",
+        )
+        observations = [original, recovered, forward]
+
+        counts = {
+            view: build_metrics(
+                observations, [], source_view=view, as_of_date="2026-07-09"
+            )["opportunity_count"]
+            for view in ("ORIGINAL", "RECOVERED", "HISTORICAL", "FORWARD", "COMBINED")
+        }
+        self.assertEqual(
+            counts,
+            {"ORIGINAL": 1, "RECOVERED": 1, "HISTORICAL": 2, "FORWARD": 1, "COMBINED": 3},
         )
         self.assertEqual(
             v1_performance_price(

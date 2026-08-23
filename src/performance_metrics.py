@@ -9,7 +9,7 @@ from src.performance_models import PerformanceObservation, PerformanceResolution
 
 
 _RATIO_QUANTUM = Decimal("0.000000000001")
-_SOURCE_VIEWS = frozenset({"HISTORICAL", "FORWARD", "COMBINED"})
+_SOURCE_VIEWS = frozenset({"ORIGINAL", "RECOVERED", "HISTORICAL", "FORWARD", "COMBINED"})
 _ROLLING_WINDOWS = (("30D", 30), ("90D", 90), ("365D", 365))
 
 
@@ -33,11 +33,17 @@ def build_metrics(
     if len(strategy_ids) > 1:
         raise ValueError("MULTIPLE_PERFORMANCE_STRATEGIES")
 
+    original_count = sum(_is_original(row) for row in raw)
+    recovered_count = sum(_is_recovered(row) for row in raw)
     historical_count = sum(row.source_layer == "HISTORICAL" for row in raw)
     forward_count = sum(row.source_layer == "FORWARD" for row in raw)
     identical_overlap_count = 0
     if source_view == "COMBINED":
         selected, identical_overlap_count = _combined_observations(raw)
+    elif source_view == "ORIGINAL":
+        selected = [row for row in raw if _is_original(row)]
+    elif source_view == "RECOVERED":
+        selected = [row for row in raw if _is_recovered(row)]
     else:
         selected = [row for row in raw if row.source_layer == source_view]
     selected.sort(key=_financial_order)
@@ -156,6 +162,8 @@ def build_metrics(
         "rolling_windows": rolling_windows,
         "rolling_series": rolling_series,
         "historical_raw_observation_count": historical_count,
+        "original_raw_observation_count": original_count,
+        "recovered_raw_observation_count": recovered_count,
         "forward_raw_observation_count": forward_count,
         "identical_overlap_count": identical_overlap_count,
         "effective_observation_count": len(selected),
@@ -172,9 +180,24 @@ def effective_observations_for_view(
     raw = _deduplicate_observations(observations)
     if source_view == "COMBINED":
         selected, _ = _combined_observations(raw)
+    elif source_view == "ORIGINAL":
+        selected = [row for row in raw if _is_original(row)]
+    elif source_view == "RECOVERED":
+        selected = [row for row in raw if _is_recovered(row)]
     else:
         selected = [row for row in raw if row.source_layer == source_view]
     return sorted(selected, key=_financial_order)
+
+
+def _is_recovered(observation: PerformanceObservation) -> bool:
+    return (
+        observation.source_layer == "HISTORICAL"
+        and observation.provenance_run_id.startswith("RECOVERED_RETROSPECTIVE:")
+    )
+
+
+def _is_original(observation: PerformanceObservation) -> bool:
+    return observation.source_layer == "HISTORICAL" and not _is_recovered(observation)
 
 
 def _deduplicate_observations(

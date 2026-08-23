@@ -13,6 +13,7 @@ from src.performance_models import (
     PerformanceIngestRun,
     PerformanceObservation,
     PerformanceResolution,
+    StrategyReconstructionStatus,
     TimeseriesRow,
     canonical_json,
     five_share_economics,
@@ -628,6 +629,80 @@ class PerformanceRepository:
             if self._connection.in_transaction:
                 self._connection.rollback()
             raise
+
+    def append_reconstruction_status(
+        self, status: StrategyReconstructionStatus
+    ) -> RepositoryWriteResult:
+        self._require_writer()
+        if type(status) is not StrategyReconstructionStatus:
+            raise ValueError("INVALID_STRATEGY_RECONSTRUCTION_TYPE")
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            stored = self._connection.execute(
+                "SELECT payload_json, payload_sha256 FROM strategy_reconstruction_status "
+                "WHERE reconstruction_key = ?",
+                (status.reconstruction_key,),
+            ).fetchone()
+            if stored is not None:
+                if tuple(stored) != (status.payload_json, status.payload_sha256):
+                    raise ValueError("STRATEGY_RECONSTRUCTION_CONFLICT")
+                self._connection.commit()
+                return RepositoryWriteResult(status.reconstruction_key, "REPLAYED")
+            duplicate = self._connection.execute(
+                "SELECT reconstruction_key FROM strategy_reconstruction_status "
+                "WHERE market_date = ? AND strategy_id = ?",
+                (status.market_date, status.strategy_id),
+            ).fetchone()
+            if duplicate is not None:
+                raise ValueError("STRATEGY_RECONSTRUCTION_CONFLICT")
+            self._connection.execute(
+                """
+                INSERT INTO strategy_reconstruction_status(
+                    reconstruction_key, schema_version, market_date, strategy_id,
+                    status, reason_code, missing_input, checkpoint_minutes_json,
+                    observation_count, evidence_sha256, input_sha256,
+                    reconstructed_at_ms, provenance_json, payload_json, payload_sha256
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    status.reconstruction_key, status.schema_version,
+                    status.market_date, status.strategy_id, status.status,
+                    status.reason_code, status.missing_input,
+                    status.checkpoint_minutes_json, status.observation_count,
+                    status.evidence_sha256, status.input_sha256,
+                    status.reconstructed_at_ms, status.provenance_json,
+                    status.payload_json, status.payload_sha256,
+                ),
+            )
+            self._connection.commit()
+            return RepositoryWriteResult(status.reconstruction_key, "INSERTED")
+        except sqlite3.IntegrityError:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise ValueError("STRATEGY_RECONSTRUCTION_CONFLICT") from None
+        except BaseException:
+            if self._connection.in_transaction:
+                self._connection.rollback()
+            raise
+
+    def read_reconstruction_statuses(
+        self, *, market_date: str | None = None, strategy_id: str | None = None
+    ) -> list[StrategyReconstructionStatus]:
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if market_date is not None:
+            clauses.append("market_date = ?")
+            parameters.append(market_date)
+        if strategy_id is not None:
+            clauses.append("strategy_id = ?")
+            parameters.append(strategy_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = self._connection.execute(
+            f"SELECT payload_json FROM strategy_reconstruction_status {where} "
+            "ORDER BY market_date ASC, strategy_id ASC",
+            tuple(parameters),
+        ).fetchall()
+        return [StrategyReconstructionStatus.create(**json.loads(row[0])) for row in rows]
 
     def read_ingest_runs(self) -> list[PerformanceIngestRun]:
         rows = self._connection.execute(

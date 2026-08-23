@@ -14,13 +14,12 @@ from src.performance_historical import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CANONICAL_ROOT = PROJECT_ROOT.parent.parent
 PINNED_RUN = "20260814T205244105513Z"
 
 
 class PinnedAhrArtifactLoaderTests(unittest.TestCase):
     def test_rejects_acceptance_whose_bytes_do_not_match_the_pinned_hash(self) -> None:
-        source_run = CANONICAL_ROOT / "reports" / "historical_revalidation" / PINNED_RUN
+        source_run = PROJECT_ROOT / "reports" / "historical_revalidation" / PINNED_RUN
         with tempfile.TemporaryDirectory() as temporary:
             run_dir = Path(temporary) / PINNED_RUN
             run_dir.mkdir()

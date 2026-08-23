@@ -16,7 +16,7 @@
     last_event_id: 0,
     performanceStatus: null,
     performanceStrategies: [],
-    performanceView: "HISTORICAL",
+    performanceView: "COMBINED",
     selectedStrategyId: null,
     selectedStrategyDetail: null,
     performanceTimeseries: null,
@@ -337,6 +337,7 @@
     addMetricCard(container, "Decision coverage", metricText(metrics, "decision_coverage_ratio", ratio), `${metricText(metrics, "decision_coverage_numerator")} / ${metricText(metrics, "decision_coverage_denominator")}`);
     addMetricCard(container, "Resolution coverage", metricText(metrics, "resolution_coverage_ratio", ratio), `${metricText(metrics, "resolution_coverage_numerator")} / ${metricText(metrics, "resolution_coverage_denominator")}`);
     addMetricCard(container, "Price coverage", metricText(metrics, "price_coverage_ratio", ratio), `${metricText(metrics, "price_coverage_numerator")} / ${metricText(metrics, "price_coverage_denominator")}`);
+    addMetricCard(container, "Original / recovered / forward", `${metricText(metrics, "original_raw_observation_count")} / ${metricText(metrics, "recovered_raw_observation_count")} / ${metricText(metrics, "forward_raw_observation_count")}`, "auditable raw provenance counts");
     const annualized = metricText(metrics, "annualized_return_ratio", ratio);
     addMetricCard(container, "Annualized return", annualized, `reason ${metricText(metrics, "annualized_return_reason_code")}`);
   }
@@ -357,23 +358,31 @@
   }
 
   function seriesRows(points, labelKeys) {
-    return (Array.isArray(points) ? points : []).slice(-12).reverse().map((point) => {
-      const label = labelKeys.map((key) => point && point[key]).find((item) => item !== null && item !== undefined) || NO_DATA;
+    return (Array.isArray(points) ? points : []).map((point) => {
+      const label = labelKeys.map((key) => point && point[key]).filter((item) => item !== null && item !== undefined).join(" · ") || NO_DATA;
       return [label, rowSummary(point)];
     });
+  }
+
+  function chronologicalSeriesRows(points, labelKeys, limit = 12) {
+    return seriesRows((Array.isArray(points) ? points : []).slice(-limit), labelKeys);
+  }
+
+  function recentFirstSeriesRows(points, labelKeys, limit = 12) {
+    return seriesRows((Array.isArray(points) ? points : []).slice(-limit).reverse(), labelKeys);
   }
 
   function renderPerformanceSeries() {
     const payload = state.performanceTimeseries;
     const series = payload && payload.status === "READY" && payload.timeseries ? payload.timeseries : {};
     const cumulative = series.CUMULATIVE || [];
-    replaceRows("cumulative-series", seriesRows(cumulative, ["market_date", "as_of_date", "observation_key"]));
-    replaceRows("recent-resolutions", seriesRows(cumulative.slice(-10), ["market_date", "observation_key"]));
-    replaceRows("monthly-series", seriesRows(series.MONTHLY || [], ["month", "period_key"]));
+    replaceRows("cumulative-series", chronologicalSeriesRows(cumulative, ["market_date", "as_of_date", "observation_key"]));
+    replaceRows("recent-resolutions", recentFirstSeriesRows(cumulative, ["market_date", "observation_key"], 10));
+    replaceRows("monthly-series", chronologicalSeriesRows(series.MONTHLY || [], ["month", "period_key"]));
     const rolling = ["ROLLING_30D", "ROLLING_90D", "ROLLING_365D"].flatMap((kind) =>
       (Array.isArray(series[kind]) ? series[kind] : []).slice(-4).map((point) => ({ ...point, window_kind: kind }))
     );
-    replaceRows("rolling-series", seriesRows(rolling, ["window_kind", "as_of_date", "observation_key"]));
+    replaceRows("rolling-series", recentFirstSeriesRows(rolling, ["window_kind", "as_of_date", "observation_key"]));
   }
 
   function renderRecentDecisions() {
