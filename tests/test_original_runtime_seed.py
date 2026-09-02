@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,7 @@ from unittest.mock import patch
 import src.original_runtime_seed as seed_module
 from src.historical_input_builder import EXPECTED_SOURCE_SHA256
 from src.original_runtime_seed import OriginalRuntimeSeedLoader
+from src.performance_historical import PinnedAhrArtifactLoader
 from src.performance_engine import StrategyPerformanceEngine
 from src.performance_models import (
     PerformanceObservation,
@@ -309,6 +311,50 @@ class OriginalRuntimeSeedPackagingTests(unittest.TestCase):
                 self.assertEqual(
                     expected.read_bytes(), generated.joinpath(expected.name).read_bytes(), expected.name
                 )
+
+    def test_packager_rejects_missing_accepted_parity_report(self) -> None:
+        from tools.build_original_runtime_seed_v1 import build_seed
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run_dir = self._copy_packaging_run(root)
+            with self.assertRaisesRegex(
+                ValueError, "ORIGINAL_RUNTIME_SEED_PARITY_REPORT_MISSING"
+            ):
+                build_seed(
+                    project_root=PROJECT_ROOT,
+                    output_dir=root / "output",
+                    ahr_run_dir=run_dir,
+                )
+
+    def test_packager_rejects_tampered_accepted_parity_report(self) -> None:
+        from tools.build_original_runtime_seed_v1 import build_seed
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run_dir = self._copy_packaging_run(root, include_parity=True)
+            with run_dir.joinpath("PARITY_REPORT.json").open("ab") as stream:
+                stream.write(b"\n")
+            with self.assertRaisesRegex(
+                ValueError, "ORIGINAL_RUNTIME_SEED_PARITY_REPORT_HASH_MISMATCH"
+            ):
+                build_seed(
+                    project_root=PROJECT_ROOT,
+                    output_dir=root / "output",
+                    ahr_run_dir=run_dir,
+                )
+
+    @staticmethod
+    def _copy_packaging_run(root: Path, *, include_parity: bool = False) -> Path:
+        source = PinnedAhrArtifactLoader(project_root=PROJECT_ROOT)._resolve_run_dir()
+        run_dir = root / source.name
+        run_dir.mkdir()
+        names = ["ACCEPTANCE.json", "INPUT_MANIFEST.json", "STRATEGY_RESULTS.parquet"]
+        if include_parity:
+            names.append("PARITY_REPORT.json")
+        for name in names:
+            shutil.copyfile(source / name, run_dir / name)
+        return run_dir
 
 
 class OriginalRuntimeSeedIntegrationTests(unittest.TestCase):

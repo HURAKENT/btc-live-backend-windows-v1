@@ -26,12 +26,17 @@ from src.performance_historical import (
 )
 
 
-def build_seed(*, project_root: Path, output_dir: Path) -> dict[str, Any]:
+def build_seed(
+    *, project_root: Path, output_dir: Path, ahr_run_dir: Path | None = None
+) -> dict[str, Any]:
     project_root = Path(project_root).resolve()
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    bundle = PinnedAhrArtifactLoader(project_root=project_root).load()
+    bundle = PinnedAhrArtifactLoader(
+        project_root=project_root, run_dir=ahr_run_dir
+    ).load()
+    parity_report_sha256 = _validated_parity_report(bundle.run_dir)
     observations = HistoricalPerformanceObservationBuilder(
         project_root=project_root, bundle=bundle
     ).build()
@@ -125,7 +130,7 @@ def build_seed(*, project_root: Path, output_dir: Path) -> dict[str, Any]:
             "acceptance_sha256": bundle.acceptance_sha256,
             "input_manifest_file_sha256": PINNED_AHR_MANIFEST_SHA256,
             "input_manifest_semantic_sha256": bundle.input_manifest_sha256,
-            "parity_report_sha256": PINNED_AHR_PARITY_REPORT_SHA256,
+            "parity_report_sha256": parity_report_sha256,
             "path_name": f"historical_revalidation/{bundle.run_id}",
             "run_id": bundle.run_id,
             "settlements_sha256": bundle.settlement_artifact_sha256,
@@ -155,6 +160,27 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _validated_parity_report(run_dir: Path) -> str:
+    path = Path(run_dir) / "PARITY_REPORT.json"
+    if not path.is_file():
+        raise ValueError("ORIGINAL_RUNTIME_SEED_PARITY_REPORT_MISSING")
+    actual_hash = _sha256(path)
+    if actual_hash != PINNED_AHR_PARITY_REPORT_SHA256:
+        raise ValueError("ORIGINAL_RUNTIME_SEED_PARITY_REPORT_HASH_MISMATCH")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        raise ValueError("ORIGINAL_RUNTIME_SEED_PARITY_REPORT_INVALID") from None
+    if payload != {
+        "comparisons": 5_063,
+        "mismatches": [],
+        "schema_version": "AHR_1_PARITY_REPORT_V1",
+        "status": "PASS",
+    }:
+        raise ValueError("ORIGINAL_RUNTIME_SEED_PARITY_REPORT_INVALID")
+    return actual_hash
 
 
 def main(argv: list[str] | None = None) -> int:
