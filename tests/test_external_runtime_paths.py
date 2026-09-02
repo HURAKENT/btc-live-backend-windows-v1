@@ -13,6 +13,8 @@ from src import runtime_paths
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+C9_LAUNCHER = PROJECT_ROOT / "scripts" / "C9_RUN_BACKEND.ps1"
+MANUAL_LAUNCHER = PROJECT_ROOT / "scripts" / "RUN_BACKEND_SAFE.ps1"
 
 
 class ExternalRuntimePathContractTests(unittest.TestCase):
@@ -130,18 +132,16 @@ class ExternalRuntimePathContractTests(unittest.TestCase):
                 environ={},
             )
 
-    def test_environment_root_and_conflicting_database_path_fail_closed(self):
+    def test_explicit_legacy_database_path_wins_over_environment_root(self):
         root = Path(tempfile.gettempdir()) / "environment root"
         database = Path(tempfile.gettempdir()) / "other" / "legacy.sqlite3"
 
-        with self.assertRaisesRegex(
-            runtime_paths.RuntimePathError,
-            "^DATA_ROOT_DATABASE_PATH_CONFLICT$",
-        ):
-            runtime_paths.resolve_runtime_paths(
-                database_path=str(database),
-                environ={"BTC_DAILY_RANGE_DATA_ROOT": str(root)},
-            )
+        resolved = runtime_paths.resolve_runtime_paths(
+            database_path=str(database),
+            environ={"BTC_DAILY_RANGE_DATA_ROOT": str(root)},
+        )
+
+        self.assertEqual(resolved.database_path, database.resolve(strict=False))
 
     def test_all_derived_paths_share_one_root(self):
         root = Path(tempfile.gettempdir()) / "contract root"
@@ -202,6 +202,26 @@ class ExternalRuntimePathContractTests(unittest.TestCase):
                 captured["database_path"],
             )
 
+    def test_unpinned_windows_entrypoint_keeps_external_os_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            user_profile = Path(directory) / "user profile"
+            with patch.dict(
+                os.environ,
+                {"USERPROFILE": str(user_profile)},
+                clear=True,
+            ):
+                exit_code, captured = self._run_windows([])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                captured["database_path"],
+                user_profile
+                / "Documents"
+                / "BTC Daily Range"
+                / "runtime"
+                / "btc_daily_range.sqlite3",
+            )
+
     def test_all_five_security_guards_remain_false(self):
         config = json.loads(
             (PROJECT_ROOT / "config" / "mvp_runtime_v1.json").read_text(
@@ -247,6 +267,39 @@ class ExternalRuntimePathContractTests(unittest.TestCase):
             backend_runner=clean_runner,
         )
         return exit_code, captured
+
+
+class WindowsTransitionalLauncherContractTests(unittest.TestCase):
+    def test_c9_launcher_pins_pre_a1_database_and_log(self):
+        text = C9_LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn(
+            '$DatabasePath = Join-Path $ProjectRoot "data\\runtime\\btc_live_backend.sqlite3"',
+            text,
+        )
+        self.assertIn(
+            '$LogPath = Join-Path $ProjectRoot "data\\runtime\\backend.log"',
+            text,
+        )
+        self.assertIn('"--database-path" $DatabasePath', text)
+        self.assertIn('"--log-path" $LogPath', text)
+
+    def test_manual_launcher_matches_c9_transitional_paths_and_entrypoint(self):
+        c9_text = C9_LAUNCHER.read_text(encoding="utf-8")
+        manual_text = MANUAL_LAUNCHER.read_text(encoding="utf-8")
+
+        for text in (c9_text, manual_text):
+            self.assertIn("run_windows_backend.py", text)
+            self.assertIn(
+                '$DatabasePath = Join-Path $ProjectRoot "data\\runtime\\btc_live_backend.sqlite3"',
+                text,
+            )
+            self.assertIn(
+                '$LogPath = Join-Path $ProjectRoot "data\\runtime\\backend.log"',
+                text,
+            )
+            self.assertIn('"--database-path" $DatabasePath', text)
+            self.assertIn('"--log-path" $LogPath', text)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,10 @@ Durable current authority lives in `docs/operation/OPERATIONAL_LAUNCH_STATE.md`,
 - The Windows default is the local
   `%USERPROFILE%\Documents\BTC Daily Range`; `--data-root` or
   `BTC_DAILY_RANGE_DATA_ROOT` may configure another absolute local path.
+- Before the separately authorized production cutover, both supported Windows
+  PowerShell launchers must explicitly pin the existing repo-local
+  `data\runtime\btc_live_backend.sqlite3` database and
+  `data\runtime\backend.log`; code integration is not a data-root cutover.
 
 ## Operational rules
 

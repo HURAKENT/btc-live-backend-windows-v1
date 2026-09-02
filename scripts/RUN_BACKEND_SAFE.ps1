@@ -32,6 +32,8 @@ if ($LASTEXITCODE -ne 0) {
     exit 30
 }
 
-& $PythonPath ".\run_windows_backend.py"
+$DatabasePath = Join-Path $ProjectRoot "data\runtime\btc_live_backend.sqlite3"
+$LogPath = Join-Path $ProjectRoot "data\runtime\backend.log"
+& $PythonPath (Join-Path $ProjectRoot "run_windows_backend.py") "--database-path" $DatabasePath "--log-path" $LogPath
 $BackendExitCode = $LASTEXITCODE
 exit $BackendExitCode

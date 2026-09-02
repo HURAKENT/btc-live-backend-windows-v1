@@ -141,10 +141,7 @@ def resolve_runtime_paths(
     project_root: Path | None = None,
 ) -> RuntimePaths:
     environment = os.environ if environ is None else environ
-    has_configured_root = (
-        data_root is not None
-        or DATA_ROOT_ENVIRONMENT_VARIABLE in environment
-    )
+    has_explicit_data_root = data_root is not None
     root = resolve_data_root(
         data_root,
         environ=environment,
@@ -159,6 +156,6 @@ def resolve_runtime_paths(
         database_path,
         project_root=project_root,
     )
-    if has_configured_root and legacy_database_path != paths.database_path:
+    if has_explicit_data_root and legacy_database_path != paths.database_path:
         raise RuntimePathError("DATA_ROOT_DATABASE_PATH_CONFLICT")
     return replace(paths, database_path=legacy_database_path)
