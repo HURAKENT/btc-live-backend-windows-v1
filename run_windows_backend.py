@@ -9,18 +9,24 @@ from functools import partial
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from run_backend import CONFIG_PATH, DatabasePathError, resolve_database_path
+from run_backend import CONFIG_PATH, DatabasePathError
 from src.app import BackendRuntime, LiveBackend, run_backend
 from src.integration_endpoints import load_integration_endpoints
 from src.runtime_orchestrator import build_default_runtime_orchestrator
+from src.runtime_paths import (
+    derive_runtime_paths,
+    resolve_data_root,
+    resolve_runtime_paths,
+)
 from src.windows_operations import StartupValidatedSqliteStore
 from src.performance_engine import bootstrap_historical_performance
 from src.performance_repository import PerformanceRepository
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "runtime" / "btc_live_backend.sqlite3"
-DEFAULT_LOG_PATH = PROJECT_ROOT / "data" / "runtime" / "backend.log"
+_DEFAULT_RUNTIME_PATHS = derive_runtime_paths(resolve_data_root(environ={}))
+DEFAULT_DATABASE_PATH = _DEFAULT_RUNTIME_PATHS.database_path
+DEFAULT_LOG_PATH = _DEFAULT_RUNTIME_PATHS.log_root / "backend.log"
 LOG_MAX_BYTES = 5 * 1024 * 1024
 LOG_BACKUP_COUNT = 5
 _LOGGER_NAME = "btc_live_backend.windows"
@@ -39,6 +45,7 @@ class _ArgumentParser(argparse.ArgumentParser):
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = _ArgumentParser(add_help=True)
+    parser.add_argument("--data-root")
     parser.add_argument("--database-path")
     parser.add_argument("--log-path")
     parser.add_argument("--integration-test-mode", action="store_true")
@@ -104,17 +111,19 @@ def main(
     logger = None
     try:
         arguments = _build_parser().parse_args(argv)
+        root_paths = derive_runtime_paths(resolve_data_root(arguments.data_root))
         log_path = (
             Path(arguments.log_path).resolve(strict=False)
             if arguments.log_path is not None
-            else DEFAULT_LOG_PATH
+            else Path(root_paths.log_root / "backend.log")
         )
         logger = configure_backend_logger(log_path)
-        database_path = resolve_database_path(
-            arguments.database_path
-            if arguments.database_path is not None
-            else str(DEFAULT_DATABASE_PATH.resolve(strict=False))
+        paths = resolve_runtime_paths(
+            data_root=arguments.data_root,
+            database_path=arguments.database_path,
+            project_root=PROJECT_ROOT,
         )
+        database_path = Path(paths.database_path)
         if arguments.integration_test_mode != (
             arguments.integration_endpoints is not None
         ):
@@ -138,6 +147,8 @@ def main(
                 ),
                 performance_bootstrap=None,
             )
+
+        database_path.parent.mkdir(parents=True, exist_ok=True)
 
         backend_kwargs = {
             "config_path": CONFIG_PATH,

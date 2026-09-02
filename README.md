@@ -9,7 +9,19 @@ simulation.
 
 The backend is deployed through the existing user-level Windows Task Scheduler
 path, exposes its API and Dashboard only on `127.0.0.1:8767`, and persists
-runtime state in SQLite WAL under `data/runtime`.
+runtime state in SQLite WAL under one external local data root. The Windows
+default is `%USERPROFILE%\Documents\BTC Daily Range`; Linux uses absolute
+`$XDG_DATA_HOME/btc_daily_range` or falls back to
+`~/.local/share/btc_daily_range`. `--data-root` overrides
+`BTC_DAILY_RANGE_DATA_ROOT`, which overrides the OS default. Active data roots
+must be absolute local paths; Windows UNC, cloud-sync, and shared active SQLite
+paths are unsupported.
+
+The shared path contract derives `runtime/btc_daily_range.sqlite3`, `backups`,
+`logs`, and `diagnostics` from that root. The legacy absolute
+`--database-path` remains supported. When it is combined with a CLI or
+environment data root, it must equal the derived database path or startup exits
+with `DATA_ROOT_DATABASE_PATH_CONFLICT`.
 
 Operational recovery is cursor-driven: a disconnected or stale source is not
 live, recent gaps are reconciled before returning to `LIVE`, and unrecoverable

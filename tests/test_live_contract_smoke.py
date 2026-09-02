@@ -120,9 +120,10 @@ class LiveContractSmokeTests(unittest.TestCase):
     def test_backend_launcher_checks_config_and_returns_backend_exit(self):
         text = self._launcher(LAUNCHERS[0])
         self.assertIn("c0_c1_frozen_config.json", text)
-        self.assertIn("run_backend.py", text)
+        self.assertIn("run_windows_backend.py", text)
         self.assertIn("exit $BackendExitCode", text)
-        self.assertEqual(text.count("Tee-Object -FilePath $RunLogPath"), 1)
+        self.assertNotIn("data\\runtime", text)
+        self.assertNotIn("Tee-Object -FilePath $RunLogPath", text)
 
     def test_test_launcher_runs_all_offline_commands(self):
         text = self._launcher(LAUNCHERS[1])

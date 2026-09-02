@@ -32,12 +32,6 @@ if ($LASTEXITCODE -ne 0) {
     exit 30
 }
 
-$RuntimeDirectory = Join-Path $ProjectRoot "data\runtime"
-if (-not (Test-Path -LiteralPath $RuntimeDirectory -PathType Container)) {
-    New-Item -ItemType Directory -Path $RuntimeDirectory | Out-Null
-}
-
-$RunLogPath = Join-Path $RuntimeDirectory "backend-run.log"
-& $PythonPath ".\run_backend.py" 2>&1 | Tee-Object -FilePath $RunLogPath
+& $PythonPath ".\run_windows_backend.py"
 $BackendExitCode = $LASTEXITCODE
 exit $BackendExitCode

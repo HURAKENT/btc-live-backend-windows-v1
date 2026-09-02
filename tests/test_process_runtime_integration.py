@@ -77,6 +77,21 @@ class IntegrationEndpointContractTests(unittest.TestCase):
     def test_mode_without_endpoints_returns_exit_30(self):
         self.assertEqual(self._main(["--integration-test-mode"]), 30)
 
+    def test_rejected_startup_does_not_create_data_root(self):
+        data_root = self.root / "must-not-exist"
+
+        self.assertEqual(
+            self._main(
+                [
+                    "--data-root",
+                    str(data_root),
+                    "--integration-test-mode",
+                ]
+            ),
+            30,
+        )
+        self.assertFalse(data_root.exists())
+
     def test_relative_endpoints_path_returns_exit_30(self):
         self.assertEqual(
             self._main(
@@ -116,7 +131,12 @@ class IntegrationEndpointContractTests(unittest.TestCase):
                 new=AsyncMock(return_value=0),
             ).start()
             try:
-                self.assertEqual(run_backend.main([]), 0)
+                self.assertEqual(
+                    run_backend.main(
+                        ["--data-root", str(self.root / "runtime-data")]
+                    ),
+                    0,
+                )
                 runner.assert_awaited_once()
                 self.assertNotIn(
                     "integration_endpoints",

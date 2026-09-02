@@ -11,17 +11,21 @@ from tools import simulate_downtime
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DATABASE_PATH = (
-    PROJECT_ROOT / "data" / "runtime" / "btc_live_backend.sqlite3"
-)
 
 
 class RuntimePathTests(unittest.TestCase):
-    def test_no_argument_launch_preserves_exact_default_database_path(self):
-        self.assertEqual(
-            run_backend.resolve_database_path(None),
-            DEFAULT_DATABASE_PATH,
-        )
+    def test_data_root_cli_selects_derived_database_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data_root = Path(directory) / "external data root"
+            exit_code, backend_class = self._run_main(
+                ["--data-root", str(data_root)]
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                backend_class.call_args.kwargs["database_path"],
+                data_root / "runtime" / "btc_daily_range.sqlite3",
+            )
 
     def test_absolute_database_path_is_accepted(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -57,11 +61,11 @@ class RuntimePathTests(unittest.TestCase):
             ):
                 run_backend.resolve_database_path(str(path))
 
-    def test_parent_directory_is_created_safely(self):
+    def test_legacy_database_resolver_does_not_create_parent(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "nested" / "acceptance.sqlite3"
             resolved = run_backend.resolve_database_path(str(path))
-            self.assertTrue(resolved.parent.is_dir())
+            self.assertFalse(resolved.parent.exists())
             self.assertFalse(resolved.exists())
 
     def test_resolved_path_is_passed_to_backend_application(self):
@@ -106,13 +110,14 @@ class RuntimePathTests(unittest.TestCase):
             )
 
     def test_acceptance_tool_rejects_default_database(self):
+        default_database_path = run_backend.DEFAULT_DATABASE_PATH
         data_root = PROJECT_ROOT.parent / "acceptance-data"
         with self.assertRaisesRegex(
             simulate_downtime.AcceptanceBlocked,
             "BLOCKED_RUNTIME_PATH_CONTRACT",
         ):
             simulate_downtime.validate_acceptance_database_path(
-                DEFAULT_DATABASE_PATH,
+                default_database_path,
                 data_root,
             )
 
@@ -151,13 +156,14 @@ class RuntimePathTests(unittest.TestCase):
                 simulate_downtime.prepare_run_data_root(data_root)
 
     def test_default_database_is_unchanged_by_isolated_bootstrap(self):
-        before = simulate_downtime.path_fingerprint(DEFAULT_DATABASE_PATH)
+        default_database_path = run_backend.DEFAULT_DATABASE_PATH
+        before = simulate_downtime.path_fingerprint(default_database_path)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "acceptance.sqlite3"
             exit_code, _ = self._run_main(["--database-path", str(path)])
             self.assertEqual(exit_code, 0)
         self.assertEqual(
-            simulate_downtime.path_fingerprint(DEFAULT_DATABASE_PATH),
+            simulate_downtime.path_fingerprint(default_database_path),
             before,
         )
 

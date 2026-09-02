@@ -2,10 +2,14 @@
 
 ## Current objective
 
-Codex is the Operational Launch Manager for `btc_live_backend_windows_v1` on
-branch `codex/final-project-completion`. The active mode is:
+The canonical `btc_live_backend_windows_v1` checkout remains in operational
+mode:
 
 `NORMAL OPERATION / SIGNAL ONLY`
+
+Development changes must use an isolated worktree and must not mutate the
+canonical checkout, its running backend, its Task Scheduler definition, or its
+production data.
 
 The accepted backend must run permanently on Windows through the existing
 user-level Task Scheduler design. Normal lifecycle is:
@@ -15,6 +19,21 @@ user-level Task Scheduler design. Normal lifecycle is:
 Durable current authority lives in `docs/operation/OPERATIONAL_LAUNCH_STATE.md`,
 `docs/operation/OPERATIONAL_LAUNCH_DECISIONS.md`, and
 `docs/release/RELEASE_STATE.md`.
+
+## Development context and external data
+
+- The Git project tree is normal Codex context and may be inspected as needed.
+- Mutable runtime data lives under one configurable external `DATA_ROOT`; treat
+  that external directory as opaque by default and never recursively inspect
+  its database, backups, logs, or diagnostics.
+- Access external data only when it is material to the active task and current
+  permissions allow it. Current-runtime claims require fresh evidence.
+- Request any additional permissions once, up front, as one consolidated batch.
+- Active SQLite must remain on a local filesystem. OneDrive, other cloud-sync
+  directories, shared SQLite, UNC, SMB, and NFS paths are unsupported.
+- The Windows default is the local
+  `%USERPROFILE%\Documents\BTC Daily Range`; `--data-root` or
+  `BTC_DAILY_RANGE_DATA_ROOT` may configure another absolute local path.
 
 ## Operational rules
 

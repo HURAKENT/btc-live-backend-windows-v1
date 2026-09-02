@@ -109,6 +109,22 @@ class C9WindowsLauncherTests(unittest.TestCase):
             self.log_path.read_text(encoding="utf-8"),
         )
 
+    def test_rejected_startup_does_not_create_database_directory(self):
+        data_root = self.root / "must-not-exist"
+
+        exit_code = run_windows_backend.main(
+            [
+                "--data-root",
+                str(data_root),
+                "--log-path",
+                str(self.log_path.resolve()),
+                "--integration-test-mode",
+            ]
+        )
+
+        self.assertEqual(exit_code, 30)
+        self.assertFalse((data_root / "runtime").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
