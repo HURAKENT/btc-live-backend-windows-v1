@@ -19,7 +19,9 @@ PINNED_RUN = "20260814T205244105513Z"
 
 class PinnedAhrArtifactLoaderTests(unittest.TestCase):
     def test_rejects_acceptance_whose_bytes_do_not_match_the_pinned_hash(self) -> None:
-        source_run = PROJECT_ROOT / "reports" / "historical_revalidation" / PINNED_RUN
+        source_run = PinnedAhrArtifactLoader(
+            project_root=PROJECT_ROOT
+        )._resolve_run_dir()
         with tempfile.TemporaryDirectory() as temporary:
             run_dir = Path(temporary) / PINNED_RUN
             run_dir.mkdir()

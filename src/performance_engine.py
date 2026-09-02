@@ -10,6 +10,7 @@ from src.performance_historical import (
     HistoricalSettlementReconciler,
     PinnedAhrArtifactLoader,
 )
+from src.original_runtime_seed import OriginalRuntimeSeedLoader
 from src.performance_metrics import build_metrics, effective_observations_for_view
 from src.performance_models import (
     AggregateRevision,
@@ -22,7 +23,7 @@ from src.performance_models import (
     canonical_sha256,
     materialization_children_sha256,
 )
-from src.performance_repository import PerformanceRepository
+from src.performance_repository import PerformanceRepository, RepositoryWriteResult
 
 
 CALCULATION_VERSION = "PERFORMANCE_METRICS_V2"
@@ -52,6 +53,24 @@ class StrategyPerformanceEngine:
     def bootstrap_historical(
         self, *, as_of_date: date | str = "2026-08-15"
     ) -> HistoricalBootstrapResult:
+        seed = OriginalRuntimeSeedLoader(project_root=self.project_root).load()
+        self._validate_seed_schema(seed.expected_migration_version)
+        observation_results = self.repository.append_observation_batch(
+            seed.observations
+        )
+        return self._complete_historical_bootstrap(
+            observations=seed.observations,
+            resolutions=seed.resolutions,
+            observation_results=observation_results,
+            acceptance_sha256=seed.acceptance_sha256,
+            result_artifact_sha256=seed.result_artifact_sha256,
+            as_of_date=as_of_date,
+        )
+
+    def bootstrap_historical_from_ahr(
+        self, *, as_of_date: date | str = "2026-08-15"
+    ) -> HistoricalBootstrapResult:
+        """Explicit research/parity path using all pinned AHR source datasets."""
         bundle = PinnedAhrArtifactLoader(project_root=self.project_root).load()
         observations = HistoricalPerformanceObservationBuilder(
             project_root=self.project_root, bundle=bundle
@@ -67,19 +86,38 @@ class StrategyPerformanceEngine:
         resolutions = HistoricalSettlementReconciler(
             project_root=self.project_root, bundle=bundle
         ).reconcile(persisted)
+        return self._complete_historical_bootstrap(
+            observations=observations,
+            resolutions=resolutions,
+            observation_results=observation_results,
+            acceptance_sha256=bundle.acceptance_sha256,
+            result_artifact_sha256=bundle.result_artifact_sha256,
+            as_of_date=as_of_date,
+        )
+
+    def _complete_historical_bootstrap(
+        self,
+        *,
+        observations: Sequence[PerformanceObservation],
+        resolutions: Sequence[PerformanceResolution],
+        observation_results: Sequence[RepositoryWriteResult],
+        acceptance_sha256: str,
+        result_artifact_sha256: str,
+        as_of_date: date | str,
+    ) -> HistoricalBootstrapResult:
         first_key = observations[0].observation_key
         last_key = observations[-1].observation_key
         completed_at = _date_epoch_ms(max(row.market_date for row in observations))
         ingest = PerformanceIngestRun.create(
             ingest_run_key=canonical_identity(
                 "performance-ingest-historical",
-                {"acceptance_sha256": bundle.acceptance_sha256,
-                 "results_sha256": bundle.result_artifact_sha256},
+                {"acceptance_sha256": acceptance_sha256,
+                 "results_sha256": result_artifact_sha256},
             ),
             mode="HISTORICAL_BOOTSTRAP",
             source_artifact_class="PINNED_AHR_STRATEGY_RESULTS",
-            source_sha256=bundle.result_artifact_sha256,
-            acceptance_sha256=bundle.acceptance_sha256,
+            source_sha256=result_artifact_sha256,
+            acceptance_sha256=acceptance_sha256,
             source_schema_version="AHR_1_RESULT_RECORD_V1_V2",
             input_count=len(observations), inserted_count=len(observations),
             replayed_count=0,
@@ -107,6 +145,16 @@ class StrategyPerformanceEngine:
             materialization_inserted=materializations["inserted"],
             materialization_replayed=materializations["replayed"],
         )
+
+    def _validate_seed_schema(self, expected_migration_version: int) -> None:
+        actual = self.repository._connection.execute(
+            "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
+        ).fetchone()[0]
+        if actual != expected_migration_version:
+            raise ValueError(
+                f"ORIGINAL_RUNTIME_SEED_SCHEMA_INCOMPATIBLE:{actual}:"
+                f"{expected_migration_version}"
+            )
 
     def refresh_all(self, *, as_of_date: date | str) -> dict[str, int]:
         observations = self.repository.read_observations()

@@ -56,6 +56,15 @@ Historical C0–C1 is `COMPLETE`; the accepted Tasks 13–14 evidence remains
 preserved. Registry 47 stays available to historical/research replay and is
 separate from the production operational scheduler projection.
 
+Normal empty-database startup bootstraps the accepted ORIGINAL performance
+baseline from the immutable Git-controlled `ORIGINAL_RUNTIME_SEED_V1` under
+`strategy_sources/frozen/original_runtime_seed_v1/`. It does not read the nine
+machine-local AHR research datasets. Rebuilding or revalidating that seed is a
+separate explicit research operation and still requires the hash-pinned AHR
+run and all nine source datasets; see
+`docs/operation/ORIGINAL_RUNTIME_SEED_V1.md`. The external runtime `DATA_ROOT`
+remains mutable/local and never contains the frozen program seed.
+
 Historical C0-C11 evidence is retained. The historical 48-hour C11 protocol is
 `OPTIONAL / DEFERRED ENDURANCE TEST`, not a blocking operational gate. The next
 separate research task is `AUTONOMOUS HISTORICAL REVALIDATION`; it is not a
