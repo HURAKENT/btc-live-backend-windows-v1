@@ -122,10 +122,9 @@ class LiveContractSmokeTests(unittest.TestCase):
         self.assertIn("c0_c1_frozen_config.json", text)
         self.assertIn("run_windows_backend.py", text)
         self.assertIn("exit $BackendExitCode", text)
-        self.assertIn("data\\runtime\\btc_live_backend.sqlite3", text)
-        self.assertIn("data\\runtime\\backend.log", text)
-        self.assertIn('"--database-path" $DatabasePath', text)
-        self.assertIn('"--log-path" $LogPath', text)
+        self.assertNotIn("data\\runtime", text)
+        self.assertNotIn("--database-path", text)
+        self.assertNotIn("--log-path", text)
         self.assertNotIn("Tee-Object -FilePath $RunLogPath", text)
 
     def test_test_launcher_runs_all_offline_commands(self):

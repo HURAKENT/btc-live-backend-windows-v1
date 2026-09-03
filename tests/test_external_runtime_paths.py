@@ -269,37 +269,24 @@ class ExternalRuntimePathContractTests(unittest.TestCase):
         return exit_code, captured
 
 
-class WindowsTransitionalLauncherContractTests(unittest.TestCase):
-    def test_c9_launcher_pins_pre_a1_database_and_log(self):
+class WindowsExternalDataLauncherContractTests(unittest.TestCase):
+    def test_c9_launcher_uses_python_external_default_without_data_arguments(self):
         text = C9_LAUNCHER.read_text(encoding="utf-8")
 
-        self.assertIn(
-            '$DatabasePath = Join-Path $ProjectRoot "data\\runtime\\btc_live_backend.sqlite3"',
-            text,
-        )
-        self.assertIn(
-            '$LogPath = Join-Path $ProjectRoot "data\\runtime\\backend.log"',
-            text,
-        )
-        self.assertIn('"--database-path" $DatabasePath', text)
-        self.assertIn('"--log-path" $LogPath', text)
+        self.assertIn("run_windows_backend.py", text)
+        self.assertNotIn("data\\runtime", text)
+        self.assertNotIn("--database-path", text)
+        self.assertNotIn("--log-path", text)
 
-    def test_manual_launcher_matches_c9_transitional_paths_and_entrypoint(self):
+    def test_manual_launcher_matches_c9_external_default_entrypoint(self):
         c9_text = C9_LAUNCHER.read_text(encoding="utf-8")
         manual_text = MANUAL_LAUNCHER.read_text(encoding="utf-8")
 
         for text in (c9_text, manual_text):
             self.assertIn("run_windows_backend.py", text)
-            self.assertIn(
-                '$DatabasePath = Join-Path $ProjectRoot "data\\runtime\\btc_live_backend.sqlite3"',
-                text,
-            )
-            self.assertIn(
-                '$LogPath = Join-Path $ProjectRoot "data\\runtime\\backend.log"',
-                text,
-            )
-            self.assertIn('"--database-path" $DatabasePath', text)
-            self.assertIn('"--log-path" $LogPath', text)
+            self.assertNotIn("data\\runtime", text)
+            self.assertNotIn("--database-path", text)
+            self.assertNotIn("--log-path", text)
 
 
 if __name__ == "__main__":

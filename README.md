@@ -23,14 +23,13 @@ The shared path contract derives `runtime/btc_daily_range.sqlite3`, `backups`,
 `--data-root`, it must equal the derived database path or startup exits with
 `DATA_ROOT_DATABASE_PATH_CONFLICT`.
 
-Until the separate production cutover, `C9_RUN_BACKEND.ps1` and
-`RUN_BACKEND_SAFE.ps1` intentionally pass the existing repo-local
-`data/runtime/btc_live_backend.sqlite3` database and `data/runtime/backend.log`
-log explicitly. This makes the code safe to integrate without moving production
-state. Direct Python invocation still uses the external data-root contract. An
-explicit legacy `--database-path` overrides environment/default database
-selection; only an explicitly supplied `--data-root` enforces consistency with
-that database path.
+`C9_RUN_BACKEND.ps1` and `RUN_BACKEND_SAFE.ps1` use the Python-owned external
+data-root contract without repo-local database or log overrides. On Windows this
+selects `%USERPROFILE%\Documents\BTC Daily Range`, including
+`runtime\btc_daily_range.sqlite3` and `logs\backend.log`. An explicit legacy
+`--database-path` remains available for bounded recovery and overrides
+environment/default database selection; only an explicitly supplied
+`--data-root` enforces consistency with that database path.
 
 Operational recovery is cursor-driven: a disconnected or stale source is not
 live, recent gaps are reconciled before returning to `LIVE`, and unrecoverable
